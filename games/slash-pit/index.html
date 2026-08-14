@@ -234,3 +234,45 @@
     { r: "epic", name: "Ash Greaves", stat: "speed", v: 1.5 },
     { r: "epic", name: "Blink Dust", stat: "dodge", v: 0.28 }
   ];
+
+  /* speed relics were +px/s; now tile-units/s so values are scaled down */
+
+  let W = 390, H = 844, dpr = 1;
+  let TILE = 32, COLS = 11, ROWS = 15, mapX = 0, mapY = 0, mapW = 0, mapH = 0;
+  let MAP = [];
+  let THEME = null;
+  let phase = "title";
+  let room = 1;
+  let last = 0;
+  let shake = 0;
+  let flash = 0;
+  let banner = { t: 0, text: "" };
+  let toastT = 0;
+  let pid = 0;
+  let tick = 0;
+  let spawnTile = { x: 5.5, y: 12.5 };
+  let doorTile = { x: 5.5, y: 1.5 };
+
+  const player = {};
+  let enemies = [];
+  let gems = [];
+  let chest = null;
+  let exitGate = null;
+  let floats = [];
+  let parts = [];
+  let embers = [];
+  let recap = [];
+  let slots = { weapon: null, armor: null };
+  let titleMobs = [];
+  let tileCache = {};
+  let spr = {};
+  let torches = [];
+  let ghosts = [];
+  let lightCvs = null, lightCtx = null;
+
+  const ptr = { down: false, x: 0, y: 0, sx: 0, sy: 0, t: 0, id: null };
+
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function pick(a) { return a[(Math.random() * a.length) | 0]; }
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  function dist(ax, ay, bx, by) { return Math.hypot(ax - bx, ay - by); }
