@@ -643,6 +643,7 @@
   let doorTile = { x: 5.5, y: 1.5 };
   let combo = 0;
   let comboT = 0;
+  let comboPaid = 0;
   let muted = false;
   let audioCtx = null;
   let drone = null;
@@ -1855,6 +1856,7 @@
     gold = 0;
     combo = 0;
     comboT = 0;
+    comboPaid = 0;
     const wdef = START_WEAPONS.filter(function (w) { return w.id === unlocks.weapon; })[0] || START_WEAPONS[0];
     if (wdef && wdef.dmg) {
       player.dmg += wdef.dmg;
@@ -2420,7 +2422,8 @@
     if (ngPlus && n === 9) return "combat";
     if (n % 8 === 0) return "boss";
     if (n % 4 === 0) return "warden";
-    const busy = lastKind === "challenge" || lastKind === "shop" || lastKind === "event" || lastKind === "rest";
+    const busy = lastKind === "challenge" || lastKind === "shop" || lastKind === "event" || lastKind === "rest" || lastKind === "vault";
+    if (n >= 8 && !busy && rng() < 0.10) return "vault";
     if (n > 4 && !busy && rng() < 0.11) return "challenge";
     if (n > 3 && !busy && rng() < 0.10) return "rest";
     if (!hasMut("rich") && n > 3 && !busy && rng() < 0.18) return "shop";
@@ -2505,7 +2508,7 @@
       : (n === 1 ? { layout: "hall", theme: "ember" }
       : (roomKind === "heart" ? { layout: "arena", theme: "blood" }
       : (roomKind === "shop" || roomKind === "rest" ? { layout: "chamber" }
-      : (roomKind === "warden" || roomKind === "challenge" ? { layout: "arena" } : null)))));
+      : (roomKind === "warden" || roomKind === "challenge" || roomKind === "vault" ? { layout: "arena" } : null)))));
     buildMap(n, forced);
     player.x = spawnTile.x; player.y = spawnTile.y;
     player.tx = null; player.ty = null; player.dash = null;
@@ -2513,6 +2516,7 @@
     player.iframes = Math.max(player.iframes, n === 1 ? 1.05 : 0.85);
     player.vx = 0; player.vy = 0;
     combo = Math.min(combo, 3);
+    if (combo < 10) comboPaid = 0;
     if (familiar) { familiar.x = player.x - 0.65; familiar.y = player.y - 0.45; familiar.peck = Math.max(familiar.peck || 0, 0.4); }
     if (hasMut("glass") && (n >= 2 || ngPlus) && !player._glassApplied) {
       player.maxhp = Math.max(1, Math.round(player.maxhp * 0.5));
@@ -2598,6 +2602,23 @@
         banner = { t: 1.1, text: "ELITE" };
         startDrone();
       }
+    } else if (roomKind === "vault") {
+      phase = "fight";
+      const mid = clampToWalkable(COLS * 0.5, ROWS * 0.48);
+      chest = { x: mid.x, y: mid.y, open: false, t: 0, vault: true };
+      if (rng() < 0.4) {
+        const et = rng() < 0.5 ? "brute" : (depth >= 6 ? "knight" : (depth >= 2 ? "bat" : "brute"));
+        spawnEnemy(et, COLS * 0.5, ROWS * 0.34, false, true);
+      } else {
+        const plan = buildPack(n);
+        const count = Math.min(4, Math.max(2, plan.list.length - 1));
+        for (let i = 0; i < count; i++) {
+          const ang = -Math.PI / 2 + (i - (count - 1) / 2) * 0.95;
+          spawnEnemy(plan.list[i], COLS * 0.5 + Math.cos(ang) * 2.15, ROWS * 0.34 + Math.sin(ang) * 0.7, plan.fast, false);
+        }
+      }
+      banner = { t: 1.15, text: "VAULT" };
+      startDrone();
     } else if (roomKind === "challenge") {
       phase = "fight";
       challenge = { t: 20, wave: 0, next: 0.35, done: false };
@@ -2695,6 +2716,7 @@
     if (roomKind === "shop") ch = "S";
     else if (roomKind === "rest") ch = "R";
     else if (roomKind === "boss" || roomKind === "heart") ch = "B";
+    else if (roomKind === "vault") ch = "V";
     else if (roomKind === "event") {
       let elite = false;
       for (let i = 0; i < enemies.length; i++) if (enemies[i].elite) elite = true;
@@ -2902,7 +2924,7 @@
   function placeDeathGhost(n) {
     const g = lastGhost || loadGhost();
     if (!g || !g.gold || g.depth !== n) return;
-    if (roomKind === "shop" || roomKind === "boss" || roomKind === "warden" || roomKind === "challenge" || roomKind === "rest") return;
+    if (roomKind === "shop" || roomKind === "boss" || roomKind === "warden" || roomKind === "challenge" || roomKind === "rest" || roomKind === "vault") return;
     let x = COLS * 0.5, y = ROWS * 0.46;
     if ((g.seed >>> 0) === (runSeed >>> 0) && g.x) { x = g.x; y = g.y; }
     const e = spawnEnemy("shade", x, y, false, false);
@@ -3226,13 +3248,17 @@
       spawnGem(chest.x, chest.y - 0.45, makeItem(chest.epic ? "epic" : "rare"));
       burst(chest.x, chest.y, chest.epic ? "#d8b4fe" : "#fbbf24", 14);
       if (chest.epic) showToast("BOSS CHEST", "#d8b4fe");
+      else if (chest.vault) {
+        addGold(18 + depth * 3, chest.x, chest.y);
+        showToast("VAULT", "#fbbf24");
+      }
     }
     if (layoutId === "treasury") {
       spawnGem(COLS * 0.35, ROWS * 0.44, makeItem());
       spawnGem(COLS * 0.65, ROWS * 0.44, makeItem("common"));
       addGold(10 + depth, COLS * 0.5, ROWS * 0.4);
     }
-    const canBranch = depth >= 2 && roomKind !== "shop" && roomKind !== "event" && roomKind !== "rest" && roomKind !== "boss" && roomKind !== "heart" && rng() < 0.46;
+    const canBranch = depth >= 2 && roomKind !== "shop" && roomKind !== "event" && roomKind !== "rest" && roomKind !== "boss" && roomKind !== "heart" && roomKind !== "vault" && rng() < 0.46;
     if (canBranch) {
       const L = clampToWalkable(COLS * 0.28, Math.max(1.4, doorTile.y));
       const R = clampToWalkable(COLS * 0.72, Math.max(1.4, doorTile.y));
@@ -3246,7 +3272,8 @@
     }
     doorAnim = 0.55;
     let fell = "CLEAR";
-    if (roomKind === "warden") fell = "WARDEN FELLED";
+    if (roomKind === "vault") fell = "VAULT OPEN";
+    else if (roomKind === "warden") fell = "WARDEN FELLED";
     else if (roomKind === "boss") {
       fell = "LORD FELLED";
       if (lastBoss === "boneking") fell = "KING FELLED";
@@ -3401,7 +3428,7 @@
     player.flash = 0.18;
     screenFlash(0.12, src === "poison" ? "74,222,128" : src === "burn" ? "251,146,60" : "255,50,36");
     shake = Math.max(shake, 7);
-    combo = 0; comboT = 0;
+    combo = 0; comboT = 0; comboPaid = 0;
     sfx("hurt");
     vibe(28);
     if (src === "poison") applyStatus("poison", 3.2);
@@ -3456,7 +3483,19 @@
     combo += 1;
     comboT = 1.2;
     if (combo >= 10) unlockAch("combo10");
+    payCombo();
     syncHud();
+  }
+  function payCombo() {
+    const steps = [10, 25, 50];
+    const golds = [6, 12, 22];
+    for (let i = 0; i < steps.length; i++) {
+      if (combo < steps[i] || comboPaid >= steps[i]) continue;
+      comboPaid = steps[i];
+      addGold(golds[i] + ((depth / 4) | 0), player.x, player.y);
+      showToast("COMBO " + steps[i], "#fde68a", 0.7);
+      burst(player.x, player.y, "#fde68a", 8);
+    }
   }
 
   function slashDmg(crit) {
@@ -3523,6 +3562,7 @@
     screenFlash(0.12, "253,230,138");
     combo = 0;
     comboT = 0;
+    comboPaid = 0;
     syncHud();
     showToast("FINISHER", "#fde68a");
   }
@@ -5171,7 +5211,7 @@
     flash = Math.max(0, flash - dt * 3);
     if (comboT > 0) {
       comboT -= dt;
-      if (comboT <= 0) { combo = 0; syncHud(); }
+      if (comboT <= 0) { combo = 0; comboPaid = 0; syncHud(); }
     }
     const lowHp = player.maxhp && player.hp / player.maxhp < 0.3 && !player.dead &&
       (phase === "fight" || phase === "loot" || phase === "shop" || phase === "event");
@@ -6028,6 +6068,12 @@
   function drawChest() {
     if (!chest) return;
     footShadow(chest.x, chest.y, 0.7);
+    if (chest.vault && !chest.open) {
+      ctx.fillStyle = "rgba(251,191,36," + (0.16 + 0.1 * Math.sin(tick * 8)) + ")";
+      ctx.beginPath();
+      ctx.arc(sx(chest.x), sy(chest.y) - TILE * 0.18, TILE * 0.55, 0, Math.PI * 2);
+      ctx.fill();
+    }
     let s = spr.chestC;
     if (chest.open && chest.t > 0.2) s = spr.chestOpen;
     else if (chest.open) s = spr.chestO;
@@ -6508,7 +6554,7 @@
       const ch = hist[i];
       const last = i === hist.length - 1;
       ctx.fillStyle = last
-        ? (ch === "!" ? "#fda4af" : ch === "B" ? "#fb923c" : ch === "S" ? "#fbbf24" : ch === "R" ? "#86efac" : ch === "E" ? "#c4b5fd" : "#fde68a")
+        ? (ch === "!" ? "#fda4af" : ch === "B" ? "#fb923c" : ch === "S" || ch === "V" ? "#fbbf24" : ch === "R" ? "#86efac" : ch === "E" ? "#c4b5fd" : "#fde68a")
         : "#6a5a50";
       ctx.fillText(ch, x + pad + 5 + i * 10, y + mh - 3);
     }
