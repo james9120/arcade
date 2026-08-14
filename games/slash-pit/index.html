@@ -1015,7 +1015,7 @@
     soulTree.bought.push(id);
     saveTree(soulTree);
     showToast("SOUL · " + def.name.toUpperCase(), "#fde68a");
-    sfx("buy");
+    sfx("soul");
     renderTitle();
   }
   function loadAchs() {
@@ -1180,16 +1180,27 @@
     else if (name === "clang") beep(380, 0.06, "triangle", 0.05, 220);
     else if (name === "ping") { beep(980, 0.08, "square", 0.06, 1480); beep(1320, 0.05, "triangle", 0.045); }
     else if (name === "boom") { beep(80, 0.22, "sawtooth", 0.09, 40); beep(50, 0.28, "triangle", 0.06); }
+    else if (name === "leapsquat") beep(140, 0.11, "triangle", 0.045, 70);
+    else if (name === "leaphop") beep(180, 0.09, "square", 0.05, 340);
+    else if (name === "leapland") { beep(85, 0.12, "triangle", 0.06, 45); beep(130, 0.07, "sine", 0.04); }
+    else if (name === "vault") { beep(180, 0.08, "triangle", 0.06, 90); setTimeout(function () { beep(420, 0.07, "square", 0.05); }, 55); setTimeout(function () { beep(620, 0.1, "triangle", 0.05); }, 110); }
+    else if (name === "phase2") { beep(70, 0.28, "sawtooth", 0.08, 40); setTimeout(function () { beep(110, 0.16, "square", 0.06); }, 90); setTimeout(function () { beep(165, 0.22, "triangle", 0.055); }, 180); }
+    else if (name === "tick") beep(640, 0.028, "square", 0.035);
+    else if (name === "wheel") { beep(392, 0.07, "square", 0.055); setTimeout(function () { beep(494, 0.07, "square", 0.055); }, 60); setTimeout(function () { beep(587, 0.12, "triangle", 0.06); }, 120); }
+    else if (name === "combo10") { beep(330, 0.06, "square", 0.05); setTimeout(function () { beep(440, 0.08, "square", 0.05); }, 50); }
+    else if (name === "combo25") { beep(330, 0.05, "square", 0.05); setTimeout(function () { beep(440, 0.05, "square", 0.05); }, 45); setTimeout(function () { beep(554, 0.1, "triangle", 0.055); }, 90); }
+    else if (name === "combo50") { beep(330, 0.05, "square", 0.05); setTimeout(function () { beep(415, 0.05, "square", 0.05); }, 40); setTimeout(function () { beep(494, 0.05, "square", 0.05); }, 80); setTimeout(function () { beep(659, 0.14, "triangle", 0.06); }, 130); }
+    else if (name === "soul") { beep(247, 0.07, "sine", 0.05); setTimeout(function () { beep(370, 0.08, "triangle", 0.05); }, 55); setTimeout(function () { beep(494, 0.12, "sine", 0.045); }, 115); }
   }
   const MUSIC = {
-    ember: { bass: 110.00, lead: 220.00, notes: [0, 3, 7, 3, 0, 7, 10, 7] },
-    moss:  { bass: 98.00,  lead: 196.00, notes: [0, 2, 7, 2, 0, 5, 9, 5] },
-    blood: { bass: 146.83, lead: 293.66, notes: [0, 3, 5, 7, 5, 3, 0, 7] },
-    ash:   { bass: 87.31,  lead: 174.61, notes: [0, 2, 5, 7, 5, 2, 0, 10] },
-    hell:  { bass: 82.41,  lead: 164.81, notes: [0, 1, 4, 7, 4, 1, 0, 8] },
-    ice:   { bass: 130.81, lead: 261.63, notes: [0, 4, 7, 11, 7, 4, 0, 9] },
-    void:  { bass: 73.42,  lead: 146.83, notes: [0, 1, 6, 7, 6, 1, 0, 13] },
-    mire:  { bass: 92.50,  lead: 185.00, notes: [0, 3, 5, 3, 0, 7, 10, 5] }
+    ember: { bass: 110.00, lead: 220.00, notes: [0, 3, 7, 3, 0, 7, 10, 7], pad: [0, 7, 3, 10] },
+    moss:  { bass: 98.00,  lead: 196.00, notes: [0, 2, 7, 2, 0, 5, 9, 5], pad: [0, 5, 2, 9] },
+    blood: { bass: 146.83, lead: 293.66, notes: [0, 3, 5, 7, 5, 3, 0, 7], pad: [0, 7, 5, 3] },
+    ash:   { bass: 87.31,  lead: 174.61, notes: [0, 2, 5, 7, 5, 2, 0, 10], pad: [0, 5, 2, 10] },
+    hell:  { bass: 82.41,  lead: 164.81, notes: [0, 1, 4, 7, 4, 1, 0, 8], pad: [0, 4, 1, 8] },
+    ice:   { bass: 130.81, lead: 261.63, notes: [0, 4, 7, 11, 7, 4, 0, 9], pad: [12, 16, 19, 11] },
+    void:  { bass: 73.42,  lead: 146.83, notes: [0, 1, 6, 7, 6, 1, 0, 13], pad: [0, 1, 6, -1] },
+    mire:  { bass: 92.50,  lead: 185.00, notes: [0, 3, 5, 3, 0, 7, 10, 5], pad: [-5, -2, 0, 3] }
   };
   function startDrone() {
     stopDrone();
@@ -1218,7 +1229,14 @@
     arp.frequency.value = tune.lead * 1.5;
     arpG.gain.value = 0.001;
     arp.connect(arpG); arpG.connect(master);
-    bass.start(); lead.start(); arp.start();
+    const pad = ac.createOscillator();
+    const padG = ac.createGain();
+    const biome = (THEME && THEME._name) || "ember";
+    pad.type = biome === "ice" ? "triangle" : (biome === "void" || biome === "mire" ? "sine" : "triangle");
+    pad.frequency.value = Math.max(55, tune.bass);
+    padG.gain.value = 0.001;
+    pad.connect(padG); padG.connect(master);
+    bass.start(); lead.start(); arp.start(); pad.start();
     let step = 0;
     const stepMs = 280;
     function tickMusic() {
@@ -1242,10 +1260,20 @@
         arpG.gain.setValueAtTime(0.08, t);
         arpG.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
       }
+      if (step % 4 === 2) {
+        const pads = tune.pad || [0, 7, 3, 10];
+        const pn = pads[(step / 4 | 0) % pads.length];
+        const pf = Math.max(55, tune.bass * Math.pow(2, pn / 12));
+        pad.frequency.setValueAtTime(pf, t);
+        padG.gain.cancelScheduledValues(t);
+        const pv = biome === "ice" ? 0.10 : (biome === "void" ? 0.07 : (biome === "mire" ? 0.09 : 0.06));
+        padG.gain.setValueAtTime(pv, t);
+        padG.gain.exponentialRampToValueAtTime(0.001, t + (biome === "mire" ? 0.44 : (biome === "void" ? 0.36 : 0.24)));
+      }
       step++;
       drone.timer = setTimeout(tickMusic, stepMs);
     }
-    drone = { o: bass, o2: lead, o3: arp, g: master, alive: true, timer: null };
+    drone = { o: bass, o2: lead, o3: arp, o4: pad, g: master, alive: true, timer: null };
     tickMusic();
   }
   function stopDrone() {
@@ -1255,6 +1283,7 @@
     try { drone.o.stop(); } catch (e) {}
     try { if (drone.o2) drone.o2.stop(); } catch (e) {}
     try { if (drone.o3) drone.o3.stop(); } catch (e) {}
+    try { if (drone.o4) drone.o4.stop(); } catch (e) {}
     drone = null;
   }
   function toggleMute(silent) {
@@ -2309,7 +2338,7 @@
     shake = Math.max(shake, 10);
     screenFlash(0.16, "253,230,138");
     burst(e.x, e.y, "#fde68a", 16);
-    sfx("boom");
+    sfx("phase2");
     return true;
   }
   function maybeBossPhase(e) {
@@ -3269,6 +3298,7 @@
     } else {
       applyItem(makeItem("epic"));
     }
+    sfx("wheel");
     burst(wheel.x, wheel.y, id === "curse" ? "#a78bfa" : "#fde68a", 16);
     exitGate = { x: doorTile.x, y: doorTile.y };
     doorAnim = 0.55;
@@ -3277,8 +3307,13 @@
   function tickWheel(dt) {
     if (!wheel || !wheel.spinning) return;
     const TAU = Math.PI * 2;
+    const prev = wheel.ang;
     wheel.ang += wheel.vel * dt;
     wheel.vel *= Math.exp(-2.35 * dt);
+    const segs = 8;
+    const a0 = ((-prev) % TAU + TAU) % TAU;
+    const a1 = ((-wheel.ang) % TAU + TAU) % TAU;
+    if (((a0 / (TAU / segs)) | 0) !== ((a1 / (TAU / segs)) | 0)) sfx("tick");
     if (wheel.vel < 0.55) {
       wheel.vel = 0;
       wheel.spinning = false;
@@ -3335,6 +3370,7 @@
       else if (chest.vault) {
         addGold(18 + depth * 3, chest.x, chest.y);
         showToast("VAULT", "#fbbf24");
+        sfx("vault");
       }
     }
     if (layoutId === "treasury") {
@@ -3580,6 +3616,7 @@
       addGold(golds[i] + ((depth / 4) | 0), player.x, player.y);
       showToast("COMBO " + steps[i], "#fde68a", 0.7);
       burst(player.x, player.y, "#fde68a", 8);
+      sfx(steps[i] === 50 ? "combo50" : steps[i] === 25 ? "combo25" : "combo10");
     }
   }
 
@@ -5223,7 +5260,7 @@
           burst(e.x, e.y, "#4ade80", 11);
           shake = Math.max(shake, 4);
           puddles.push({ x: e.x, y: e.y, t: 1.35, r: 0.72, tick: 0.2, kind: "mire" });
-          beep(90, 0.08, "triangle", 0.05);
+          sfx("leapland");
           if (dist(player.x, player.y, e.x, e.y) < 0.95 + player.r) {
             hurtPlayer(e.dmg, player.x - e.x, player.y - e.y, foeCause(e));
           }
@@ -5245,6 +5282,7 @@
           e.hopFromX = e.x; e.hopFromY = e.y;
           e.hopToX = dest.x; e.hopToY = dest.y;
           e.hopDur = 0.34; e.hopT = 0.34; e.hopH = 0;
+          sfx("leaphop");
         }
         resolve(e);
         return;
@@ -5258,6 +5296,7 @@
         const hd = Math.hypot(tx - e.x, ty - e.y) || 1;
         if (hd > 3.2) { tx = e.x + (tx - e.x) / hd * 3.2; ty = e.y + (ty - e.y) / hd * 3.2; }
         e.hopMark = { x: tx, y: ty };
+        sfx("leapsquat");
       }
       resolve(e);
       return;
