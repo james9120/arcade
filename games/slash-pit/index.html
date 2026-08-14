@@ -281,6 +281,17 @@
   const BEST_KEY = "slashpit-best";
   const UNLOCK_KEY = "slashpit-unlocks";
   const MUTE_KEY = "slashpit-mute";
+  const ACH_KEY = "slashpit-achs";
+  const ACH_DEFS = [
+    { id: "firstkill", name: "First Blood" },
+    { id: "depth8", name: "Pit Depths" },
+    { id: "depth16", name: "Deep Dark" },
+    { id: "shopspend", name: "Big Spender" },
+    { id: "elite", name: "Elite Slayer" },
+    { id: "secret", name: "Crack Rat" },
+    { id: "combo10", name: "x10 Frenzy" },
+    { id: "ngplus", name: "Deeper Still" }
+  ];
 
   const RARITY = {
     junk:   { w: 40, label: "JUNK",   color: "#c4c0b8" },
@@ -300,7 +311,9 @@
     { r: "rare", name: "Widow Blade", dmg: 13 },
     { r: "epic", name: "Hellfang", dmg: 18 },
     { r: "epic", name: "Soul Reaver", dmg: 16 },
-    { r: "epic", name: "Ash Reaper", dmg: 17 }
+    { r: "epic", name: "Ash Reaper", dmg: 17 },
+    { r: "rare", name: "Tide Cutter", dmg: 10, onSlash: "wave" },
+    { r: "epic", name: "Grave Hook", dmg: 19 }
   ];
   const ARMORS = [
     { r: "junk", name: "Rag Wrap", hp: 8 },
@@ -314,7 +327,9 @@
     { r: "rare", name: "Scale Guard", hp: 26 },
     { r: "epic", name: "Pit Carapace", hp: 45 },
     { r: "epic", name: "Infernal Shell", hp: 42 },
-    { r: "epic", name: "Void Mail", hp: 40 }
+    { r: "epic", name: "Void Mail", hp: 40 },
+    { r: "rare", name: "Witch Veil", hp: 24 },
+    { r: "epic", name: "Bone Cage", hp: 48 }
   ];
   const RELICS = [
     { r: "junk", name: "Frayed Charm", stat: "crit", v: 0.03 },
@@ -329,7 +344,9 @@
     { r: "epic", name: "Pit Crown", stat: "crit", v: 0.12 },
     { r: "epic", name: "Void Heart", stat: "leech", v: 0.16 },
     { r: "epic", name: "Ash Greaves", stat: "speed", v: 1.5 },
-    { r: "epic", name: "Blink Dust", stat: "dodge", v: 0.28 }
+    { r: "epic", name: "Blink Dust", stat: "dodge", v: 0.28 },
+    { r: "rare", name: "Cinder Fuse", stat: "dodge", v: 0.12, onDodge: "bomb" },
+    { r: "epic", name: "Hex Coin", stat: "crit", v: 0.09 }
   ];
   const START_RELICS = [
     { id: "leech", name: "Leech Fang", need: 4, cost: 18, stat: "leech", v: 0.08, desc: "+8% leech", r: "common" },
@@ -373,6 +390,7 @@
   let ngPlus = false;
   let layoutId = "hall";
   let lastKind = "combat";
+  let lastBoss = "boss";
   let setFlags = { junk: false, common: false, rare: false, epic: false };
 
   const player = {};
@@ -396,6 +414,12 @@
   let ghosts = [];
   let lightCvs = null, lightCtx = null;
   let roomKind = "combat";
+  let secret = null;
+  let puddles = [];
+  let bombs = [];
+  let bloodStains = [];
+  let hitstop = 0;
+  let flashCol = "255,50,36";
 
   const ptr = { down: false, x: 0, y: 0, sx: 0, sy: 0, t: 0, id: null };
   const pad = { x: 0, y: 0, id: null, a: false, b: false };
@@ -466,6 +490,34 @@
     try { localStorage.setItem(UNLOCK_KEY, JSON.stringify(u)); } catch (e) {}
   }
   let unlocks = loadUnlocks();
+  function loadAchs() {
+    try {
+      const raw = localStorage.getItem(ACH_KEY);
+      if (!raw) return {};
+      const o = JSON.parse(raw);
+      return o && typeof o === "object" ? o : {};
+    } catch (e) { return {}; }
+  }
+  function saveAchs() {
+    try { localStorage.setItem(ACH_KEY, JSON.stringify(achs)); } catch (e) {}
+  }
+  function achCount() {
+    let n = 0;
+    ACH_DEFS.forEach(function (a) { if (achs[a.id]) n++; });
+    return n;
+  }
+  function unlockAch(id) {
+    if (achs[id]) return;
+    let def = null;
+    for (let i = 0; i < ACH_DEFS.length; i++) if (ACH_DEFS[i].id === id) def = ACH_DEFS[i];
+    if (!def) return;
+    achs[id] = 1;
+    saveAchs();
+    const toast = function () { showToast("ACHIEVEMENT · " + def.name, "#fde68a"); sfx("clear"); };
+    if (toastT > 0) setTimeout(toast, 1450);
+    else toast();
+  }
+  let achs = loadAchs();
 
   function relicUnlocked(id) {
     const def = START_RELICS.filter(function (r) { return r.id === id; })[0];
@@ -811,6 +863,18 @@
     ], 32);
     spr.boss = bake(bossIdle);
     spr.bossSlam = bake(bossSlam);
+    spr.boneking = bake(padBottom([
+      "......y.y..........y.y..........",".....kykyk........kykyk.........","......kiiiiiiiiiiiik............",".....kiihhhhhhhhhiik............",".....kiihww.hww.hiik............",".....kiihhhhhhhhhiik............","......kiiiqqqqqiiik.............",".....kkiiiiiiiiiiikk............","....kSSkiiiiiiiiikSSk...........","....kSSiiiiiiiiiiiSSk...........",".....kkiiiiiiiiiiikk............","......kiiiiiiiiiiik.............","......kiiiiikkiiiik.............",".....kSSSSk..kSSSSk.............",".....kSSSSk..kSSSSk.............","......kkkkk..kkkkk..............","......kiiik..kiiik..............","......kkkkk..kkkkk.............."
+    ], 24));
+    spr.bonekingSlam = bake(padBottom([
+      "..y.y..................y.y......",".kykyk................kykyk.....","..kiiiiiiiiiiiiiiiiiiiik........",".kiihhhhhhhhhhhhhhhhhiik........",".kiihww.qq.hww.qq.hiik..........",".kiihhhhhhhhhhhhhhhhhiik........","..kiiiiiiiiiiiiiiiiiiik.........","...kkiiiiiiiiiiiiiiikk..........","....kSSkiiiiiiiiikSSk...........","....kSSiiiiiiiiiiiSSk...........",".....kkiiiiiiiiiiikk............","......kiiiiiiiiiiik.............","......kiiiikkiiiiik.............",".....kSSSk....kSSSk.............",".....kSSSk....kSSSk.............","......kkk......kkk.............."
+    ], 24));
+    spr.ashwitch = bake([
+      "................",".....kBBk.......","....kBBBBk......","....kBwwBk......","....kBBBBk......",".....kBBk.f.....","....kksskkF.....","...kBssssBk.....","...kBssssBk.f...","....kssssk.F....",".....ko.ok......",".....k...k......",".....kk.kk......","................","................","................"
+    ]);
+    spr.ashwitchCast = bake([
+      "................","....fkBBkf......","...F.kBBBk.F....","....kBwwBk......","....kBBBBk......","...fkBBkf.......","....kksskk......","...kBssssBk.....","..fkBssssBkf....","..F.kssssk.F....",".....ko.ok......",".....k...k......",".....kk.kk......","................","................","................"
+    ]);
   }
 
   const THEMES = {
@@ -1145,7 +1209,8 @@
       iframes: 1.0, vx: 0, vy: 0, face: 0,
       dash: null, flash: 0, dead: false, walkT: 0, flip: false,
       charging: false, chargeT: 0, chargeReady: false, heavy: 0,
-      epicPulse: false, epicPulseT: 0
+      epicPulse: false, epicPulseT: 0,
+      poison: 0, burn: 0, slow: 0, poisonTick: 0, burnTick: 0, cursed: false
     });
     slots = { weapon: null, armor: null, relic: null };
     setFlags = { junk: false, common: false, rare: false, epic: false };
@@ -1199,6 +1264,8 @@
 
   function itemBonus(it) {
     if (it.kind === "flask") return "heal " + it.heal + " hp";
+    if (it.onSlash === "wave") return "+" + it.dmg + " dmg · WAVE";
+    if (it.onDodge === "bomb") return "dodge bomb";
     if (it.kind === "weapon") return "+" + it.dmg + " dmg";
     if (it.kind === "armor") return "+" + it.hp + " hp";
     if (it.stat === "speed") return "+" + it.v + " spd";
@@ -1279,6 +1346,61 @@
     toastEl.classList.add("show");
     toastT = 1.4;
   }
+  function screenFlash(t, rgb) {
+    flash = t;
+    flashCol = rgb || "255,50,36";
+  }
+  function isBossType(t) {
+    return t === "boss" || t === "boneking" || t === "ashwitch";
+  }
+  function bossTypeFor(n) {
+    const i = Math.max(0, ((n / 8) | 0) - 1) % 3;
+    return i === 0 ? "boss" : i === 1 ? "boneking" : "ashwitch";
+  }
+  function bossTitle(t) {
+    return t === "boneking" ? "BONE KING" : t === "ashwitch" ? "ASH WITCH" : "PIT LORD";
+  }
+  function applyStatus(kind, dur) {
+    if (depth === 1 || player.dead) return;
+    if (kind === "poison") player.poison = Math.max(player.poison || 0, dur);
+    else if (kind === "burn") player.burn = Math.max(player.burn || 0, dur);
+    else if (kind === "slow") player.slow = Math.max(player.slow || 0, dur);
+  }
+  function tickDot(kind) {
+    if (player.dead) return;
+    const dmg = kind === "poison" ? 3 : 4;
+    player.hp -= dmg;
+    screenFlash(0.08, kind === "poison" ? "74,222,128" : "251,146,60");
+    floats.push({ x: player.x, y: player.y - 0.7, t: 0.55, text: "" + dmg, col: kind === "poison" ? "#4ade80" : "#fb923c" });
+    if (player.hp <= 0) { player.hp = 0; player.dead = true; dieRun(); }
+    syncHud();
+  }
+  function fireSlashWave() {
+    if (!slots.weapon || slots.weapon.onSlash !== "wave") return;
+    const fx = Math.cos(player.face || 0), fy = Math.sin(player.face || 0);
+    shots.push({
+      x: player.x + fx * 0.45, y: player.y + fy * 0.45,
+      vx: fx * 7.2, vy: fy * 7.2,
+      dmg: Math.max(4, (player.dmg * 0.48) | 0),
+      life: 0.42, friendly: true, wave: true
+    });
+  }
+  function dropDodgeBomb() {
+    if (!slots.relic || slots.relic.onDodge !== "bomb") return;
+    bombs.push({
+      x: player.x, y: player.y, t: 0.4,
+      r: 1.55, dmg: Math.max(8, (player.dmg * 0.7) | 0)
+    });
+  }
+  function bloodBurst(x, y, n) {
+    const cols = ["#7f1d1d", "#9b1d20", "#450a0a", "#dc2626"];
+    for (let i = 0; i < n; i++) {
+      const a = rnd(0, Math.PI * 2);
+      const sp = rnd(1.4, 5.2);
+      parts.push({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.6, t: rnd(0.35, 0.7), col: cols[i % cols.length], r: rnd(1.4, 3.1) });
+    }
+    bloodStains.push({ x: x, y: y, t: 11, v: ((x * 97 + y * 53) | 0) });
+  }
 
   function spawnGem(x, y, item) {
     const c = clampToWalkable(x, y);
@@ -1322,14 +1444,16 @@
     if (type === "mimic") return { type: "mimic", hp: 70, dmg: 16, speed: 1.55, r: 0.5, cr: 0.34, range: 0.9, cd: 0.95 };
     if (type === "warden") return { type: "warden", hp: 120, dmg: 18, speed: 1.2, r: 0.64, cr: 0.4, range: 1.12, cd: 1.18, slam: 2.6 };
     const cycle = Math.max(1, (depth / 8) | 0);
+    if (type === "boneking") return { type: "boneking", hp: 200 + (cycle - 1) * 70, dmg: 20 + (cycle - 1) * 3, speed: 1.38 + (cycle - 1) * 0.06, r: 0.76, cr: 0.46, range: 1.1, cd: 1.08, slam: 3.1 };
+    if (type === "ashwitch") return { type: "ashwitch", hp: 165 + (cycle - 1) * 60, dmg: 17 + (cycle - 1) * 3, speed: 1.62, r: 0.48, cr: 0.3, range: 2.55, cd: 1.15 };
     return { type: "boss", hp: 220 + (cycle - 1) * 85, dmg: 22 + (cycle - 1) * 4, speed: 1.48 + (cycle - 1) * 0.07, r: 0.82, cr: 0.48, range: 1.18, cd: 1.05, slam: 3 };
   }
 
   function spawnEnemy(type, x, y, fast, elite) {
     const d = enemyDef(type);
     const c = clampToWalkable(x, y);
-    const scale = type === "boss" || depth === 1 ? 1 : (1 + (depth - 1) * 0.07);
-    const spdScale = type === "boss" || depth === 1 ? 1 : Math.min(1.55, 1 + (depth - 1) * 0.028);
+    const scale = isBossType(type) || depth === 1 ? 1 : (1 + (depth - 1) * 0.07);
+    const spdScale = isBossType(type) || depth === 1 ? 1 : Math.min(1.55, 1 + (depth - 1) * 0.028);
     const e = Object.assign({}, d, {
       x: c.x, y: c.y,
       hp: Math.round(d.hp * scale * (elite ? 2.15 : 1) * (ngPlus ? 1.2 : 1)),
@@ -1337,7 +1461,8 @@
       speed: d.speed * spdScale * (fast ? 1.2 : 1) * (depth === 1 ? 0.72 : 1),
       atk: 0, wind: 0, flash: 0, slamT: d.slam || 0, slam: null,
       bob: rnd(0, 6.2), flip: false, face: 0, vuln: 0, boom: 0,
-      elite: !!elite, swoopT: 0, sx: c.x, sy: c.y
+      elite: !!elite, swoopT: 0, sx: c.x, sy: c.y,
+      burn: 0, burnTick: 0, summonT: 2.8, teleT: 2.4, casting: false
     });
     e.maxhp = e.hp;
     if (depth === 1 && type === "slime") { e.hp = e.maxhp = 18; e.dmg = 6; e.speed = 1.35; }
@@ -1384,6 +1509,9 @@
     exitGate = null;
     enemies = [];
     gems = [];
+    secret = null;
+    puddles = [];
+    bombs = [];
     roomKind = decideKind(n);
     lastKind = roomKind;
     const forced = n === 1 ? { layout: "hall", theme: "ember" }
@@ -1409,11 +1537,13 @@
         phase = "event";
         const a = clampToWalkable(COLS * 0.32, ROWS * 0.48);
         const b = clampToWalkable(COLS * 0.68, ROWS * 0.48);
+        const c = clampToWalkable(COLS * 0.5, ROWS * 0.64);
         shrine = {
           used: false, sel: 0,
           opts: [
             { id: "heal", name: "HEAL", x: a.x, y: a.y },
-            { id: "gamble", name: "GAMBLE", x: b.x, y: b.y }
+            { id: "gamble", name: "GAMBLE", x: b.x, y: b.y },
+            { id: "curse", name: "CURSE", x: c.x, y: c.y }
           ]
         };
         exitGate = { x: doorTile.x, y: doorTile.y };
@@ -1440,8 +1570,10 @@
       startDrone();
     } else if (roomKind === "boss") {
       phase = "fight";
-      spawnEnemy("boss", COLS * 0.5, ROWS * 0.42, false, false);
-      banner = { t: 1.25, text: "PIT LORD" };
+      const bt = bossTypeFor(n);
+      lastBoss = bt;
+      spawnEnemy(bt, COLS * 0.5, ROWS * 0.42, false, false);
+      banner = { t: 1.25, text: bossTitle(bt) };
       startDrone();
     } else {
       phase = "fight";
@@ -1465,7 +1597,66 @@
         addGold(6 + ((n / 2) | 0), COLS * 0.5, ROWS * 0.52);
       }
     }
+    placeSecret();
+    if (n >= 8) unlockAch("depth8");
+    if (n >= 16) unlockAch("depth16");
     syncHud();
+  }
+
+  function placeSecret() {
+    secret = null;
+    if (depth === 1 || roomKind === "shop") return;
+    if (rng() > 0.34) return;
+    const cands = [];
+    for (let ty = 0; ty < ROWS; ty++) {
+      for (let tx = 0; tx < COLS; tx++) {
+        const ch = MAP[ty][tx];
+        if (ch !== "#" && ch !== "*") continue;
+        const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+        for (let i = 0; i < dirs.length; i++) {
+          const nx = tx + dirs[i][0], ny = ty + dirs[i][1];
+          if (ny < 0 || ny >= ROWS || nx < 0 || nx >= COLS) continue;
+          const nch = MAP[ny][nx];
+          if (isSolidChar(nch) || nch === "D" || nch === "S") continue;
+          cands.push({ tx: tx, ty: ty });
+          break;
+        }
+      }
+    }
+    if (!cands.length) return;
+    const inner = cands.filter(function (c) {
+      return MAP[c.ty][c.tx] === "#" && c.tx > 0 && c.ty > 0 && c.tx < COLS - 1 && c.ty < ROWS - 1;
+    });
+    const pool = inner.length ? inner : cands;
+    const c = pool[(rng() * pool.length) | 0];
+    secret = { tx: c.tx, ty: c.ty, opened: false };
+  }
+  function openSecret() {
+    if (!secret || secret.opened) return;
+    secret.opened = true;
+    MAP[secret.ty][secret.tx] = ".";
+    const px = secret.tx + 0.5, py = secret.ty + 0.5;
+    burst(px, py, "#d8b4fe", 14);
+    sfx("pickup");
+    showToast("SECRET", "#d8b4fe");
+    if (rng() < 0.48) {
+      const want = depth >= 8 ? "rare" : "common";
+      const pool = RELICS.filter(function (r) { return r.r === want; });
+      const base = spick(pool.length ? pool : RELICS);
+      spawnGem(px, py, Object.assign({ kind: "relic", rarity: base.r }, base));
+    } else addGold(12 + depth * 2, px, py);
+    unlockAch("secret");
+  }
+  function tryCrackSecret() {
+    if (!secret || secret.opened) return false;
+    const dx = (secret.tx + 0.5) - player.x;
+    const dy = (secret.ty + 0.5) - player.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 1.9) return false;
+    const fx = Math.cos(player.face || 0), fy = Math.sin(player.face || 0);
+    if (d > 0.05 && (dx * fx + dy * fy) / d < 0.08) return false;
+    openSecret();
+    return true;
   }
 
   function openShop() {
@@ -1504,6 +1695,7 @@
     gold -= g.price;
     g.bought = true;
     applyItem(g.item);
+    unlockAch("shopspend");
     sfx("buy");
     burst(g.x, g.y, "#fbbf24", 10);
     syncHud();
@@ -1519,6 +1711,12 @@
       player.hp = Math.min(player.maxhp, player.hp + add);
       showToast("SHRINE HEALS +" + add, "#86efac");
       sfx("pickup");
+    } else if (id === "curse") {
+      player.cursed = true;
+      applyItem(makeItem("epic"));
+      showToast("CURSED · EPIC", "#d8b4fe");
+      sfx("hurt");
+      screenFlash(0.16, "168,85,247");
     } else {
       const cost = Math.max(8, Math.round(player.maxhp * 0.2));
       player.hp = Math.max(1, player.hp - cost);
@@ -1561,7 +1759,15 @@
       addGold(10 + depth, COLS * 0.5, ROWS * 0.4);
     }
     exitGate = { x: doorTile.x, y: doorTile.y };
-    banner = { t: 0.7, text: roomKind === "boss" ? "LORD FELLED" : roomKind === "warden" ? "WARDEN FELLED" : "CLEAR" };
+    let fell = "CLEAR";
+    if (roomKind === "warden") fell = "WARDEN FELLED";
+    else if (roomKind === "boss") {
+      const live = enemies[0];
+      fell = "LORD FELLED";
+      if (lastBoss === "boneking") fell = "KING FELLED";
+      else if (lastBoss === "ashwitch") fell = "WITCH FELLED";
+    }
+    banner = { t: 0.7, text: fell };
   }
 
   function nextRoom() {
@@ -1578,7 +1784,7 @@
     if (e.type === "bomber") base = 7;
     if (e.type === "mimic") base = 18;
     if (e.type === "warden") base = 24;
-    if (e.type === "boss") base = 42;
+    if (e.type === "boss" || e.type === "boneking" || e.type === "ashwitch") base = 42;
     base = Math.round(base * (1 + depth * 0.08));
     if (e.elite) base = Math.round(base * 3);
     return Math.max(1, (base * (0.7 + rng() * 0.6)) | 0);
@@ -1588,11 +1794,11 @@
     const rad = 1.85;
     burst(e.x, e.y, "#fb923c", 18);
     shake = Math.max(shake, 9);
-    flash = 0.14;
+    screenFlash(0.14, "251,146,60");
     sfx("boom");
     floats.push({ x: e.x, y: e.y - 0.4, t: 0.7, text: "BOOM", col: "#fb923c" });
     if (dist(player.x, player.y, e.x, e.y) < rad + player.r) {
-      hurtPlayer(Math.round(12 + depth * 0.6), player.x - e.x, player.y - e.y);
+      hurtPlayer(Math.round(12 + depth * 0.6), player.x - e.x, player.y - e.y, "poison");
     }
     enemies.forEach(function (o) {
       if (o === e || o.hp <= 0) return;
@@ -1618,20 +1824,23 @@
       floats.push({ x: e.x, y: e.y - 0.5, t: 0.6, text: "!", col: "#fb923c" });
       return;
     }
-    const col = e.type === "slime" ? "#4ade80" : e.type === "bat" ? "#a78bfa" : e.type === "spitter" ? "#2dd4bf" : e.type === "knight" || e.type === "warden" ? "#cbd5e1" : e.type === "bomber" ? "#fb923c" : e.type === "mimic" ? "#fbbf24" : e.type === "brute" ? "#c2410c" : "#9b1d20";
-    burst(e.x, e.y, col, e.type === "boss" ? 22 : 12);
+    const col = e.type === "slime" ? "#4ade80" : e.type === "bat" ? "#a78bfa" : e.type === "spitter" ? "#2dd4bf" : e.type === "knight" || e.type === "warden" ? "#cbd5e1" : e.type === "bomber" ? "#fb923c" : e.type === "mimic" ? "#fbbf24" : e.type === "brute" ? "#c2410c" : e.type === "ashwitch" ? "#fb923c" : e.type === "boneking" ? "#e2e8f0" : "#9b1d20";
+    burst(e.x, e.y, col, isBossType(e.type) ? 22 : 12);
+    bloodBurst(e.x, e.y, isBossType(e.type) ? 18 : 10);
     floats.push({ x: e.x, y: e.y - 0.4, t: 0.7, text: "POP", col: "#ffe8a3" });
-    shake = Math.max(shake, e.type === "boss" ? 10 : 5);
+    shake = Math.max(shake, isBossType(e.type) ? 10 : 5);
     addGold(goldFor(e), e.x, e.y);
+    unlockAch("firstkill");
     if (e.elite) {
       spawnGem(e.x, e.y - 0.3, makeItem("rare"));
       showToast("ELITE DROP", "#fde68a");
+      unlockAch("elite");
     }
     if (e.type === "warden") {
       spawnGem(e.x, e.y - 0.35, makeItem("rare"));
       showToast("WARDEN RELIC", "#7dd3fc");
     }
-    if (e.type === "boss") {
+    if (isBossType(e.type)) {
       applyItem(Object.assign({ kind: "weapon", rarity: "epic" }, spick(WEAPONS.filter(function (i) { return i.r === "epic"; }))));
       applyItem(makeItem("rare"));
     }
@@ -1639,15 +1848,19 @@
     if (!enemies.length && phase === "fight") clearRoom();
   }
 
-  function hurtPlayer(dmg, ox, oy) {
+  function hurtPlayer(dmg, ox, oy, src) {
     if (player.iframes > 0 || player.dead) return;
+    if (player.cursed) dmg = Math.round(dmg * 1.35);
     player.hp -= dmg;
     player.iframes = 0.35;
     player.flash = 0.18;
-    flash = 0.12;
+    screenFlash(0.12, src === "poison" ? "74,222,128" : src === "burn" ? "251,146,60" : "255,50,36");
     shake = Math.max(shake, 7);
     combo = 0; comboT = 0;
     sfx("hurt");
+    if (src === "poison") applyStatus("poison", 3.2);
+    else if (src === "burn" || (THEME && THEME._name === "ember")) applyStatus("burn", 2.4);
+    if (THEME && THEME._name === "ash") applyStatus("slow", 2.2);
     const len = Math.hypot(ox, oy) || 1;
     tryMove(player, player.x + (ox / len) * 0.7, player.y + (oy / len) * 0.7);
     player.dash = null;
@@ -1671,6 +1884,7 @@
   function bumpCombo() {
     combo += 1;
     comboT = 1.2;
+    if (combo >= 10) unlockAch("combo10");
     syncHud();
   }
 
@@ -1687,6 +1901,8 @@
     player.face = Math.atan2(target.y - player.y, target.x - player.x);
     player.flip = target.x < player.x;
     sfx("slash");
+    fireSlashWave();
+    tryCrackSecret();
     const crit = rng() < player.crit;
     const dmg = slashDmg(crit);
     hitEnemy(target, dmg, crit);
@@ -1720,6 +1936,8 @@
     });
     burst(e.x, e.y, crit ? "#fde68a" : "#fb923c", crit ? 8 : 5);
     shake = Math.max(shake, crit ? 6 : 3);
+    screenFlash(player.heavy > 0 ? 0.1 : 0.05, crit || player.heavy > 0 ? "253,230,138" : "251,146,60");
+    if (player.heavy > 0) hitstop = Math.max(hitstop, 0.04);
     syncHud();
     if (e.hp <= 0) killEnemy(e);
   }
@@ -1743,6 +1961,7 @@
     player.tx = null;
     player.face = Math.atan2(dy, dx);
     player.flip = dx < 0;
+    dropDodgeBomb();
     burst(player.x, player.y, "#67e8f9", 6);
     ghosts.push({ x: player.x, y: player.y, t: 0.2, flip: player.flip });
     sfx("dodge");
@@ -1834,6 +2053,8 @@
     player.slashCd = 0.28;
     player.slashAnim = 1;
     sfx("slash");
+    fireSlashWave();
+    tryCrackSecret();
     const hitR = player.slashR * 0.88;
     for (let i = 0; i < enemies.length; i++) {
       const e = enemies[i];
@@ -1879,6 +2100,10 @@
     sfx("slash");
     beep(150, 0.14, "sawtooth", 0.07, 55);
     shake = Math.max(shake, 8);
+    hitstop = 0.04;
+    screenFlash(0.14, "253,230,138");
+    fireSlashWave();
+    tryCrackSecret();
     const hitR = player.slashR * 1.55;
     for (let i = 0; i < enemies.length; i++) {
       const e = enemies[i];
@@ -1888,6 +2113,7 @@
       if ((dx * fx + dy * fy) / d > -0.28) {
         const crit = rng() < player.crit + 0.08;
         hitEnemy(e, Math.round(slashDmg(crit) * 1.8), crit);
+        if (depth > 1) e.burn = Math.max(e.burn || 0, 2.5);
       }
     }
     burst(player.x + fx * 0.75, player.y + fy * 0.75, "#fde68a", 12);
@@ -1926,6 +2152,7 @@
     resetPlayer();
     startRoom(ngPlus ? 9 : 1);
     syncHud();
+    if (ngPlus) unlockAch("ngplus");
     showToast(ngPlus ? "DEEPER · SEED " + seedLabel(runSeed) : "SEED " + seedLabel(runSeed), ngPlus ? "#d8b4fe" : "#c4b4a4");
     setTimeout(checkSetBonus, 900);
   }
@@ -2008,6 +2235,10 @@
     }
     if ((phase === "loot" || phase === "shop" || phase === "event") && exitGate && dist(w.x, w.y, exitGate.x, exitGate.y) < 1.5) {
       nextRoom();
+      return;
+    }
+    if (secret && !secret.opened && dist(w.x, w.y, secret.tx + 0.5, secret.ty + 0.5) < 1.15) {
+      openSecret();
       return;
     }
     if (phase === "fight") {
@@ -2299,6 +2530,17 @@
     e.bob += dt;
     e.flash = Math.max(0, e.flash - dt);
     e.vuln = Math.max(0, e.vuln - dt);
+    if (e.burn > 0) {
+      e.burn -= dt;
+      e.burnTick = (e.burnTick || 0) - dt;
+      if (e.burnTick <= 0) {
+        e.burnTick = 0.5;
+        e.hp -= 3;
+        e.flash = 0.08;
+        floats.push({ x: e.x, y: e.y - e.r - 0.2, t: 0.45, text: "3", col: "#fb923c" });
+        if (e.hp <= 0) { killEnemy(e); return; }
+      }
+    }
     if (e.boom > 0) {
       e.boom -= dt;
       if (e.boom <= 0) explodeBomber(e);
@@ -2309,7 +2551,57 @@
     e.flip = dx < 0;
     if (e.type !== "spitter") e.face = Math.atan2(dy, dx);
 
-    if (e.type === "boss" || e.type === "warden") {
+    if (e.type === "ashwitch") {
+      e.face = Math.atan2(dy, dx);
+      e.teleT = (e.teleT == null ? 2.4 : e.teleT) - dt;
+      if (e.teleT <= 0.5 && !e.casting) {
+        e.casting = true;
+        e.wind = 0.5;
+        e.puddleX = player.x;
+        e.puddleY = player.y;
+      }
+      if (e.casting) {
+        e.wind -= dt;
+        if (e.wind <= 0) {
+          puddles.push({ x: e.x, y: e.y, t: 3.4, r: 0.95, tick: 0.2 });
+          burst(e.x, e.y, "#fb923c", 10);
+          const dest = clampToWalkable(srnd(1.6, COLS - 1.6), srnd(2.0, ROWS - 2.2));
+          e.x = dest.x; e.y = dest.y;
+          burst(e.x, e.y, "#a78bfa", 10);
+          puddles.push({ x: e.puddleX || player.x, y: e.puddleY || player.y, t: 2.5, r: 0.8, tick: 0.15 });
+          e.casting = false;
+          e.teleT = 2.7;
+          e.wind = 0;
+          screenFlash(0.1, "251,146,60");
+        }
+        resolve(e);
+        return;
+      }
+      const pref = 2.6;
+      if (d < pref - 0.4) tryMove(e, e.x - (dx / d) * e.speed * dt, e.y - (dy / d) * e.speed * dt);
+      else if (d > pref + 0.8) tryMove(e, e.x + (dx / d) * e.speed * dt, e.y + (dy / d) * e.speed * dt);
+      e.atk = Math.max(0, e.atk - dt);
+      if (e.atk <= 0 && d < 6.4) {
+        shots.push({ x: e.x, y: e.y - 0.25, vx: (dx / d) * 3.1, vy: (dy / d) * 3.1, dmg: e.dmg, life: 2.2, burn: true });
+        e.atk = e.cd;
+      }
+      resolve(e);
+      return;
+    }
+
+    if (e.type === "boss" || e.type === "warden" || e.type === "boneking") {
+      if (e.type === "boneking") {
+        e.summonT = (e.summonT == null ? 2.6 : e.summonT) - dt;
+        if (e.summonT <= 0) {
+          e.summonT = 3.3;
+          let bats = 0;
+          for (let i = 0; i < enemies.length; i++) if (enemies[i].type === "bat") bats++;
+          if (bats < 3) {
+            spawnEnemy("bat", e.x + srnd(-1.1, 1.1), e.y + srnd(-0.5, 0.7), true, false);
+            floats.push({ x: e.x, y: e.y - 0.8, t: 0.6, text: "RISE", col: "#e2e8f0" });
+          }
+        }
+      }
       if (!e.slam) {
         e.slamT -= dt;
         if (e.slamT <= 0) {
@@ -2321,7 +2613,7 @@
         e.slam.t -= dt;
         if (e.slam.t <= 0) {
           shake = Math.max(shake, e.type === "warden" ? 9 : 11);
-          flash = 0.16;
+          screenFlash(0.16, "239,68,68");
           burst(e.slam.x, e.slam.y, "#ef4444", e.type === "warden" ? 12 : 16);
           if (dist(player.x, player.y, e.slam.x, e.slam.y) < e.slam.r + 0.22) {
             hurtPlayer(e.dmg, player.x - e.slam.x, player.y - e.slam.y);
@@ -2338,7 +2630,7 @@
       else if (d > pref + 0.7) tryMove(e, e.x + (dx / d) * e.speed * dt, e.y + (dy / d) * e.speed * dt);
       e.atk = Math.max(0, e.atk - dt);
       if (e.atk <= 0 && d < 6.2) {
-        shots.push({ x: e.x, y: e.y - 0.2, vx: (dx / d) * 3.4, vy: (dy / d) * 3.4, dmg: e.dmg, life: 2.4 });
+        shots.push({ x: e.x, y: e.y - 0.2, vx: (dx / d) * 3.4, vy: (dy / d) * 3.4, dmg: e.dmg, life: 2.4, poison: true });
         e.atk = e.cd;
         e.wind = 0.12;
       }
@@ -2407,7 +2699,7 @@
       if (d > e.range + player.r * 0.4) {
         tryMove(e, e.x + (dx / d) * e.speed * dt, e.y + (dy / d) * e.speed * dt);
       } else if (e.atk <= 0 && !e.slam) {
-        e.wind = e.type === "boss" ? 0.38 : e.type === "warden" ? 0.4 : 0.28;
+        e.wind = e.type === "boss" || e.type === "boneking" ? 0.38 : e.type === "warden" ? 0.4 : 0.28;
       }
     }
     resolve(e);
@@ -2486,6 +2778,17 @@
         syncHud();
       }
     }
+    if (player.poison > 0) {
+      player.poison -= dt;
+      player.poisonTick -= dt;
+      if (player.poisonTick <= 0) { player.poisonTick = 0.65; tickDot("poison"); }
+    }
+    if (player.burn > 0) {
+      player.burn -= dt;
+      player.burnTick -= dt;
+      if (player.burnTick <= 0) { player.burnTick = 0.5; tickDot("burn"); }
+    }
+    if (player.slow > 0) player.slow -= dt;
 
     let moving = false;
     if (player.dodging > 0) {
@@ -2524,7 +2827,8 @@
       if (player.tx != null) {
         const dx = player.tx - player.x, dy = player.ty - player.y;
         const d = Math.hypot(dx, dy);
-        const spd = player.dash ? player.speed * 2.6 : player.speed;
+        const slowM = player.slow > 0 ? 0.55 : 1;
+        const spd = (player.dash ? player.speed * 2.6 : player.speed) * slowM;
         if (d < 0.12) { player.x = player.tx; player.y = player.ty; player.tx = null; }
         else {
           tryMove(player, player.x + (dx / d) * spd * dt, player.y + (dy / d) * spd * dt);
@@ -2552,10 +2856,54 @@
       const s = shots[i];
       s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt;
       if (s.life <= 0 || solidAt(s.x, s.y)) { shots.splice(i, 1); continue; }
+      if (s.friendly) {
+        let hit = false;
+        for (let j = 0; j < enemies.length; j++) {
+          const e = enemies[j];
+          if (e.hp <= 0) continue;
+          if (dist(s.x, s.y, e.x, e.y) < e.r + 0.28) {
+            hitEnemy(e, s.dmg, false);
+            hit = true;
+          }
+        }
+        if (hit) shots.splice(i, 1);
+        continue;
+      }
       if (dist(s.x, s.y, player.x, player.y) < player.r + 0.18) {
-        hurtPlayer(s.dmg, player.x - s.x, player.y - s.y);
+        hurtPlayer(s.dmg, player.x - s.x, player.y - s.y, s.poison ? "poison" : (s.burn ? "burn" : null));
+        if (s.burn) applyStatus("burn", 2.4);
         shots.splice(i, 1);
       }
+    }
+
+    for (let i = puddles.length - 1; i >= 0; i--) {
+      const pdl = puddles[i];
+      pdl.t -= dt;
+      if (pdl.t <= 0) { puddles.splice(i, 1); continue; }
+      if (dist(player.x, player.y, pdl.x, pdl.y) < pdl.r + player.r * 0.4) {
+        applyStatus("burn", 2.2);
+        pdl.tick = (pdl.tick || 0) - dt;
+        if (pdl.tick <= 0) { pdl.tick = 0.55; tickDot("burn"); }
+      }
+    }
+    for (let i = bombs.length - 1; i >= 0; i--) {
+      const b = bombs[i];
+      b.t -= dt;
+      if (b.t > 0) continue;
+      burst(b.x, b.y, "#fb923c", 14);
+      shake = Math.max(shake, 7);
+      screenFlash(0.12, "251,146,60");
+      sfx("boom");
+      for (let j = 0; j < enemies.length; j++) {
+        const o = enemies[j];
+        if (o.hp <= 0) continue;
+        if (dist(o.x, o.y, b.x, b.y) < b.r + o.r) hitEnemy(o, b.dmg, false);
+      }
+      bombs.splice(i, 1);
+    }
+    for (let i = bloodStains.length - 1; i >= 0; i--) {
+      bloodStains[i].t -= dt;
+      if (bloodStains[i].t <= 0) bloodStains.splice(i, 1);
     }
 
     if (phase !== "fight") return;
@@ -2685,6 +3033,19 @@
       const flicker = ((tx * 3 + (tick * 11) | 0) % 2) ? spr.torch1 : spr.torch0;
       blit(flicker, tx + 0.5, ty + 0.95, false, false);
     }
+    if (secret && !secret.opened && secret.tx === tx && secret.ty === ty) {
+      const x = sx(tx), y = sy(ty);
+      const pulse = 0.4 + Math.sin(tick * 6) * 0.28;
+      ctx.fillStyle = "rgba(220,180,130," + pulse + ")";
+      ctx.fillRect(x + TILE * 0.32, y + 4, 2, 5);
+      ctx.fillRect(x + TILE * 0.32 + 2, y + 8, 4, 2);
+      ctx.fillRect(x + TILE * 0.48, y + 10, 2, 5);
+      ctx.fillRect(x + TILE * 0.38, y + 14, 5, 2);
+      ctx.fillStyle = "rgba(12,6,6,0.75)";
+      ctx.fillRect(x + TILE * 0.36, y + 5, 1, 11);
+      ctx.fillStyle = "rgba(167,139,250," + (0.2 + pulse * 0.35) + ")";
+      ctx.fillRect(x + TILE * 0.3, y + 3, 1, 3);
+    }
   }
 
   function drawMapFloor() {
@@ -2711,6 +3072,15 @@
           drawBlood(tx, ty);
         }
       }
+    }
+    for (let i = 0; i < bloodStains.length; i++) {
+      const st = bloodStains[i];
+      const a = clamp(st.t / 11, 0, 1) * 0.55;
+      const x = sx(st.x), y = sy(st.y);
+      ctx.fillStyle = "rgba(120,16,16," + a + ")";
+      ctx.fillRect(x - 5, y - 2, 7, 3);
+      ctx.fillRect(x - 1, y - 5, 3, 6);
+      ctx.fillRect(x + 2, y - 1, 4, 2);
     }
     let minx = 99, miny = 99, maxx = 0, maxy = 0, found = 0;
     for (let ty = 0; ty < ROWS; ty++) {
@@ -2844,9 +3214,26 @@
     }
     ctx.restore();
   }
+  function drawStatusIcons(wx, wy) {
+    const icons = [];
+    if (player.poison > 0) icons.push("#4ade80");
+    if (player.burn > 0) icons.push("#fb923c");
+    if (player.slow > 0) icons.push("#94a3b8");
+    if (player.cursed) icons.push("#a78bfa");
+    if (!icons.length) return;
+    const baseX = sx(wx) - (icons.length - 1) * 5;
+    const baseY = sy(wy) - TILE * 1.22;
+    for (let i = 0; i < icons.length; i++) {
+      ctx.fillStyle = icons[i];
+      ctx.fillRect(baseX + i * 10 - 2, baseY, 5, 5);
+      ctx.fillStyle = "#1a0a08";
+      ctx.fillRect(baseX + i * 10, baseY + 1, 2, 3);
+    }
+  }
   function drawPlayer() {
     if (player.x == null) return;
     drawHeroAt(player.x, player.y, player.flip, player.flash, null, player.slashAnim);
+    drawStatusIcons(player.x, player.y);
   }
 
   function enemySprite(e) {
@@ -2861,6 +3248,8 @@
       if (e.atk > e.cd * 0.7) return spr.brute;
       return ((e.bob * 4) | 0) % 2 ? spr.bruteW : spr.brute;
     }
+    if (e.type === "boneking") return (e.slam && e.slam.t > 0.2) ? spr.bonekingSlam : spr.boneking;
+    if (e.type === "ashwitch") return (e.wind > 0 || e.casting) ? spr.ashwitchCast : spr.ashwitch;
     return (e.slam && e.slam.t > 0.2) ? spr.bossSlam : spr.boss;
   }
 
@@ -2882,6 +3271,9 @@
   }
   function drawEnemy(e) {
     if (e.slam) drawSlamZone(e.slam);
+    if (e.type === "ashwitch" && e.casting && e.puddleX != null) {
+      drawSlamZone({ x: e.puddleX, y: e.puddleY, t: Math.max(0.05, e.wind), dur: 0.5, r: 0.9 });
+    }
     if (e.boom > 0) {
       const k = 1 - e.boom / 0.55;
       ctx.strokeStyle = "rgba(255,120,40," + (0.4 + k * 0.5) + ")";
@@ -2890,11 +3282,11 @@
       ctx.arc(sx(e.x), sy(e.y) - 6, TILE * (0.6 + k * 1.3), 0, Math.PI * 2);
       ctx.stroke();
     }
-    const span = e.type === "boss" ? 1.35 : (e.type === "warden") ? 1.25 : (e.type === "brute" || e.type === "knight" || e.type === "mimic") ? 1.05 : 0.7;
+    const span = e.type === "boss" || e.type === "boneking" ? 1.35 : (e.type === "warden") ? 1.25 : (e.type === "brute" || e.type === "knight" || e.type === "mimic") ? 1.05 : 0.7;
     footShadow(e.x, e.y, span);
     const s = enemySprite(e);
     const hurt = e.flash > 0 || e.wind > 0;
-    const escale = e.type === "warden" ? 1.5 : 1;
+    const escale = e.type === "warden" ? 1.5 : (e.type === "boneking" ? 1.15 : 1);
     blit(s, e.x, e.y, e.flip, hurt && e.flash > 0, escale);
     if (e.wind > 0 && e.type !== "boss") {
       ctx.globalAlpha = 0.55;
@@ -3035,11 +3427,43 @@
     list.sort(function (a, b) { return a.y - b.y; });
     list.forEach(function (it) { it.draw(); });
 
+    puddles.forEach(function (pdl) {
+      const a = 0.22 + 0.18 * Math.sin(tick * 8 + pdl.x);
+      ctx.fillStyle = "rgba(232,93,4," + a + ")";
+      const pr = pdl.r * TILE;
+      ctx.fillRect(sx(pdl.x) - pr, sy(pdl.y) - pr * 0.45, pr * 2, pr * 0.9);
+      ctx.fillStyle = "rgba(253,230,138," + (a + 0.1) + ")";
+      ctx.fillRect(sx(pdl.x) - pr * 0.4, sy(pdl.y) - pr * 0.2, pr * 0.8, pr * 0.35);
+    });
+    bombs.forEach(function (b) {
+      const k = 1 - b.t / 0.4;
+      ctx.fillStyle = "#fb923c";
+      ctx.fillRect(sx(b.x) - 4, sy(b.y) - 6, 8, 8);
+      ctx.fillStyle = "#fde68a";
+      ctx.fillRect(sx(b.x) - 2, sy(b.y) - 4, 4, 4);
+      ctx.strokeStyle = "rgba(251,146,60," + (0.4 + k * 0.5) + ")";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(sx(b.x), sy(b.y) - 2, TILE * (0.4 + k * 0.7), 0, Math.PI * 2);
+      ctx.stroke();
+    });
     shots.forEach(function (s) {
-      ctx.fillStyle = "#5eead4";
-      ctx.fillRect(sx(s.x) - 3, sy(s.y) - 3, 6, 6);
-      ctx.fillStyle = "#ecfdf5";
-      ctx.fillRect(sx(s.x) - 1, sy(s.y) - 1, 3, 3);
+      if (s.wave) {
+        ctx.fillStyle = "#7dd3fc";
+        ctx.fillRect(sx(s.x) - 7, sy(s.y) - 4, 14, 8);
+        ctx.fillStyle = "#e0f2fe";
+        ctx.fillRect(sx(s.x) - 3, sy(s.y) - 2, 8, 4);
+      } else if (s.burn) {
+        ctx.fillStyle = "#fb923c";
+        ctx.fillRect(sx(s.x) - 3, sy(s.y) - 3, 6, 6);
+        ctx.fillStyle = "#fde68a";
+        ctx.fillRect(sx(s.x) - 1, sy(s.y) - 1, 3, 3);
+      } else {
+        ctx.fillStyle = "#5eead4";
+        ctx.fillRect(sx(s.x) - 3, sy(s.y) - 3, 6, 6);
+        ctx.fillStyle = "#ecfdf5";
+        ctx.fillRect(sx(s.x) - 1, sy(s.y) - 1, 3, 3);
+      }
     });
     parts.forEach(function (p) {
       ctx.globalAlpha = clamp(p.t * 3, 0, 1);
@@ -3089,9 +3513,10 @@
       ctx.globalAlpha = 1;
     });
     if (flash > 0) {
-      ctx.fillStyle = "rgba(255,50,36," + (flash * 0.28) + ")";
+      ctx.fillStyle = "rgba(" + (flashCol || "255,50,36") + "," + (flash * 0.28) + ")";
       ctx.fillRect(0, 0, W, H);
     }
+    if (phase === "fight" || phase === "loot" || phase === "shop" || phase === "event") drawMinimap();
     if (!player.dead && player.maxhp && player.hp / player.maxhp < 0.3 &&
         (phase === "fight" || phase === "loot" || phase === "shop" || phase === "event")) {
       const a = 0.2 + 0.2 * (0.5 + 0.5 * Math.sin(tick * 7));
@@ -3109,11 +3534,64 @@
     }
   }
 
+  function drawMinimap() {
+    if (!MAP.length || player.dead) return;
+    const cell = 3;
+    const pad = 3;
+    const mw = COLS * cell + pad * 2;
+    const mh = ROWS * cell + pad * 2 + 12;
+    const deck = document.getElementById("gbsp");
+    const bot = deck ? Math.max(140, deck.offsetHeight) : 168;
+    const x = 8;
+    const y = H - bot - mh - 6;
+    ctx.fillStyle = "rgba(10,6,6,0.78)";
+    ctx.fillRect(x, y, mw, mh);
+    ctx.strokeStyle = "#5a3a20";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, mw - 1, mh - 1);
+    for (let ty = 0; ty < ROWS; ty++) {
+      for (let tx = 0; tx < COLS; tx++) {
+        const ch = MAP[ty][tx];
+        let col = "#1a1210";
+        if (ch === "." || ch === "S" || ch === "+" || ch === "~" || ch === "o") col = "#3a2a22";
+        if (ch === "D") col = "#fbbf24";
+        if (secret && !secret.opened && secret.tx === tx && secret.ty === ty) col = "#a78bfa";
+        ctx.fillStyle = col;
+        ctx.fillRect(x + pad + tx * cell, y + pad + ty * cell, cell, cell);
+      }
+    }
+    for (let i = 0; i < enemies.length; i++) {
+      ctx.fillStyle = "#ef4444";
+      ctx.fillRect(x + pad + Math.floor(enemies[i].x) * cell, y + pad + Math.floor(enemies[i].y) * cell, cell, cell);
+    }
+    if (player.x != null) {
+      ctx.fillStyle = "#67e8f9";
+      ctx.fillRect(x + pad + Math.floor(player.x) * cell, y + pad + Math.floor(player.y) * cell, cell, cell);
+    }
+    ctx.fillStyle = "#c4b4a4";
+    ctx.font = "700 8px ui-sans-serif, system-ui";
+    ctx.textAlign = "left";
+    ctx.fillText((roomKind || "ROOM").toUpperCase(), x + pad, y + mh - 3);
+    const pipY = y + mh - 8;
+    const pip0 = x + mw - pad - 8 * 4;
+    for (let i = 0; i < 8; i++) {
+      ctx.fillStyle = i === ((depth - 1) % 8) ? "#e85d04" : "#3a2018";
+      ctx.fillRect(pip0 + i * 4, pipY, 3, 3);
+    }
+  }
+
   function loop(ts) {
     if (!last) last = ts;
     let dt = (ts - last) / 1000;
     last = ts;
     if (dt > 0.05) dt = 0.05;
+    if (hitstop > 0) {
+      hitstop -= dt;
+      if (hitstop < 0) hitstop = 0;
+      draw();
+      pid = requestAnimationFrame(loop);
+      return;
+    }
     for (let i = ghosts.length - 1; i >= 0; i--) {
       ghosts[i].t -= dt;
       if (ghosts[i].t <= 0) ghosts.splice(i, 1);
@@ -3158,7 +3636,7 @@
     overlay.innerHTML =
       "<h1>SLASH PIT</h1>" +
       "<p>One thumb. Dash-strike. Grab loot. Don't get slammed.</p>" +
-      "<p id='bestline'>" + (b ? "Best depth " + b : "No descents yet.") + " · Unlocks " + unlockCount() + "/" + unlockTotal() + "</p>" +
+      "<p id='bestline'>" + (b ? "Best depth " + b : "No descents yet.") + " · Unlocks " + unlockCount() + "/" + unlockTotal() + " · Achs " + achCount() + "/" + ACH_DEFS.length + "</p>" +
       "<p id='seedline'>TAP TO ENTER rolls a seed · DAILY uses UTC date" + (b >= 16 ? " · DEEPER starts at 9" : "") + "</p>" +
       "<button class='btn' id='enterbtn' type='button'>TAP TO ENTER</button>" +
       "<div class='btn-row'><button class='btn btn-alt btn-sm' id='dailybtn' type='button'>DAILY</button>" +
