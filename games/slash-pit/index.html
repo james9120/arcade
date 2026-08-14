@@ -372,6 +372,18 @@
       display: none; text-transform: uppercase;
     }
     #chalhud.on { display: block; }
+    #pacthud {
+      position: fixed; left: 50%; transform: translateX(-50%);
+      bottom: calc(162px + env(safe-area-inset-bottom, 0px));
+      z-index: 6; display: none; gap: 0.65rem;
+      width: min(22.5rem, 94vw); pointer-events: none;
+    }
+    #pacthud.on { display: flex; pointer-events: auto; }
+    #pacthud .btn {
+      margin-top: 0; flex: 1; min-width: 0; min-height: 3.45rem;
+      font-size: 1.12rem; letter-spacing: 0.12em;
+    }
+    #pacthud .btn-pact { background: #9b1d20; color: #fde8e8; }
     #mutline { margin-top: 0.35rem; font-size: 0.72rem; letter-spacing: 0.1em; color: #7dd3fc; text-transform: uppercase; min-height: 1.05em; }
     @media (max-height: 540px) {
       #gbsp { --dp: 84px; --bt: 48px; }
@@ -381,6 +393,7 @@
       .gb-btn { font-size: 13px; }
       .gb-start { display: none; }
       #overlay { inset: 0 0 calc(110px + env(safe-area-inset-bottom, 0px)) 0; }
+      #pacthud { bottom: calc(122px + env(safe-area-inset-bottom, 0px)); }
     }
     @media (max-width: 340px) {
       #gbsp { --dp: 96px; --bt: 52px; }
@@ -405,6 +418,10 @@
   </div>
   <div id="relictray"></div>
   <div id="chalhud"></div>
+  <div id="pacthud">
+    <button class="btn btn-pact" id="pacttake" type="button">TAKE</button>
+    <button class="btn btn-alt" id="pactleave" type="button">LEAVE</button>
+  </div>
   <div id="toast"></div>
   <div id="pauseov" class="hidden" hidden aria-hidden="true"></div>
   <div id="hint">D-PAD MOVE · A SLASH · HOLD A CHARGE · B DODGE / PARRY</div>
@@ -662,6 +679,7 @@
   let exitGate = null;
   let shop = null;
   let shrine = null;
+  let pact = null;
   let floats = [];
   let parts = [];
   let embers = [];
@@ -1895,7 +1913,8 @@
       dash: null, flash: 0, dead: false, walkT: 0, flip: false,
       charging: false, chargeT: 0, chargeReady: false, heavy: 0,
       epicPulse: false, epicPulseT: 0,
-      poison: 0, burn: 0, slow: 0, poisonTick: 0, burnTick: 0, cursed: false
+      poison: 0, burn: 0, slow: 0, poisonTick: 0, burnTick: 0, cursed: false,
+      pactRage: 0
     });
     if (treeHas("skin")) { player.maxhp += 8; player.hp += 8; }
     if (treeHas("step")) player.speed *= 1.08;
@@ -2493,7 +2512,19 @@
   }
 
   function spawnEnemy(type, x, y, fast, elite) {
-    if ((type === "knight" || type === "leaper") && depth <= 2 && !runPractice) type = "slime";
+    if (!runPractice) {
+      if (depth === 1) {
+        if (type === "knight" || type === "leaper" || type === "bomber") type = "slime";
+        elite = false;
+      } else if (depth <= 3) {
+        if (type === "knight" || type === "bomber") type = "slime";
+        if (type === "leaper") {
+          let leaps = 0;
+          for (let i = 0; i < enemies.length; i++) if (enemies[i].type === "leaper") leaps++;
+          if (leaps >= 1) type = "slime";
+        }
+      }
+    }
     const d = enemyDef(type);
     const c = clampToWalkable(x, y);
     const scale = isBossType(type) || depth === 1 ? 1 : (1 + (depth - 1) * 0.07);
@@ -2560,8 +2591,15 @@
     const list = [];
     for (let i = 0; i < count; i++) list.push(spick(pool));
     if (mutLive("swarm")) list.push(spick(pool));
-    if (n <= 2) {
-      for (let i = 0; i < list.length; i++) if (list[i] === "knight" || list[i] === "leaper") list[i] = "slime";
+    if (n <= 3) {
+      let leaps = 0;
+      for (let i = 0; i < list.length; i++) {
+        if (list[i] === "knight" || list[i] === "bomber") list[i] = "slime";
+        else if (list[i] === "leaper") {
+          leaps++;
+          if (n === 1 || leaps > 1) list[i] = "slime";
+        }
+      }
     }
     return { list: list, fast: n >= 5 && rng() < 0.45, chest: n >= 3 && rng() < 0.34, elite: false };
   }
@@ -2574,6 +2612,8 @@
     coins = [];
     shop = null;
     shrine = null;
+    pact = null;
+    showPactHud(false);
     chest = null;
     exitGate = null;
     enemies = [];
@@ -2674,8 +2714,24 @@
       banner = { t: 1.15, text: "REST" };
       stopDrone();
     } else if (roomKind === "event") {
-      const ev = rng() < 0.2 ? "wheel" : spick(["shrine", "mimic", "elite"]);
-      if (ev === "wheel") {
+      let ev;
+      if (n >= 4 && rng() < 0.14) ev = "pact";
+      else ev = rng() < 0.2 ? "wheel" : spick(n < 4 ? ["shrine"] : ["shrine", "mimic", "elite"]);
+      if (ev === "pact") {
+        phase = "event";
+        const a = clampToWalkable(COLS * 0.30, ROWS * 0.50);
+        const b = clampToWalkable(COLS * 0.70, ROWS * 0.50);
+        pact = {
+          used: false, sel: 0,
+          opts: [
+            { id: "take", name: "TAKE", x: a.x, y: a.y },
+            { id: "leave", name: "LEAVE", x: b.x, y: b.y }
+          ]
+        };
+        banner = { t: 1.2, text: "BLOOD PACT" };
+        stopDrone();
+        showPactHud(true);
+      } else if (ev === "wheel") {
         phase = "event";
         const p = clampToWalkable(COLS * 0.5, ROWS * 0.48);
         wheel = { x: p.x, y: p.y, used: false, spinning: false, ang: 0, vel: 0 };
@@ -2706,7 +2762,7 @@
         startDrone();
       } else {
         phase = "fight";
-        const et = rng() < 0.5 ? "brute" : (depth >= 2 ? "bat" : "brute");
+        const et = depth < 8 ? (rng() < 0.5 ? "bat" : "wisp") : (rng() < 0.5 ? "brute" : "bat");
         spawnEnemy(et, COLS * 0.5, ROWS * 0.4, false, true);
         if (depth >= 6) spawnEnemy("slime", COLS * 0.35, ROWS * 0.46, false, false);
         banner = { t: 1.1, text: "ELITE" };
@@ -2782,7 +2838,7 @@
         spawnEnemy("wisp", COLS * 0.72, ROWS * 0.36, true, false);
         spawnEnemy("wisp", COLS * 0.3, ROWS * 0.52, false, false);
       }
-      if (THEME && THEME._name === "mire" && n > 2) {
+      if (THEME && THEME._name === "mire" && n > 3) {
         spawnEnemy("leaper", COLS * 0.62, ROWS * 0.38, false, false);
       }
       if (incoming === "left") {
@@ -2854,7 +2910,7 @@
     if (w >= 10) types.push("golem");
     const n = Math.min(8, 2 + ((w - 1) / 2 | 0));
     for (let i = 0; i < n; i++) {
-      const t = w <= 2 && (types[i % types.length] === "knight" || types[i % types.length] === "leaper") ? "slime" : spick(types);
+      const t = w <= 3 && (types[i % types.length] === "knight" || types[i % types.length] === "bomber") ? "slime" : spick(types);
       spawnEnemy(t, COLS * (0.24 + rng() * 0.52), ROWS * (0.24 + rng() * 0.28), w >= 5 && rng() < 0.3, w >= 12 && rng() < 0.12);
     }
     banner = { t: 1.15, text: "WAVE " + w };
@@ -3270,6 +3326,42 @@
     syncHud();
   }
 
+  function showPactHud(on) {
+    const el = document.getElementById("pacthud");
+    if (!el) return;
+    el.classList.toggle("on", !!on);
+  }
+  function usePact(id) {
+    if (shopActLatch > 0) return;
+    if (!pact || pact.used) return;
+    shopActLatch = 0.3;
+    pact.used = true;
+    showPactHud(false);
+    if (id === "take") {
+      const cost = 8;
+      player.hp = Math.max(1, player.hp - cost);
+      sfx("hurt");
+      screenFlash(0.16, "185,28,28");
+      burst(player.x, player.y, "#ef4444", 16);
+      dmgFloat(player.x, player.y - 0.7, "" + cost, "#fda4af", 0.7);
+      if (rng() < 0.5) {
+        const want = rng() < 0.42 ? "rare" : "common";
+        const pool = RELICS.filter(function (r) { return r.r === want; });
+        const base = spick(pool.length ? pool : RELICS);
+        applyItem(Object.assign({ kind: "relic", rarity: base.r }, base));
+      } else {
+        player.pactRage = 18;
+        showToast("BLOOD RAGE", "#ef4444");
+      }
+      syncHud();
+    } else {
+      showToast("PACT BROKEN", "#8a7060");
+      sfx("shop");
+    }
+    exitGate = { x: doorTile.x, y: doorTile.y };
+    doorAnim = 0.55;
+  }
+
   function spinWheel() {
     if (shopActLatch > 0) return;
     if (!wheel || wheel.used || wheel.spinning) return;
@@ -3623,6 +3715,7 @@
   function slashDmg(crit) {
     let dmg = player.dmg * (crit ? 1.6 : 1);
     if (combo >= 5) dmg *= 1.25;
+    if (player.pactRage > 0) dmg *= 1.55;
     return Math.round(dmg);
   }
 
@@ -3944,6 +4037,15 @@
       shrine.sel = nearest;
       if (nd < 1.4) { useShrine(shrine.opts[shrine.sel].id); return; }
     }
+    if (phase === "event" && pact && !pact.used) {
+      let nearest = pact.sel, nd = 99;
+      for (let i = 0; i < pact.opts.length; i++) {
+        const d = dist(player.x, player.y, pact.opts[i].x, pact.opts[i].y);
+        if (d < nd) { nd = d; nearest = i; }
+      }
+      pact.sel = nearest;
+      if (nd < 2.1) { usePact(pact.opts[pact.sel].id); return; }
+    }
     facingSlash();
   }
 
@@ -4196,6 +4298,7 @@
     syncRelicTray();
     const chEl = document.getElementById("chalhud");
     if (chEl) { chEl.classList.remove("on"); chEl.textContent = ""; }
+    showPactHud(false);
     const best = Math.max(depth, bestDepth());
     const nextW = START_WEAPONS.filter(function (w) { return w.need > 0 && best < w.need; })[0];
     const unlockProg = "Unlocks " + unlockCount() + "/" + unlockTotal() +
@@ -4277,6 +4380,7 @@
     overlay.classList.remove("hidden");
     syncPauseGlyph();
     syncRelicTray();
+    showPactHud(false);
     overlay.innerHTML =
       "<h2>PRACTICE CLEAR</h2>" +
       "<p>" + esc(bossTitle(practiceBoss)) + " · " + fmtTime(runTime) + "</p>" +
@@ -4352,6 +4456,15 @@
         if (dist(w.x, w.y, shrine.opts[i].x, shrine.opts[i].y) < 1.15) {
           shrine.sel = i;
           useShrine(shrine.opts[i].id);
+          return;
+        }
+      }
+    }
+    if (pact && !pact.used) {
+      for (let i = 0; i < pact.opts.length; i++) {
+        if (dist(w.x, w.y, pact.opts[i].x, pact.opts[i].y) < 2.15) {
+          pact.sel = i;
+          usePact(pact.opts[i].id);
           return;
         }
       }
@@ -4657,6 +4770,8 @@
       rest.sel = (rest.sel + (dir > 0 ? 1 : -1) + rest.opts.length) % rest.opts.length;
     } else if (phase === "event" && shrine && !shrine.used) {
       shrine.sel = (shrine.sel + (dir > 0 ? 1 : -1) + shrine.opts.length) % shrine.opts.length;
+    } else if (phase === "event" && pact && !pact.used) {
+      pact.sel = (pact.sel + (dir > 0 ? 1 : -1) + pact.opts.length) % pact.opts.length;
     }
   }
 
@@ -4736,6 +4851,19 @@
     e.stopPropagation();
     toggleMute();
   });
+  (function bindPactHud() {
+    function bind(id, choice) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener("pointerdown", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        usePact(choice);
+      }, { passive: false });
+    }
+    bind("pacttake", "take");
+    bind("pactleave", "leave");
+  })();
 
   function onTap(id, fn) {
     const el = document.getElementById(id);
@@ -5406,6 +5534,13 @@
       comboT -= dt;
       if (comboT <= 0) { combo = 0; comboPaid = 0; syncHud(); }
     }
+    if (player.pactRage > 0) {
+      player.pactRage -= dt;
+      if (player.pactRage <= 0) {
+        player.pactRage = 0;
+        showToast("RAGE ENDS", "#8a7060");
+      }
+    }
     const lowHp = player.maxhp && player.hp / player.maxhp < 0.3 && !player.dead &&
       (phase === "fight" || phase === "loot" || phase === "shop" || phase === "event");
     if (lowHp) {
@@ -5559,7 +5694,8 @@
         const slowM = player.slow > 0 ? 0.55 : 1;
         const af = armorFeel();
         const armM = af.stout ? 0.88 : af.light ? 1.12 : 1;
-        const spd = (player.dash ? player.speed * 2.6 : player.speed) * slowM * armM;
+        const rageM = player.pactRage > 0 ? 1.22 : 1;
+        const spd = (player.dash ? player.speed * 2.6 : player.speed) * slowM * armM * rageM;
         if (d < 0.12) { player.x = player.tx; player.y = player.ty; player.tx = null; }
         else {
           tryMove(player, player.x + (dx / d) * spd * dt, player.y + (dy / d) * spd * dt);
@@ -6144,6 +6280,7 @@
     if (player.burn > 0) icons.push("#fb923c");
     if (player.slow > 0) icons.push("#94a3b8");
     if (player.cursed) icons.push("#a78bfa");
+    if (player.pactRage > 0) icons.push("#ef4444");
     if (!icons.length) return;
     const baseX = sx(wx) - (icons.length - 1) * 5;
     const baseY = sy(wy) - TILE * 1.22;
@@ -6503,6 +6640,21 @@
     ctx.fillText(o.name, sx(o.x), sy(o.y) + TILE * 0.42);
   }
 
+  function drawPactOpt(o, i) {
+    const x = sx(o.x), y = sy(o.y);
+    const w = TILE * 2.4, h = TILE * 1.2;
+    const on = pact && pact.sel === i && !pact.used;
+    ctx.fillStyle = o.id === "take" ? "rgba(127,29,29,0.9)" : "rgba(42,32,24,0.9)";
+    ctx.fillRect(x - w * 0.5, y - h * 0.5, w, h);
+    ctx.strokeStyle = on ? "#fde68a" : (o.id === "take" ? "#ef4444" : "#8a7060");
+    ctx.lineWidth = on ? 3 : 2;
+    ctx.strokeRect(x - w * 0.5, y - h * 0.5, w, h);
+    ctx.fillStyle = pact && pact.used ? "#6a5a50" : (o.id === "take" ? "#fda4af" : "#e8d5c0");
+    ctx.font = "800 14px ui-sans-serif, system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText(o.name, x, y + 5);
+  }
+
   function draw() {
     const ox = (Math.random() - 0.5) * shake;
     const oy = (Math.random() - 0.5) * shake;
@@ -6564,6 +6716,7 @@
     if (shop && shop.refresh) list.push({ y: shop.refresh.y, draw: drawShopRefresh });
     if (wheel) list.push({ y: wheel.y, draw: drawWheel });
     if (shrine) shrine.opts.forEach(function (o, i) { list.push({ y: o.y, draw: function () { drawShrineOpt(o, i); } }); });
+    if (pact) pact.opts.forEach(function (o, i) { list.push({ y: o.y, draw: function () { drawPactOpt(o, i); } }); });
     if (rest) {
       list.push({ y: rest.fire.y, draw: function () { drawCampfire(rest.fire); } });
       rest.opts.forEach(function (o, i) { list.push({ y: o.y, draw: function () { drawRestOpt(o, i); } }); });
@@ -7126,6 +7279,8 @@
   function showTitle() {
     hidePauseOverlay();
     hideToast();
+    showPactHud(false);
+    pact = null;
     titleMode = "main";
     titleBackTo = "main";
     titleDaily = false;
