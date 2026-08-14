@@ -88,13 +88,13 @@
     #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
     #overlay {
       position: fixed;
-      inset: 0;
+      inset: 0 0 calc(150px + env(safe-area-inset-bottom, 0px)) 0;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       text-align: center;
-      padding: 1.5rem 1.25rem calc(2rem + env(safe-area-inset-bottom, 0px));
+      padding: 1.5rem 1.25rem 1rem;
       background: radial-gradient(ellipse at center, rgba(6,3,3,0.82) 0%, rgba(6,3,3,0.48) 62%, rgba(6,3,3,0.34) 100%);
       z-index: 4;
     }
@@ -141,17 +141,263 @@
       touch-action: manipulation;
     }
     .btn:active { transform: scale(0.98); }
-    #hint {
+    #hint { display: none; }
+
+    /* ===== Game Boy SP control deck ===== */
+    #gbsp {
+      --dp: 108px;
+      --bt: 60px;
+      --arm: calc(var(--dp) / 3);
       position: fixed;
-      left: 0; right: 0;
-      bottom: calc(0.7rem + env(safe-area-inset-bottom, 0px));
+      left: 0; right: 0; bottom: 0;
+      z-index: 5;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      touch-action: none;
+    }
+    #gbsp * { touch-action: none; -webkit-user-select: none; user-select: none; }
+    .gb-lip {
+      height: 6px;
+      background:
+        linear-gradient(#3a3028 0 2px, #1a1410 2px 4px, #0a0806 4px 6px);
+      box-shadow: 0 -2px 0 #080604;
+    }
+    .gb-tray {
+      position: relative;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding: 20px 18px 12px;
+      background-color: rgba(14, 10, 9, 0.90);
+      background-image:
+        linear-gradient(180deg, rgba(255,220,180,0.05) 0 2px, transparent 2px 10px),
+        repeating-linear-gradient(90deg, rgba(0,0,0,0.22) 0 2px, transparent 2px 4px),
+        repeating-linear-gradient(0deg, rgba(0,0,0,0.14) 0 2px, transparent 2px 4px);
+      border-top: 2px solid #2a2018;
+      box-shadow: inset 0 2px 0 #4a3a30, inset 0 -2px 0 #080604;
+    }
+    .gb-legend {
+      position: absolute;
+      left: 0; right: 0; top: 6px;
       text-align: center;
-      font-size: 0.72rem;
-      letter-spacing: 0.12em;
+      font-size: 9px;
+      letter-spacing: 0.16em;
       text-transform: uppercase;
       color: #8a7060;
       pointer-events: none;
+      font-weight: 700;
+    }
+    .gb-screw {
+      position: absolute;
+      width: 8px; height: 8px;
+      background: #2a221c;
+      box-shadow: inset 2px 2px 0 #5a4a40, inset -2px -2px 0 #0a0806, 2px 2px 0 #0a0806;
+      pointer-events: none;
+    }
+    .gb-screw.s1 { left: 8px; top: 10px; }
+    .gb-screw.s2 { right: 8px; top: 10px; }
+    .gb-left {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .dpad {
+      width: var(--dp);
+      height: var(--dp);
+      position: relative;
+      filter: drop-shadow(0 4px 0 #080604);
+    }
+    .dpad-v, .dpad-h {
+      position: absolute;
+      background: #2c3036;
+      box-shadow:
+        inset 2px 2px 0 #5a616a,
+        inset -2px -2px 0 #14161a,
+        0 0 0 2px #0a0808;
+    }
+    .dpad-v {
+      width: var(--arm);
+      height: var(--dp);
+      left: var(--arm);
+      top: 0;
+    }
+    .dpad-h {
+      width: var(--dp);
+      height: var(--arm);
+      left: 0;
+      top: var(--arm);
+    }
+    .dpad-nub {
+      position: absolute;
+      width: 22px; height: 22px;
+      left: calc(50% - 11px);
+      top: calc(50% - 11px);
+      background: #1a1c20;
+      border-radius: 4px;
+      box-shadow:
+        inset 2px 2px 0 #4a5058,
+        inset -2px -2px 0 #0c0c0e,
+        0 0 0 2px #0a0808;
       z-index: 2;
+    }
+    .dpad-arr {
+      position: absolute;
+      z-index: 1;
+      pointer-events: none;
+      width: 0; height: 0;
+    }
+    .dpad-arr.u {
+      left: calc(50% - 6px); top: 8px;
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-bottom: 8px solid #6a727c;
+    }
+    .dpad-arr.d {
+      left: calc(50% - 6px); bottom: 8px;
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-top: 8px solid #6a727c;
+    }
+    .dpad-arr.l {
+      left: 8px; top: calc(50% - 6px);
+      border-top: 6px solid transparent;
+      border-bottom: 6px solid transparent;
+      border-right: 8px solid #6a727c;
+    }
+    .dpad-arr.r {
+      right: 8px; top: calc(50% - 6px);
+      border-top: 6px solid transparent;
+      border-bottom: 6px solid transparent;
+      border-left: 8px solid #6a727c;
+    }
+    .dpad.press-u .dpad-v {
+      box-shadow: inset 2px 4px 0 #14161a, inset -2px -2px 0 #3a4048, 0 0 0 2px #0a0808;
+    }
+    .dpad.press-d .dpad-v {
+      box-shadow: inset 2px 2px 0 #3a4048, inset -2px -4px 0 #14161a, 0 0 0 2px #0a0808;
+    }
+    .dpad.press-l .dpad-h {
+      box-shadow: inset 4px 2px 0 #14161a, inset -2px -2px 0 #3a4048, 0 0 0 2px #0a0808;
+    }
+    .dpad.press-r .dpad-h {
+      box-shadow: inset 2px 2px 0 #3a4048, inset -4px -2px 0 #14161a, 0 0 0 2px #0a0808;
+    }
+    .dpad.press-u .dpad-arr.u { border-bottom-color: #c8d0d8; }
+    .dpad.press-d .dpad-arr.d { border-top-color: #c8d0d8; }
+    .dpad.press-l .dpad-arr.l { border-right-color: #c8d0d8; }
+    .dpad.press-r .dpad-arr.r { border-left-color: #c8d0d8; }
+
+    .gb-right {
+      position: relative;
+      width: 132px;
+      height: var(--dp);
+      margin-top: 10px;
+    }
+    .gb-btn {
+      position: absolute;
+      width: var(--bt);
+      height: var(--bt);
+      border: 0;
+      padding: 0;
+      color: #1a0800;
+      font-weight: 900;
+      font-size: 15px;
+      letter-spacing: 0.06em;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      line-height: var(--bt);
+      text-align: center;
+      cursor: pointer;
+      image-rendering: pixelated;
+      border-radius: 50%;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .gb-btn:focus { outline: none; }
+    .gb-a {
+      right: 0; top: 0;
+      background: #e85d04;
+      box-shadow:
+        0 0 0 3px #1a1008,
+        0 0 0 5px #0a0706,
+        inset 2px 2px 0 #ffb060,
+        inset -2px -3px 0 #9a3400,
+        0 4px 0 #3a1400;
+      text-shadow: 0 2px 0 #9a3400;
+    }
+    .gb-b {
+      left: 0; bottom: 4px;
+      background: #8a9098;
+      color: #1a1c20;
+      box-shadow:
+        0 0 0 3px #1a1008,
+        0 0 0 5px #0a0706,
+        inset 2px 2px 0 #c8cdd4,
+        inset -2px -3px 0 #4a5058,
+        0 4px 0 #2a2c30;
+      text-shadow: 0 2px 0 #4a5058;
+    }
+    .gb-btn.pressed {
+      transform: translateY(3px);
+      filter: brightness(0.82);
+    }
+    .gb-a.pressed {
+      box-shadow:
+        0 0 0 3px #1a1008,
+        0 0 0 5px #0a0706,
+        inset 2px 3px 0 #9a3400,
+        inset -2px -1px 0 #c85010,
+        0 1px 0 #3a1400;
+    }
+    .gb-b.pressed {
+      box-shadow:
+        0 0 0 3px #1a1008,
+        0 0 0 5px #0a0706,
+        inset 2px 3px 0 #4a5058,
+        inset -2px -1px 0 #6a7078,
+        0 1px 0 #2a2c30;
+    }
+    .gb-start {
+      align-self: flex-end;
+      margin: 0 0 10px;
+      width: 44px;
+      height: 14px;
+      border: 0;
+      padding: 0;
+      background: #2a2420;
+      color: #6a5a50;
+      font-size: 7px;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      box-shadow: inset 2px 2px 0 #0a0806, inset -2px -2px 0 #4a3a30, 0 2px 0 #0a0806;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .gb-start:focus { outline: none; }
+    .gb-start.pressed {
+      color: #c4b4a4;
+      box-shadow: inset 2px 2px 0 #0a0806, inset -1px -1px 0 #3a3028;
+      transform: translateY(1px);
+    }
+
+    @media (max-height: 540px) {
+      #gbsp { --dp: 84px; --bt: 48px; }
+      .gb-legend { display: none; }
+      .gb-tray { padding: 6px 14px 8px; }
+      .gb-right { width: 108px; }
+      .gb-btn { font-size: 13px; }
+      .gb-start { display: none; }
+      #overlay { inset: 0 0 calc(110px + env(safe-area-inset-bottom, 0px)) 0; }
+    }
+    @media (max-width: 340px) {
+      #gbsp { --dp: 96px; --bt: 52px; }
+      .gb-tray { padding: 8px 10px 10px; }
+      .gb-right { width: 116px; }
     }
   </style>
 </head>
@@ -165,7 +411,31 @@
     </div>
   </div>
   <div id="toast"></div>
-  <div id="hint">TAP FOE · TAP GROUND · SWIPE DODGE</div>
+  <div id="hint">D-PAD MOVE · A SLASH · B DODGE</div>
+  <div id="gbsp">
+    <div class="gb-lip"></div>
+    <div class="gb-tray">
+      <div class="gb-screw s1"></div>
+      <div class="gb-screw s2"></div>
+      <div class="gb-legend">D-PAD MOVE · A SLASH · B DODGE</div>
+      <div class="gb-left">
+        <div id="dpad" class="dpad">
+          <div class="dpad-v"></div>
+          <div class="dpad-h"></div>
+          <div class="dpad-nub"></div>
+          <div class="dpad-arr u"></div>
+          <div class="dpad-arr d"></div>
+          <div class="dpad-arr l"></div>
+          <div class="dpad-arr r"></div>
+        </div>
+      </div>
+      <button type="button" id="gbstart" class="gb-start">START</button>
+      <div class="gb-right">
+        <button type="button" id="btnB" class="gb-btn gb-b">B</button>
+        <button type="button" id="btnA" class="gb-btn gb-a">A</button>
+      </div>
+    </div>
+  </div>
   <div id="overlay">
     <h1>SLASH PIT</h1>
     <p>One thumb. Dash-strike. Grab loot. Don't get slammed.</p>
@@ -271,6 +541,10 @@
   let lightCvs = null, lightCtx = null;
 
   const ptr = { down: false, x: 0, y: 0, sx: 0, sy: 0, t: 0, id: null };
+  const pad = { x: 0, y: 0, id: null, a: false, b: false };
+  const keys = { u: false, d: false, l: false, r: false, a: false, b: false };
+  const lastStick = { x: 1, y: 0 };
+  let stickWasOn = false;
 
   function rnd(a, b) { return a + Math.random() * (b - a); }
   function pick(a) { return a[(Math.random() * a.length) | 0]; }
@@ -955,7 +1229,8 @@
   function fitMap() {
     if (!MAP.length) return;
     const topPad = 86 + (parseFloat(getComputedStyle(document.documentElement).getPropertyValue("env(safe-area-inset-top)")) || 0);
-    const botPad = 40 + (parseFloat(getComputedStyle(document.documentElement).getPropertyValue("env(safe-area-inset-bottom)")) || 0);
+    const deck = document.getElementById("gbsp");
+    const botPad = deck ? Math.max(148, deck.offsetHeight) : 168;
     let t = Math.floor(Math.min((W - 8) / COLS, (H - topPad - botPad) / ROWS));
     t = Math.max(16, t - (t % 2));
     TILE = t;
@@ -1321,6 +1596,89 @@
     ghosts.push({ x: player.x, y: player.y, t: 0.2, flip: player.flip });
   }
 
+  function stickNow() {
+    let x = pad.x + (keys.r ? 1 : 0) - (keys.l ? 1 : 0);
+    let y = pad.y + (keys.d ? 1 : 0) - (keys.u ? 1 : 0);
+    x = x < -1 ? -1 : x > 1 ? 1 : x;
+    y = y < -1 ? -1 : y > 1 ? 1 : y;
+    const on = x !== 0 || y !== 0;
+    if (on && x && y) {
+      const inv = 1 / Math.hypot(x, y);
+      return { x: x * inv, y: y * inv, on: true };
+    }
+    return { x: x, y: y, on: on };
+  }
+
+  function refreshPadVisuals() {
+    const dpad = document.getElementById("dpad");
+    const aEl = document.getElementById("btnA");
+    const bEl = document.getElementById("btnB");
+    if (!dpad) return;
+    const sx = pad.x + (keys.r ? 1 : 0) - (keys.l ? 1 : 0);
+    const sy = pad.y + (keys.d ? 1 : 0) - (keys.u ? 1 : 0);
+    dpad.classList.toggle("press-u", sy < 0);
+    dpad.classList.toggle("press-d", sy > 0);
+    dpad.classList.toggle("press-l", sx < 0);
+    dpad.classList.toggle("press-r", sx > 0);
+    if (aEl) aEl.classList.toggle("pressed", pad.a || keys.a);
+    if (bEl) bEl.classList.toggle("pressed", pad.b || keys.b);
+  }
+
+  function bestSlashTarget() {
+    const fx = Math.cos(player.face), fy = Math.sin(player.face);
+    const reach = player.slashR + 1.05;
+    let best = null, score = 1e9;
+    for (let i = 0; i < enemies.length; i++) {
+      const e = enemies[i];
+      const dx = e.x - player.x, dy = e.y - player.y;
+      const raw = Math.hypot(dx, dy) || 0.001;
+      const d = raw - e.r;
+      if (d > reach) continue;
+      const dot = (dx * fx + dy * fy) / raw;
+      const s = d + (dot > 0.2 ? 0 : 1.55) + (dot > 0.55 ? -0.35 : 0);
+      if (s < score) { score = s; best = e; }
+    }
+    return best;
+  }
+
+  function facingSlash() {
+    if (player.slashCd > 0 || player.dead) return;
+    if (phase !== "fight" && phase !== "loot") return;
+    const fx = Math.cos(player.face), fy = Math.sin(player.face);
+    player.flip = fx < 0;
+    if (phase === "fight") {
+      const t = bestSlashTarget();
+      if (t && dist(player.x, player.y, t.x, t.y) <= player.slashR + 1.15) {
+        dashStrike(t);
+        if (dist(player.x, player.y, t.x, t.y) <= player.slashR) player.dash = null;
+        return;
+      }
+    }
+    player.slashCd = 0.28;
+    player.slashAnim = 1;
+    const hitR = player.slashR * 0.88;
+    for (let i = 0; i < enemies.length; i++) {
+      const e = enemies[i];
+      const dx = e.x - player.x, dy = e.y - player.y;
+      const d = Math.hypot(dx, dy) || 0.001;
+      if (d > hitR + e.r) continue;
+      if ((dx * fx + dy * fy) / d > 0.18) {
+        const crit = Math.random() < player.crit;
+        hitEnemy(e, Math.round(player.dmg * (crit ? 1.6 : 1)), crit);
+      }
+    }
+    burst(player.x + fx * 0.55, player.y + fy * 0.55, "#fb923c", 4);
+  }
+
+  function padDodge() {
+    const st = stickNow();
+    let dx, dy;
+    if (st.on) { dx = st.x; dy = st.y; }
+    else if (lastStick.x !== 0 || lastStick.y !== 0) { dx = lastStick.x; dy = lastStick.y; }
+    else { dx = Math.cos(player.face || 0); dy = Math.sin(player.face || 0); }
+    dodge(dx, dy);
+  }
+
   function syncHud() {
     const pct = player.maxhp ? clamp(player.hp / player.maxhp, 0, 1) : 0;
     hpfill.style.transform = "scaleX(" + pct + ")";
@@ -1439,6 +1797,147 @@
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); }, { passive: false });
   document.addEventListener("touchmove", function (e) { e.preventDefault(); }, { passive: false });
 
+  (function bindPad() {
+    const dpad = document.getElementById("dpad");
+    const aEl = document.getElementById("btnA");
+    const bEl = document.getElementById("btnB");
+    const startEl = document.getElementById("gbstart");
+    const root = document.getElementById("gbsp");
+
+    function halt(e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    function setDpadFromEvent(e) {
+      const r = dpad.getBoundingClientRect();
+      const dx = e.clientX - (r.left + r.width * 0.5);
+      const dy = e.clientY - (r.top + r.height * 0.5);
+      const dead = Math.max(10, r.width * 0.11);
+      let x = 0, y = 0;
+      if (Math.abs(dx) > dead) x = dx > 0 ? 1 : -1;
+      if (Math.abs(dy) > dead) y = dy > 0 ? 1 : -1;
+      if (!x && !y && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
+        if (Math.abs(dx) >= Math.abs(dy)) x = dx > 0 ? 1 : -1;
+        else y = dy > 0 ? 1 : -1;
+      }
+      pad.x = x; pad.y = y;
+      if (x || y) { lastStick.x = x; lastStick.y = y; }
+      refreshPadVisuals();
+    }
+
+    function clearDpad() {
+      pad.x = 0; pad.y = 0; pad.id = null;
+      refreshPadVisuals();
+    }
+
+    dpad.addEventListener("pointerdown", function (e) {
+      halt(e);
+      pad.id = e.pointerId;
+      try { dpad.setPointerCapture(e.pointerId); } catch (err) {}
+      setDpadFromEvent(e);
+    }, { passive: false });
+    dpad.addEventListener("pointermove", function (e) {
+      if (pad.id !== e.pointerId) return;
+      halt(e);
+      setDpadFromEvent(e);
+    }, { passive: false });
+    function dpadUp(e) {
+      if (pad.id !== null && e.pointerId !== pad.id) return;
+      halt(e);
+      clearDpad();
+    }
+    dpad.addEventListener("pointerup", dpadUp, { passive: false });
+    dpad.addEventListener("pointercancel", dpadUp, { passive: false });
+
+    function holdBtn(el, which) {
+      el.addEventListener("pointerdown", function (e) {
+        halt(e);
+        try { el.setPointerCapture(e.pointerId); } catch (err) {}
+        pad[which] = true;
+        refreshPadVisuals();
+        if (phase === "title" || phase === "dead" || phase === "win") { startRun(); return; }
+        if (which === "a") facingSlash();
+        else padDodge();
+      }, { passive: false });
+      function up(e) {
+        halt(e);
+        pad[which] = false;
+        refreshPadVisuals();
+      }
+      el.addEventListener("pointerup", up, { passive: false });
+      el.addEventListener("pointercancel", up, { passive: false });
+    }
+    holdBtn(aEl, "a");
+    holdBtn(bEl, "b");
+
+    startEl.addEventListener("pointerdown", function (e) {
+      halt(e);
+      startEl.classList.add("pressed");
+      if (phase === "title" || phase === "dead" || phase === "win") startRun();
+    }, { passive: false });
+    function startUp(e) {
+      halt(e);
+      startEl.classList.remove("pressed");
+    }
+    startEl.addEventListener("pointerup", startUp, { passive: false });
+    startEl.addEventListener("pointercancel", startUp, { passive: false });
+
+    root.addEventListener("contextmenu", halt, { passive: false });
+    root.addEventListener("touchstart", function (e) { e.preventDefault(); }, { passive: false });
+  })();
+
+  function keyDir(code, down) {
+    if (code === "ArrowUp" || code === "KeyW") keys.u = down;
+    else if (code === "ArrowDown" || code === "KeyS") keys.d = down;
+    else if (code === "ArrowLeft" || code === "KeyA") keys.l = down;
+    else if (code === "ArrowRight" || code === "KeyD") keys.r = down;
+    else return false;
+    if (down) {
+      const st = stickNow();
+      if (st.on) { lastStick.x = st.x; lastStick.y = st.y; }
+    }
+    refreshPadVisuals();
+    return true;
+  }
+
+  window.addEventListener("keydown", function (e) {
+    if (e.repeat && (e.code === "Space" || e.code === "KeyX" || e.code === "KeyK" || e.code === "KeyZ" || e.code === "KeyJ" || e.code === "Enter")) {
+      e.preventDefault();
+      return;
+    }
+    if (keyDir(e.code, true)) { e.preventDefault(); return; }
+    const isA = e.code === "Space" || e.code === "KeyX" || e.code === "KeyK";
+    const isB = e.code === "KeyZ" || e.code === "KeyJ";
+    const isStart = e.code === "Enter";
+    if (isA) {
+      e.preventDefault();
+      keys.a = true;
+      refreshPadVisuals();
+      if (phase === "title" || phase === "dead" || phase === "win") startRun();
+      else facingSlash();
+    } else if (isB) {
+      e.preventDefault();
+      keys.b = true;
+      refreshPadVisuals();
+      if (phase === "title" || phase === "dead" || phase === "win") startRun();
+      else padDodge();
+    } else if (isStart) {
+      e.preventDefault();
+      if (phase === "title" || phase === "dead" || phase === "win") startRun();
+    }
+  });
+  window.addEventListener("keyup", function (e) {
+    if (keyDir(e.code, false)) { e.preventDefault(); return; }
+    if (e.code === "Space" || e.code === "KeyX" || e.code === "KeyK") {
+      keys.a = false; refreshPadVisuals(); e.preventDefault();
+    } else if (e.code === "KeyZ" || e.code === "KeyJ") {
+      keys.b = false; refreshPadVisuals(); e.preventDefault();
+    }
+  });
+  window.addEventListener("resize", resize);
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", resize);
+
   document.getElementById("enterbtn").addEventListener("click", function (e) {
     e.stopPropagation();
     startRun();
@@ -1497,6 +1996,24 @@
       tryMove(player, player.x + player.vx * dt, player.y + player.vy * dt);
       moving = true;
     } else {
+      const st = stickNow();
+      if (st.on) {
+        lastStick.x = st.x; lastStick.y = st.y;
+        player.face = Math.atan2(st.y, st.x);
+        player.flip = st.x < 0;
+        if (!player.dash) {
+          player.tx = player.x + st.x * 1.55;
+          player.ty = player.y + st.y * 1.55;
+        }
+      } else if (stickWasOn && !player.dash) {
+        player.tx = null;
+        player.ty = null;
+      }
+      stickWasOn = st.on;
+      if (pad.a || keys.a) facingSlash();
+      if (pad.b || keys.b) padDodge();
+      refreshPadVisuals();
+
       if (player.dash && player.dash.hp > 0) {
         player.tx = player.dash.x; player.ty = player.dash.y;
         const d = dist(player.x, player.y, player.dash.x, player.dash.y);
