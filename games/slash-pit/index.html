@@ -1,1 +1,193 @@
-PLACEHOLDER_LOAD_FROM_DISK
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#0a0706" />
+  <title>Slash Pit</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      overscroll-behavior: none;
+      touch-action: none;
+      background: #0a0706;
+      color: #f3e8de;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+    #hud {
+      position: fixed;
+      left: 0; right: 0; top: 0;
+      padding: calc(0.55rem + env(safe-area-inset-top, 0px)) 0.9rem 0.4rem;
+      pointer-events: none;
+      z-index: 2;
+    }
+    .hpwrap {
+      height: 14px;
+      border-radius: 99px;
+      background: #1a1010;
+      border: 1px solid #3a2018;
+      overflow: hidden;
+    }
+    .hpfill {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #9b1d20, #e85d04);
+      transform-origin: left center;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-top: 0.35rem;
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #c4b4a4;
+    }
+    #hptext { font-variant-numeric: tabular-nums; }
+    #toast {
+      position: fixed;
+      left: 50%;
+      top: calc(4.1rem + env(safe-area-inset-top, 0px));
+      transform: translateX(-50%) translateY(-8px);
+      padding: 0.45rem 0.85rem;
+      border-radius: 999px;
+      background: rgba(20,10,8,0.88);
+      border: 1px solid #5a3a20;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 3;
+      white-space: nowrap;
+      max-width: 92vw;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: opacity 0.12s linear, transform 0.12s ease;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    #overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 1.5rem 1.25rem calc(2rem + env(safe-area-inset-bottom, 0px));
+      background: radial-gradient(ellipse at center, rgba(6,3,3,0.82) 0%, rgba(6,3,3,0.48) 62%, rgba(6,3,3,0.34) 100%);
+      z-index: 4;
+    }
+    #overlay.hidden { display: none; }
+    #hud.off { visibility: hidden; }
+    #overlay h1 {
+      margin: 0;
+      font-size: clamp(2.4rem, 12vw, 3.6rem);
+      letter-spacing: 0.08em;
+      line-height: 0.95;
+      text-shadow: 0 0 24px #e85d0466, 0 4px 0 #3a0c08;
+    }
+    #overlay h2 {
+      margin: 0;
+      font-size: clamp(1.8rem, 9vw, 2.6rem);
+      letter-spacing: 0.06em;
+    }
+    #overlay p {
+      margin: 0.7rem 0 0;
+      color: #c4b4a4;
+      line-height: 1.45;
+      max-width: 22rem;
+    }
+    #overlay .recap {
+      margin-top: 0.85rem;
+      font-size: 0.86rem;
+      color: #e8d5c0;
+      max-height: 28vh;
+      overflow: auto;
+      line-height: 1.55;
+    }
+    .btn {
+      margin-top: 1.5rem;
+      min-height: 3.3rem;
+      min-width: 13.5rem;
+      padding: 0.9rem 2rem;
+      border: 0;
+      border-radius: 999px;
+      background: #e85d04;
+      color: #1a0800;
+      font-weight: 800;
+      font-size: 1.15rem;
+      letter-spacing: 0.04em;
+      touch-action: manipulation;
+    }
+    .btn:active { transform: scale(0.98); }
+    #hint {
+      position: fixed;
+      left: 0; right: 0;
+      bottom: calc(0.7rem + env(safe-area-inset-bottom, 0px));
+      text-align: center;
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #8a7060;
+      pointer-events: none;
+      z-index: 2;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="hud">
+    <div class="hpwrap"><div class="hpfill" id="hpfill"></div></div>
+    <div class="row">
+      <span id="hptext">100 / 100</span>
+      <span id="roomtext">ROOM 1 / 8</span>
+    </div>
+  </div>
+  <div id="toast"></div>
+  <div id="hint">TAP FOE · TAP GROUND · SWIPE DODGE</div>
+  <div id="overlay">
+    <h1>SLASH PIT</h1>
+    <p>One thumb. Dash-strike. Grab loot. Don't get slammed.</p>
+    <p id="bestline"></p>
+    <button class="btn" id="enterbtn" type="button">TAP TO ENTER</button>
+  </div>
+  <script>
+(function () {
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
+  const hpfill = document.getElementById("hpfill");
+  const hptext = document.getElementById("hptext");
+  const roomtext = document.getElementById("roomtext");
+  const toastEl = document.getElementById("toast");
+  const overlay = document.getElementById("overlay");
+  const hint = document.getElementById("hint");
+  const hud = document.getElementById("hud");
+  const BEST_KEY = "slashpit-best";
+
+  const RARITY = {
+    junk:   { w: 40, label: "JUNK",   color: "#c4c0b8" },
+    common: { w: 35, label: "COMMON", color: "#86efac" },
+    rare:   { w: 18, label: "RARE",   color: "#7dd3fc" },
+    epic:   { w: 7,  label: "EPIC",   color: "#d8b4fe" }
+  };
