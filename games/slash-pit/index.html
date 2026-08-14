@@ -361,6 +361,8 @@
   const LORE_KEY = "slashpit-lore";
   const GHOST_KEY = "slashpit-ghost";
   const BOARD_KEY = "slashpit-board";
+  const FAM_KEY = "slashpit-familiar";
+  const WEEKLY_BEST_KEY = "slashpit-weekly-best";
   const MUTATORS = [
     { id: "swarm", name: "Swarm", desc: "+1 enemy" },
     { id: "glass", name: "Glass", desc: "half HP" },
@@ -395,7 +397,8 @@
     { id: "elite", name: "Elite Slayer" },
     { id: "secret", name: "Crack Rat" },
     { id: "combo10", name: "x10 Frenzy" },
-    { id: "ngplus", name: "Deeper Still" }
+    { id: "ngplus", name: "Deeper Still" },
+    { id: "heart", name: "Heart Taken" }
   ];
 
   const RARITY = {
@@ -538,6 +541,14 @@
   let runMutators = [];
   let titleDaily = false;
   let titleDeeper = false;
+  let titleWeekly = false;
+  let titleFamiliar = false;
+  let runWeekly = false;
+  let familiarOn = false;
+  let familiar = null;
+  let heartT = 0;
+  let lightSkip = 0;
+  let lightCacheKey = "";
   let challenge = null;
   let tablets = [];
   let loreFound = {};
@@ -603,6 +614,52 @@
     }
     return out;
   }
+  function isoWeekKey() {
+    const now = new Date();
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const day = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - day);
+    const year = d.getUTCFullYear();
+    const jan1 = new Date(Date.UTC(year, 0, 1));
+    const week = Math.ceil((((d - jan1) / 86400000) + 1) / 7);
+    return year + "-W" + (week < 10 ? "0" : "") + week;
+  }
+  function weeklySeed() {
+    return hashSeed("weekly-" + isoWeekKey());
+  }
+  function weeklyMutators() {
+    const r = makeRng(weeklySeed() ^ 0xBEE5);
+    const pool = MUTATORS.slice();
+    const out = [];
+    for (let i = 0; i < 2 && pool.length; i++) {
+      const idx = (r() * pool.length) | 0;
+      out.push(pool.splice(idx, 1)[0]);
+    }
+    return out;
+  }
+  function weeklyBest() {
+    try {
+      const raw = localStorage.getItem(WEEKLY_BEST_KEY);
+      if (!raw) return { week: isoWeekKey(), depth: 0 };
+      const o = JSON.parse(raw);
+      if (!o || o.week !== isoWeekKey()) return { week: isoWeekKey(), depth: 0 };
+      return { week: o.week, depth: +o.depth || 0 };
+    } catch (e) { return { week: isoWeekKey(), depth: 0 }; }
+  }
+  function saveWeeklyBest(n) {
+    if (!runWeekly) return;
+    const cur = weeklyBest();
+    if (n > cur.depth) {
+      try { localStorage.setItem(WEEKLY_BEST_KEY, JSON.stringify({ week: isoWeekKey(), depth: n })); } catch (e) {}
+    }
+  }
+  function loadFamiliar() {
+    try { return localStorage.getItem(FAM_KEY) === "1"; } catch (e) { return false; }
+  }
+  function saveFamiliar(on) {
+    try { localStorage.setItem(FAM_KEY, on ? "1" : "0"); } catch (e) {}
+  }
+  function familiarUnlocked() { return bestDepth() >= 10; }
   function hasMut(id) {
     for (let i = 0; i < runMutators.length; i++) if (runMutators[i].id === id) return true;
     return false;
@@ -759,6 +816,7 @@
   pickedClass = loadClass();
   loreFound = loadLore();
   lastGhost = loadGhost();
+  titleFamiliar = loadFamiliar();
 
   function relicUnlocked(id) {
     const def = START_RELICS.filter(function (r) { return r.id === id; })[0];
@@ -1155,6 +1213,15 @@
     spr.spin2 = bake([
       "........................","........kwww............","......wCCCwww...........",".....wCCk..kCCw.........","....wCk......kCw........","....wk........kw........","....w..........w........",".....ww......ww.........","......wCCwwwwCk.........","........kkkk............","........................","........................"
     ]);
+    spr.heroBack = bake([
+      "................","......kkk.......",".....kSSSk......","....kSSSSSk.....","....kSSSSSk.k...","....kSSSSSk.Sk..",".....kSSSk.kSk..","....kksssk.khk..","...kssssssk.k...","...kssssssk.....","..kbksssskbk....","..kBBssssBBk....","....k.oo.k......",".....ko.ok......",".....kS.Sk......",".....kk.kk......"
+    ]);
+    spr.heart = bake(padBottom([
+      "........kkkkkkkk........","......kkRRRRRRRRkk......",".....kRRRRqqRRRRRk......","....kRRRRyyyyRRRRRk.....","....kRRyywwwwyyRRRk.....","...kRRRyyyyyyyyRRRRk....","...kRRRRyyyyyyRRRRRk....","....kRRRRRqqRRRRRRk.....","....kRRRRRRRRRRRRk......",".....kRRRRRRRRRRk.......","......kRRRRRRRRk........",".......kRRRRRRk.........","........kRRRRk..........",".........kRRk...........","..........kk............"
+    ], 20));
+    spr.heartPulse = bake(padBottom([
+      ".......kkkkkkkkkk.......",".....kkRRqqqqRRRRkk.....","....kRRRRyyyyyyRRRk.....","...kRRRyyyywwyyyyRRk....","...kRRyywwwwwwyyRRRk....","..kRRRyyyyyyyyyyRRRRk...","..kRRRRyyyyyyyyRRRRRk...","...kRRRRRRqqRRRRRRRk....","...kRRRRRRRRRRRRRRk.....","....kRRRRRRRRRRRRk......",".....kRRRRRRRRRRk.......","......kRRRRRRRRk........",".......kRRRRRRk.........","........kRRRRk..........",".........kkkk..........."
+    ], 20));
   }
 
   const THEMES = {
@@ -1721,14 +1788,14 @@
     flashCol = rgb || "255,50,36";
   }
   function isBossType(t) {
-    return t === "boss" || t === "boneking" || t === "ashwitch" || t === "hollowtwin";
+    return t === "boss" || t === "boneking" || t === "ashwitch" || t === "hollowtwin" || t === "heart";
   }
   function bossTypeFor(n) {
     const i = Math.max(0, ((n / 8) | 0) - 1) % 4;
     return i === 0 ? "boss" : i === 1 ? "boneking" : i === 2 ? "ashwitch" : "hollowtwin";
   }
   function bossTitle(t) {
-    return t === "boneking" ? "BONE KING" : t === "ashwitch" ? "ASH WITCH" : t === "hollowtwin" ? "HOLLOW TWIN" : "PIT LORD";
+    return t === "boneking" ? "BONE KING" : t === "ashwitch" ? "ASH WITCH" : t === "hollowtwin" ? "HOLLOW TWIN" : t === "heart" ? "HEART OF THE PIT" : "PIT LORD";
   }
   function applyStatus(kind, dur) {
     if (depth === 1 || player.dead) return;
@@ -1823,6 +1890,7 @@
     if (type === "boneking") return { type: "boneking", hp: 200 + (cycle - 1) * 70, dmg: 20 + (cycle - 1) * 3, speed: 1.38 + (cycle - 1) * 0.06, r: 0.76, cr: 0.46, range: 1.1, cd: 1.08, slam: 3.1 };
     if (type === "ashwitch") return { type: "ashwitch", hp: 165 + (cycle - 1) * 60, dmg: 17 + (cycle - 1) * 3, speed: 1.62, r: 0.48, cr: 0.3, range: 2.55, cd: 1.15 };
     if (type === "hollowtwin") return { type: "hollowtwin", hp: 190 + (cycle - 1) * 65, dmg: 18 + (cycle - 1) * 3, speed: 1.58, r: 0.64, cr: 0.4, range: 1.08, cd: 0.98, slam: 2.7 };
+    if (type === "heart") return { type: "heart", hp: 480, dmg: 22, speed: 0.62, r: 0.92, cr: 0.52, range: 1.55, cd: 1.15, slam: 2.0 };
     return { type: "boss", hp: 220 + (cycle - 1) * 85, dmg: 22 + (cycle - 1) * 4, speed: 1.48 + (cycle - 1) * 0.07, r: 0.82, cr: 0.48, range: 1.18, cd: 1.05, slam: 3 };
   }
 
@@ -1841,7 +1909,7 @@
       elite: !!elite, swoopT: 0, sx: c.x, sy: c.y,
       burn: 0, burnTick: 0, summonT: 2.8, teleT: 2.4, casting: false,
       glow: 0, glowT: type === "wisp" ? 1.15 : 0,
-      stun: 0, frost: false, stash: 0, twin: false
+      stun: 0, frost: false, stash: 0, twin: false, splitGuard: 0, pulse: 0
     });
     e.maxhp = e.hp;
     if (depth === 1 && type === "slime") { e.hp = e.maxhp = 18; e.dmg = 6; e.speed = 1.35; }
@@ -1856,6 +1924,7 @@
 
   function decideKind(n) {
     if (n === 1) return "combat";
+    if (n === 40) return "heart";
     if (ngPlus && n === 9) return "combat";
     if (n % 8 === 0) return "boss";
     if (n % 4 === 0) return "warden";
@@ -1925,8 +1994,9 @@
     roomKind = decideKind(n);
     lastKind = roomKind;
     const forced = n === 1 ? { layout: "hall", theme: "ember" }
+      : (roomKind === "heart" ? { layout: "arena", theme: "blood" }
       : (roomKind === "shop" || roomKind === "rest" ? { layout: "chamber" }
-      : (roomKind === "warden" || roomKind === "challenge" ? { layout: "arena" } : null));
+      : (roomKind === "warden" || roomKind === "challenge" ? { layout: "arena" } : null)));
     buildMap(n, forced);
     player.x = spawnTile.x; player.y = spawnTile.y;
     player.tx = null; player.ty = null; player.dash = null;
@@ -1934,6 +2004,7 @@
     player.iframes = Math.max(player.iframes, n === 1 ? 1.05 : 0.85);
     player.vx = 0; player.vy = 0;
     combo = Math.min(combo, 3);
+    if (familiar) { familiar.x = player.x - 0.65; familiar.y = player.y - 0.45; familiar.peck = Math.max(familiar.peck || 0, 0.4); }
 
     if (roomKind === "shop") {
       phase = "shop";
@@ -2003,6 +2074,12 @@
       phase = "fight";
       spawnEnemy("warden", COLS * 0.5, ROWS * 0.42, false, false);
       banner = { t: 1.2, text: "WARDEN" };
+      startDrone();
+    } else if (roomKind === "heart") {
+      phase = "fight";
+      lastBoss = "heart";
+      spawnEnemy("heart", COLS * 0.5, ROWS * 0.42, false, false);
+      banner = { t: 1.35, text: "HEART OF THE PIT" };
       startDrone();
     } else if (roomKind === "boss") {
       phase = "fight";
@@ -2076,7 +2153,7 @@
 
   function placeSecret() {
     secret = null;
-    if (depth === 1 || roomKind === "shop" || roomKind === "rest") return;
+    if (depth === 1 || roomKind === "shop" || roomKind === "rest" || roomKind === "heart") return;
     if (rng() > 0.34) return;
     const cands = [];
     for (let ty = 0; ty < ROWS; ty++) {
@@ -2140,7 +2217,7 @@
 
   function placeHazards() {
     hazards = [];
-    if (depth === 1 || roomKind === "shop" || roomKind === "rest") return;
+    if (depth === 1 || roomKind === "shop" || roomKind === "rest" || roomKind === "heart") return;
     const biome = THEME && THEME._name;
     let kind = null;
     if (biome === "blood" || biome === "hell") kind = "spike";
@@ -2252,9 +2329,11 @@
       clampToWalkable(COLS * 0.50, ROWS * 0.42),
       clampToWalkable(COLS * 0.72, ROWS * 0.48)
     ];
+    const rp = clampToWalkable(COLS * 0.5, ROWS * 0.64);
     shop = {
       sel: 0,
       keeper: clampToWalkable(COLS * 0.5, ROWS * 0.30),
+      refresh: { x: rp.x, y: rp.y, price: Math.max(8, 10 + ((depth / 2) | 0)), used: false },
       goods: items.map(function (it, i) {
         return { item: it, price: itemPrice(it, depth), bought: false, x: spots[i].x, y: spots[i].y };
       })
@@ -2263,6 +2342,38 @@
     doorAnim = 0.55;
   }
 
+  function shopStock() {
+    const items = [];
+    items.push(makeItem());
+    items.push(makeItem(depth >= 8 ? "common" : null));
+    if (rng() < 0.55) items.push({ kind: "flask", rarity: "common", name: "Heart Flask", heal: 36 + ((depth / 4) | 0) * 6 });
+    else items.push(makeItem(depth >= 12 ? "rare" : "common"));
+    return items;
+  }
+  function tryRefresh() {
+    if (shopActLatch > 0) return;
+    if (!shop || !shop.refresh || shop.refresh.used) return;
+    shopActLatch = 0.28;
+    const p = shop.refresh.price;
+    if (gold < p) {
+      showToast("NEED " + p + " G", "#fda4af");
+      sfx("clang");
+      return;
+    }
+    gold -= p;
+    shop.refresh.used = true;
+    const items = shopStock();
+    for (let i = 0; i < shop.goods.length && i < items.length; i++) {
+      shop.goods[i].item = items[i];
+      shop.goods[i].price = itemPrice(items[i], depth);
+      shop.goods[i].bought = false;
+    }
+    shop.sel = 0;
+    sfx("shop");
+    showToast("REROLL", "#fbbf24");
+    burst(shop.refresh.x, shop.refresh.y, "#fbbf24", 10);
+    syncHud();
+  }
   function tryBuy(i) {
     if (shopActLatch > 0) return;
     if (!shop || !shop.goods[i] || shop.goods[i].bought) return;
@@ -2384,7 +2495,7 @@
     if (rng() < (roomLootMin ? 0.55 : 0.32)) {
       spawnGem(COLS * 0.5 + srnd(-1.4, 1.4), ROWS * 0.42 + srnd(-0.4, 0.4), makeItem(roomLootMin));
     }
-    if (roomKind === "boss") {
+    if (roomKind === "boss" || roomKind === "heart") {
       if (!chest || chest.mimic) {
         const p = clampToWalkable(COLS * 0.5, ROWS * 0.56);
         chest = { x: p.x, y: p.y, open: false, t: 0.55, epic: true };
@@ -2404,7 +2515,7 @@
       spawnGem(COLS * 0.65, ROWS * 0.44, makeItem("common"));
       addGold(10 + depth, COLS * 0.5, ROWS * 0.4);
     }
-    const canBranch = depth >= 2 && roomKind !== "shop" && roomKind !== "event" && roomKind !== "rest" && roomKind !== "boss" && rng() < 0.46;
+    const canBranch = depth >= 2 && roomKind !== "shop" && roomKind !== "event" && roomKind !== "rest" && roomKind !== "boss" && roomKind !== "heart" && rng() < 0.46;
     if (canBranch) {
       const L = clampToWalkable(COLS * 0.28, Math.max(1.4, doorTile.y));
       const R = clampToWalkable(COLS * 0.72, Math.max(1.4, doorTile.y));
@@ -2424,6 +2535,13 @@
       if (lastBoss === "boneking") fell = "KING FELLED";
       else if (lastBoss === "ashwitch") fell = "WITCH FELLED";
       else if (lastBoss === "hollowtwin") fell = "TWIN FELLED";
+    } else if (roomKind === "heart") {
+      fell = "HEART TAKEN";
+      spawnGem(COLS * 0.32, ROWS * 0.44, makeItem("epic"));
+      spawnGem(COLS * 0.68, ROWS * 0.44, makeItem("epic"));
+      spawnGem(COLS * 0.5, ROWS * 0.38, makeItem("rare"));
+      addGold(90 + depth * 2, COLS * 0.5, ROWS * 0.5);
+      unlockAch("heart");
     }
     banner = { t: 0.7, text: fell };
   }
@@ -2449,6 +2567,7 @@
     if (e.type === "mimic") base = 18;
     if (e.type === "warden") base = 24;
     if (e.type === "boss" || e.type === "boneking" || e.type === "ashwitch" || e.type === "hollowtwin") base = 42;
+    if (e.type === "heart") base = 80;
     base = Math.round(base * (1 + depth * 0.08));
     if (e.elite) base = Math.round(base * 3);
     return Math.max(1, (base * (0.7 + rng() * 0.6)) | 0);
@@ -2488,7 +2607,7 @@
       floats.push({ x: e.x, y: e.y - 0.5, t: 0.6, text: "!", col: "#fb923c" });
       return;
     }
-    const col = e.type === "slime" ? "#4ade80" : e.type === "bat" ? "#a78bfa" : e.type === "wisp" ? "#c4b5fd" : e.type === "golem" ? "#a8a29e" : e.type === "spitter" ? "#2dd4bf" : e.type === "knight" || e.type === "warden" ? "#cbd5e1" : e.type === "bomber" ? "#fb923c" : e.type === "mimic" ? "#fbbf24" : e.type === "brute" ? "#c2410c" : e.type === "ashwitch" ? "#fb923c" : e.type === "boneking" ? "#e2e8f0" : e.type === "hollowtwin" ? "#c4b5fd" : "#9b1d20";
+    const col = e.type === "slime" ? "#4ade80" : e.type === "bat" ? "#a78bfa" : e.type === "wisp" ? "#c4b5fd" : e.type === "golem" ? "#a8a29e" : e.type === "spitter" ? "#2dd4bf" : e.type === "knight" || e.type === "warden" ? "#cbd5e1" : e.type === "bomber" ? "#fb923c" : e.type === "mimic" ? "#fbbf24" : e.type === "brute" ? "#c2410c" : e.type === "ashwitch" ? "#fb923c" : e.type === "boneking" ? "#e2e8f0" : e.type === "hollowtwin" ? "#c4b5fd" : e.type === "heart" ? "#fb7185" : "#9b1d20";
     burst(e.x, e.y, col, isBossType(e.type) ? 22 : 12);
     bloodBurst(e.x, e.y, isBossType(e.type) ? 18 : 10);
     floats.push({ x: e.x, y: e.y - 0.4, t: 0.7, text: "POP", col: "#ffe8a3" });
@@ -2579,6 +2698,7 @@
   function splitHollowTwin(e) {
     if (!e || e.twin) return;
     e.twin = true;
+    e.splitGuard = 0.5;
     const half = Math.max(1, Math.round(e.maxhp * 0.5));
     e.hp = half;
     e.maxhp = half;
@@ -2586,6 +2706,7 @@
     e.slam = null;
     const c = spawnEnemy("hollowtwin", e.x + 0.95, e.y + 0.12, false, false);
     c.twin = true;
+    c.splitGuard = 0.5;
     c.hp = c.maxhp = half;
     c.r = e.r;
     c.slam = null;
@@ -2599,24 +2720,32 @@
 
   function doFinisher() {
     if (player.slashCd > 0) return;
+    const hitR = player.slashR * 1.75;
+    const targets = [];
+    for (let i = 0; i < enemies.length; i++) {
+      const e = enemies[i];
+      if (e.hp <= 0) continue;
+      if (dist(player.x, player.y, e.x, e.y) <= hitR + e.r) targets.push(e);
+    }
     player.slashCd = 0.46;
     player.slashAnim = 1.2;
     finishSpin = 1;
     player.heavy = 0.22;
     sfx("slash");
-    beep(220, 0.1, "sawtooth", 0.07, 90);
     fireSlashWave();
     tryCrackSecret();
     trySmashTablet();
-    const hitR = player.slashR * 1.75;
+    if (!targets.length) {
+      burst(player.x, player.y, "#fb923c", 6);
+      return;
+    }
+    beep(220, 0.1, "sawtooth", 0.07, 90);
     const dmg = Math.round(slashDmg(false) * 1.6);
-    for (let i = 0; i < enemies.length; i++) {
-      const e = enemies[i];
+    for (let i = 0; i < targets.length; i++) {
+      const e = targets[i];
       if (e.hp <= 0) continue;
-      if (dist(player.x, player.y, e.x, e.y) <= hitR + e.r) {
-        const crit = rng() < player.crit + 0.06;
-        hitEnemy(e, crit ? Math.round(dmg * 1.35) : dmg, crit);
-      }
+      const crit = rng() < player.crit + 0.06;
+      hitEnemy(e, crit ? Math.round(dmg * 1.35) : dmg, crit);
     }
     burst(player.x, player.y, "#fde68a", 16);
     burst(player.x, player.y, "#fb923c", 10);
@@ -2649,6 +2778,7 @@
   }
 
   function hitEnemy(e, dmg, crit) {
+    if (e.splitGuard > 0) return;
     if (e.boom > 0 || e._boomed && e.hp <= 1) return;
     if (e.type === "wisp" && !e.glow) {
       floats.push({ x: e.x, y: e.y - 0.5, t: 0.5, text: "PHASE", col: "#c4b5fd" });
@@ -2764,12 +2894,17 @@
   function interactOrSlash() {
     if (player.dead) return;
     if (phase === "shop" && shop) {
-      let nearest = shop.sel, nd = 99;
+      let nearest = shop.sel, nd = 99, ref = false;
       for (let i = 0; i < shop.goods.length; i++) {
         const d = dist(player.x, player.y, shop.goods[i].x, shop.goods[i].y);
-        if (d < nd) { nd = d; nearest = i; }
+        if (d < nd) { nd = d; nearest = i; ref = false; }
+      }
+      if (shop.refresh && !shop.refresh.used) {
+        const d = dist(player.x, player.y, shop.refresh.x, shop.refresh.y);
+        if (d < nd) { nd = d; nearest = shop.goods.length; ref = true; }
       }
       shop.sel = nearest;
+      if (ref) { if (nd < 1.4) tryRefresh(); return; }
       if (nd < 1.35) { tryBuy(shop.sel); return; }
       tryBuy(shop.sel);
       return;
@@ -2941,10 +3076,12 @@
     runSeed = seed >>> 0;
     rng = makeRng(runSeed);
     ngPlus = !!(opts && opts.deeper);
-    runMutators = (opts && opts.daily) ? dailyMutators() : [];
+    runWeekly = !!(opts && opts.weekly);
+    runMutators = runWeekly ? weeklyMutators() : ((opts && opts.daily) ? dailyMutators() : []);
     lastKind = "combat";
     titleDaily = false;
     titleDeeper = false;
+    titleWeekly = false;
     setPaused(false);
     overlay.classList.add("hidden");
     hud.classList.remove("off");
@@ -2955,11 +3092,14 @@
     boardSaved = false;
     lastGhost = loadGhost();
     resetPlayer();
+    familiarOn = familiarUnlocked() && loadFamiliar();
+    familiar = familiarOn ? { x: spawnTile.x - 0.65, y: spawnTile.y - 0.45, peck: 0.8, bob: 0 } : null;
     startRoom(ngPlus ? 9 : 1);
     syncHud();
     syncPauseGlyph();
     if (ngPlus) unlockAch("ngplus");
-    if (runMutators.length) showToast("DAILY · " + mutNames(), "#7dd3fc");
+    if (runWeekly) showToast("WEEKLY · " + mutNames(), "#fde68a");
+    else if (runMutators.length) showToast("DAILY · " + mutNames(), "#7dd3fc");
     else showToast(ngPlus ? "DEEPER · SEED " + seedLabel(runSeed) : "SEED " + seedLabel(runSeed), ngPlus ? "#d8b4fe" : "#c4b4a4");
     setTimeout(checkSetBonus, 900);
   }
@@ -2981,6 +3121,7 @@
     if (first) {
       sfx("death");
       saveBest(depth);
+      saveWeeklyBest(depth);
       if (depth > runStats.best) { runStats.best = depth; saveStats(); }
       saveGhost({ seed: runSeed, depth: depth, x: player.x, y: player.y, gold: gold });
       lastGhost = loadGhost();
@@ -3004,7 +3145,7 @@
     overlay.innerHTML =
       "<h2>YOU DIED</h2>" +
       "<p>Depth " + depth + " · " + gold + " G · Best " + best + "</p>" +
-      "<p id='seedline'>SEED " + seedLabel(runSeed) + " · +" + gained + " souls (" + unlocks.souls + ")</p>" +
+      "<p id='seedline'>SEED " + seedLabel(runSeed) + " · +" + gained + " souls (" + unlocks.souls + ")" + (runWeekly ? " · WEEKLY " + isoWeekKey() + " best " + weeklyBest().depth : "") + "</p>" +
       "<p>" + esc(unlockProg) + "</p>" +
       (recap.length ? "<div class='recap'>" + recap.map(esc).join("<br>") + "</div>" : "<p>No loot this run.</p>") +
       "<div class='btn-row'><button class='btn btn-sm' id='again' type='button'>PLAY AGAIN</button>" +
@@ -3050,6 +3191,11 @@
       if (dist(w.x, w.y, gems[i].x, gems[i].y) < 1.15) { pickup(gems[i]); return; }
     }
     if (shop) {
+      if (shop.refresh && !shop.refresh.used && dist(w.x, w.y, shop.refresh.x, shop.refresh.y) < 1.15) {
+        shop.sel = shop.goods.length;
+        tryRefresh();
+        return;
+      }
       for (let i = 0; i < shop.goods.length; i++) {
         if (dist(w.x, w.y, shop.goods[i].x, shop.goods[i].y) < 1.1) {
           shop.sel = i;
@@ -3134,6 +3280,7 @@
 
   function beginFromTitle() {
     if (titleDaily) startRun(dailySeed(), { daily: true });
+    else if (titleWeekly) startRun(weeklySeed(), { weekly: true });
     else if (titleDeeper) startRun(null, { deeper: true });
     else startRun();
   }
@@ -3292,7 +3439,8 @@
 
   function nudgeSelect(dir) {
     if (phase === "shop" && shop) {
-      shop.sel = (shop.sel + (dir > 0 ? 1 : -1) + shop.goods.length) % shop.goods.length;
+      const n = shop.goods.length + (shop.refresh && !shop.refresh.used ? 1 : 0);
+      shop.sel = (shop.sel + (dir > 0 ? 1 : -1) + n) % n;
     } else if (phase === "event" && rest && !rest.used) {
       rest.sel = (rest.sel + (dir > 0 ? 1 : -1) + rest.opts.length) % rest.opts.length;
     } else if (phase === "event" && shrine && !shrine.used) {
@@ -3377,13 +3525,28 @@
     if (daily) daily.addEventListener("click", function (e) {
       e.stopPropagation();
       if (titleDaily) startRun(dailySeed(), { daily: true });
-      else { titleDaily = true; titleDeeper = false; renderTitle(); showToast("DAILY · " + dailyMutators().map(function (m) { return m.name; }).join(" · "), "#7dd3fc"); }
+      else { titleDaily = true; titleWeekly = false; titleDeeper = false; renderTitle(); showToast("DAILY · " + dailyMutators().map(function (m) { return m.name; }).join(" · "), "#7dd3fc"); }
+    });
+    const weekly = document.getElementById("weeklybtn");
+    if (weekly) weekly.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (titleWeekly) startRun(weeklySeed(), { weekly: true });
+      else { titleWeekly = true; titleDaily = false; titleDeeper = false; renderTitle(); showToast("WEEKLY · " + weeklyMutators().map(function (m) { return m.name; }).join(" · "), "#fde68a"); }
+    });
+    const fam = document.getElementById("familiarbtn");
+    if (fam) fam.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (!familiarUnlocked()) { showToast("REACH DEPTH 10", "#fda4af"); return; }
+      titleFamiliar = !titleFamiliar;
+      saveFamiliar(titleFamiliar);
+      renderTitle();
+      showToast(titleFamiliar ? "FAMILIAR ON" : "FAMILIAR OFF", "#c4b5fd");
     });
     const deeper = document.getElementById("deeperbtn");
     if (deeper) deeper.addEventListener("click", function (e) {
       e.stopPropagation();
       if (titleDeeper) startRun(null, { deeper: true });
-      else { titleDeeper = true; titleDaily = false; renderTitle(); }
+      else { titleDeeper = true; titleDaily = false; titleWeekly = false; renderTitle(); }
     });
     const cdx = document.getElementById("codexbtn");
     if (cdx) cdx.addEventListener("click", function (e) { e.stopPropagation(); titleMode = "codex"; renderTitle(); });
@@ -3461,10 +3624,46 @@
     if (phase === "title" && titleMode === "main") beginFromTitle();
   });
 
+  function updateFamiliar(dt) {
+    if (!familiar || player.dead) return;
+    familiar.bob += dt;
+    const tx = player.x - 0.72, ty = player.y - 0.52;
+    familiar.x += (tx - familiar.x) * Math.min(1, dt * 5.4);
+    familiar.y += (ty - familiar.y) * Math.min(1, dt * 5.4);
+    if (phase !== "fight") return;
+    familiar.peck = (familiar.peck || 0) - dt;
+    if (familiar.peck > 0) return;
+    let best = null, bd = 3.35;
+    for (let i = 0; i < enemies.length; i++) {
+      const e = enemies[i];
+      if (e.hp <= 0) continue;
+      const d = dist(familiar.x, familiar.y, e.x, e.y);
+      if (d < bd) { bd = d; best = e; }
+    }
+    if (!best) return;
+    familiar.peck = 1.6;
+    familiar.x += (best.x - familiar.x) * 0.32;
+    familiar.y += (best.y - familiar.y) * 0.32;
+    if (best.splitGuard > 0) return;
+    if (best.type === "wisp" && !best.glow) return;
+    const dmg = Math.max(2, 3 + ((depth / 5) | 0));
+    best.hp -= dmg;
+    best.flash = 0.1;
+    floats.push({ x: best.x, y: best.y - 0.45, t: 0.5, text: "" + dmg, col: "#c4b5fd" });
+    burst(best.x, best.y, "#a78bfa", 4);
+    beep(640, 0.04, "square", 0.03, 380);
+    if (best.type === "hollowtwin" && !best.twin && best.hp <= best.maxhp * 0.5) {
+      if (best.hp <= 0) best.hp = 1;
+      splitHollowTwin(best);
+      return;
+    }
+    if (best.hp <= 0) killEnemy(best);
+  }
   function updateEnemy(e, dt) {
     e.bob += dt;
     e.flash = Math.max(0, e.flash - dt);
     e.vuln = Math.max(0, e.vuln - dt);
+    if (e.splitGuard > 0) e.splitGuard = Math.max(0, e.splitGuard - dt);
     if (e.stun > 0) {
       e.stun -= dt;
       e.flash = Math.max(e.flash, 0.06);
@@ -3544,6 +3743,39 @@
           tryMove(e, e.x + (dx / d) * e.speed * dt, e.y + (dy / d) * e.speed * dt);
         }
       }
+      resolve(e);
+      return;
+    }
+
+    if (e.type === "heart") {
+      e.pulse = (e.pulse || 0) + dt;
+      e.face = Math.atan2(dy, dx);
+      if (!e.slam) {
+        e.slamT -= dt;
+        if (e.slamT <= 0) {
+          e.slam = { x: e.x, y: e.y, t: 0.72, dur: 0.72, r: 2.35 };
+          e.slamT = 2.05;
+        }
+      } else {
+        e.slam.x = e.x;
+        e.slam.y = e.y;
+        e.slam.t -= dt;
+        if (e.slam.t <= 0) {
+          shake = Math.max(shake, 12);
+          screenFlash(0.18, "220,20,60");
+          burst(e.x, e.y, "#9b1d20", 20);
+          if (dist(player.x, player.y, e.x, e.y) < e.slam.r + 0.2) {
+            hurtPlayer(e.dmg, player.x - e.x, player.y - e.y);
+          }
+          e.slam = null;
+        }
+      }
+      e.atk = Math.max(0, e.atk - dt);
+      if (e.atk <= 0 && d < 5.5 && d > 0.05) {
+        shots.push({ x: e.x, y: e.y - 0.2, vx: (dx / d) * 2.6, vy: (dy / d) * 2.6, dmg: Math.max(8, e.dmg - 6), life: 2.0 });
+        e.atk = e.cd;
+      }
+      if (d > 0.85) tryMove(e, e.x + (dx / d) * e.speed * dt, e.y + (dy / d) * e.speed * dt);
       resolve(e);
       return;
     }
@@ -3725,8 +3957,19 @@
       comboT -= dt;
       if (comboT <= 0) { combo = 0; syncHud(); }
     }
+    const lowHp = player.maxhp && player.hp / player.maxhp < 0.3 && !player.dead &&
+      (phase === "fight" || phase === "loot" || phase === "shop" || phase === "event");
+    if (lowHp) {
+      heartT -= dt;
+      if (heartT <= 0) {
+        heartT = 0.42 + (player.hp / player.maxhp) * 0.38;
+        beep(62, 0.09, "sine", 0.055);
+        setTimeout(function () { beep(48, 0.11, "sine", 0.045); }, 95);
+      }
+    } else heartT = 0.02;
 
-    if (embers.length < 22) {
+    if (enemies.length > 12) embers.length = 0;
+    else if (embers.length < 22) {
       embers.push({ x: rnd(0, W), y: rnd(0, H * 0.7), vy: -rnd(8, 22), vx: rnd(-6, 6), t: rnd(1.5, 4), r: rnd(1, 2) });
     }
     if (THEME && THEME._name === "ice" && iceSpark.length < 20 && Math.random() < 0.45) {
@@ -4006,9 +4249,13 @@
       }
     }
 
-    if (phase !== "fight") return;
+    if (phase !== "fight") {
+      updateFamiliar(dt);
+      return;
+    }
 
     for (let i = 0; i < enemies.length; i++) updateEnemy(enemies[i], dt);
+    updateFamiliar(dt);
 
     for (let i = 0; i < enemies.length; i++) {
       for (let j = i + 1; j < enemies.length; j++) {
@@ -4277,35 +4524,46 @@
       lightCvs.width = canvas.width;
       lightCvs.height = canvas.height;
       lightCtx = lightCvs.getContext("2d");
+      lightCacheKey = "";
     }
-    const g = lightCtx;
-    g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    g.imageSmoothingEnabled = true;
-    g.clearRect(0, 0, W, H);
-    g.fillStyle = THEME && THEME._name === "void" ? "rgba(2,0,6,0.90)" : "rgba(5,2,3,0.80)";
-    g.fillRect(0, 0, W, H);
-    g.globalCompositeOperation = "destination-out";
-    function punch(x, y, rad, str) {
-      const grd = g.createRadialGradient(x, y, rad * 0.08, x, y, rad);
-      grd.addColorStop(0, "rgba(0,0,0," + str + ")");
-      grd.addColorStop(0.45, "rgba(0,0,0," + (str * 0.5) + ")");
-      grd.addColorStop(1, "rgba(0,0,0,0)");
-      g.fillStyle = grd;
-      g.beginPath();
-      g.arc(x, y, rad, 0, Math.PI * 2);
-      g.fill();
+    const busy = enemies.length > 12;
+    const px = player.x != null ? ((player.x * 2) | 0) : 0;
+    const py = player.y != null ? ((player.y * 2) | 0) : 0;
+    const key = px + "," + py + "," + (exitGate ? 1 : 0) + "," + (THEME && THEME._name) + "," + (hasMut("darkness") ? 1 : 0);
+    lightSkip++;
+    const reuse = lightCacheKey === key && lightSkip % (busy ? 4 : 2) !== 0;
+    if (!reuse) {
+      lightCacheKey = key;
+      const g = lightCtx;
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      g.imageSmoothingEnabled = true;
+      g.clearRect(0, 0, W, H);
+      g.fillStyle = THEME && THEME._name === "void" ? "rgba(2,0,6,0.90)" : "rgba(5,2,3,0.80)";
+      g.fillRect(0, 0, W, H);
+      g.globalCompositeOperation = "destination-out";
+      function punch(x, y, rad, str) {
+        const grd = g.createRadialGradient(x, y, rad * 0.08, x, y, rad);
+        grd.addColorStop(0, "rgba(0,0,0," + str + ")");
+        grd.addColorStop(0.45, "rgba(0,0,0," + (str * 0.5) + ")");
+        grd.addColorStop(1, "rgba(0,0,0,0)");
+        g.fillStyle = grd;
+        g.beginPath();
+        g.arc(x, y, rad, 0, Math.PI * 2);
+        g.fill();
+      }
+      for (let i = 0; i < torches.length; i++) {
+        const tch = torches[i];
+        const flick = busy ? 0.94 : (0.9 + Math.sin(tick * 9 + i * 1.7) * 0.08 + Math.sin(tick * 17 + i) * 0.04);
+        const dark = hasMut("darkness") ? 0.58 : 1;
+        punch(sx(tch.x), sy(tch.y + 0.2), TILE * 3.4 * flick * dark, 0.95);
+      }
+      const darkP = hasMut("darkness") ? 0.58 : 1;
+      if (phase !== "title" && player.x != null) punch(sx(player.x), sy(player.y - 0.4), TILE * 2.4 * darkP, 0.7);
+      if (exitGate) punch(sx(exitGate.x), sy(exitGate.y), TILE * 2.1 * darkP, 0.75);
+      g.globalCompositeOperation = "source-over";
     }
-    for (let i = 0; i < torches.length; i++) {
-      const tch = torches[i];
-      const flick = 0.9 + Math.sin(tick * 9 + i * 1.7) * 0.08 + Math.sin(tick * 17 + i) * 0.04;
-      const dark = hasMut("darkness") ? 0.58 : 1;
-      punch(sx(tch.x), sy(tch.y + 0.2), TILE * 3.4 * flick * dark, 0.95);
-    }
-    const darkP = hasMut("darkness") ? 0.58 : 1;
-    if (phase !== "title" && player.x != null) punch(sx(player.x), sy(player.y - 0.4), TILE * 2.4 * darkP, 0.7);
-    if (exitGate) punch(sx(exitGate.x), sy(exitGate.y), TILE * 2.1 * darkP, 0.75);
-    g.globalCompositeOperation = "source-over";
     ctx.drawImage(lightCvs, 0, 0, W, H);
+    if (reuse && busy) return;
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     for (let i = 0; i < torches.length; i++) {
@@ -4326,6 +4584,7 @@
   }
 
   function heroSprite() {
+    if (Math.sin(player.face || 0) < -0.48 && player.slashAnim <= 0.35 && spr.heroBack) return spr.heroBack;
     if (player.slashAnim > 0.35) return spr.heroSlash;
     if (player.walkT > 0) {
       const f = ((player.walkT * 8) | 0) % 4;
@@ -4414,6 +4673,7 @@
     if (e.type === "boneking") return (e.slam && e.slam.t > 0.2) ? spr.bonekingSlam : spr.boneking;
     if (e.type === "ashwitch") return (e.wind > 0 || e.casting) ? spr.ashwitchCast : spr.ashwitch;
     if (e.type === "hollowtwin") return (e.slam && e.slam.t > 0.2) ? spr.hollowSlam : spr.hollow;
+    if (e.type === "heart") return Math.sin((e.pulse || 0) * 7) > 0.15 ? spr.heartPulse : spr.heart;
     return (e.slam && e.slam.t > 0.2) ? spr.bossSlam : spr.boss;
   }
 
@@ -4446,11 +4706,11 @@
       ctx.arc(sx(e.x), sy(e.y) - 6, TILE * (0.6 + k * 1.3), 0, Math.PI * 2);
       ctx.stroke();
     }
-    const span = e.type === "boss" || e.type === "boneking" ? 1.35 : (e.type === "warden" || e.type === "golem" || e.type === "hollowtwin") ? 1.25 : (e.type === "brute" || e.type === "knight" || e.type === "mimic") ? 1.05 : 0.7;
+    const span = e.type === "boss" || e.type === "boneking" || e.type === "heart" ? 1.35 : (e.type === "warden" || e.type === "golem" || e.type === "hollowtwin") ? 1.25 : (e.type === "brute" || e.type === "knight" || e.type === "mimic") ? 1.05 : 0.7;
     footShadow(e.x, e.y, span);
     const s = enemySprite(e);
     const hurt = e.flash > 0 || e.wind > 0;
-    const escale = e.type === "warden" ? 1.5 : (e.type === "boneking" ? 1.15 : (e.type === "golem" ? 1.2 : (e.type === "hollowtwin" ? (e.twin ? 0.82 : 1.08) : 1)));
+    const escale = e.type === "warden" ? 1.5 : (e.type === "boneking" ? 1.15 : (e.type === "golem" ? 1.2 : (e.type === "hollowtwin" ? (e.twin ? 0.82 : 1.08) : (e.type === "heart" ? 1.62 + Math.sin((e.pulse || 0) * 6.2) * 0.1 : 1))));
     if (e.type === "shade") ctx.globalAlpha = 0.42;
     blit(s, e.x, e.y, e.flip, hurt && e.flash > 0, escale);
     if (e.type === "shade") ctx.globalAlpha = 1;
@@ -4500,6 +4760,38 @@
     blit(s, g.x, g.y - bob - hop, false, false);
   }
 
+  function drawShopRefresh() {
+    if (!shop || !shop.refresh) return;
+    const r = shop.refresh;
+    footShadow(r.x, r.y, 0.5);
+    if (r.used) {
+      ctx.globalAlpha = 0.35;
+      blit(spr.coin, r.x, r.y, false, false);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "#6a5a50";
+      ctx.font = "700 9px ui-sans-serif, system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("SOLD", sx(r.x), sy(r.y) + TILE * 0.4);
+      return;
+    }
+    const bob = Math.sin(tick * 5) * 0.06;
+    blit(spr.coin, r.x, r.y - bob, false, false);
+    if (shop.sel === shop.goods.length) {
+      ctx.strokeStyle = "#fbbf24";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(sx(r.x) - TILE * 0.5, sy(r.y) - TILE * 0.85, TILE, TILE * 1.15);
+    }
+    ctx.fillStyle = gold >= r.price ? "#fbbf24" : "#fda4af";
+    ctx.font = "700 10px ui-sans-serif, system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText("REROLL " + r.price + "G", sx(r.x), sy(r.y) + TILE * 0.4);
+  }
+  function drawFamiliar() {
+    if (!familiar) return;
+    footShadow(familiar.x, familiar.y, 0.32);
+    const s = Math.sin(familiar.bob * 10) > 0 ? spr.bat1 : spr.bat2;
+    blit(s, familiar.x, familiar.y, familiar.x > (player.x || familiar.x), false, 0.7);
+  }
   function drawShopGood(g, i) {
     footShadow(g.x, g.y, 0.55);
     if (g.bought) {
@@ -4660,6 +4952,7 @@
       footShadow(shop.keeper.x, shop.keeper.y, 0.7);
       blit(spr.keeper, shop.keeper.x, shop.keeper.y, false, false);
     }});
+    if (shop && shop.refresh) list.push({ y: shop.refresh.y, draw: drawShopRefresh });
     if (shrine) shrine.opts.forEach(function (o, i) { list.push({ y: o.y, draw: function () { drawShrineOpt(o, i); } }); });
     if (rest) {
       list.push({ y: rest.fire.y, draw: function () { drawCampfire(rest.fire); } });
@@ -4683,6 +4976,7 @@
         drawHeroAt(gh.x, gh.y, gh.flip, 0, clamp(gh.t * 4, 0, 0.45), 0);
       }});
     });
+    if (familiar) list.push({ y: familiar.y, draw: drawFamiliar });
     if (player.y != null) list.push({ y: player.y, draw: drawPlayer });
     list.sort(function (a, b) { return a.y - b.y; });
     list.forEach(function (it) { it.draw(); });
@@ -4766,7 +5060,7 @@
     }
     ctx.restore();
     if (MAP.length) drawLighting();
-    embers.forEach(function (m) {
+    if (enemies.length <= 12) embers.forEach(function (m) {
       ctx.globalAlpha = clamp(m.t, 0, 1) * 0.45;
       ctx.fillStyle = "#e85d04";
       ctx.fillRect(m.x, m.y, m.r, m.r);
@@ -4938,6 +5232,7 @@
         "<p class='statline'>GOLD EARNED · " + runStats.gold + "</p>" +
         "<p class='statline'>KILLS · " + runStats.kills + "</p>" +
         "<p class='statline'>SECRETS · " + runStats.secrets + "</p>" +
+        "<p class='statline'>WEEKLY BEST · " + weeklyBest().depth + " · " + weeklyBest().week + "</p>" +
         "<button class='btn btn-sm' id='backbtn' type='button'>BACK</button>";
       bindTitleButtons();
       return;
@@ -4972,12 +5267,15 @@
       "<h1>SLASH PIT</h1>" +
       "<p>One thumb. Dash-strike. Grab loot. Don't get slammed.</p>" +
       "<p id='bestline'>" + (b ? "Best depth " + b : "No descents yet.") + " · Unlocks " + unlockCount() + "/" + unlockTotal() + " · Achs " + achCount() + "/" + ACH_DEFS.length + "</p>" +
-      "<p id='seedline'>TAP TO ENTER rolls a seed · DAILY uses UTC date" + (b >= 16 ? " · DEEPER starts at 9" : "") + "</p>" +
-      (titleDaily ? "<p id='mutline'>DAILY · " + dailyMutators().map(function (m) { return m.name; }).join(" · ") + "</p>" : "<p id='mutline'></p>") +
+      "<p id='seedline'>TAP TO ENTER rolls a seed · DAILY uses UTC date · WEEKLY uses ISO week" + (b >= 16 ? " · DEEPER starts at 9" : "") + "</p>" +
+      (titleWeekly ? "<p id='mutline'>WEEKLY · " + weeklyMutators().map(function (m) { return m.name; }).join(" · ") + " · best " + weeklyBest().depth + "</p>"
+        : (titleDaily ? "<p id='mutline'>DAILY · " + dailyMutators().map(function (m) { return m.name; }).join(" · ") + "</p>" : "<p id='mutline'></p>")) +
       classRowHtml() +
-      "<button class='btn' id='enterbtn' type='button'>" + (titleDaily ? "ENTER DAILY" : (titleDeeper ? "ENTER DEEPER" : "TAP TO ENTER")) + "</button>" +
+      "<button class='btn' id='enterbtn' type='button'>" + (titleDaily ? "ENTER DAILY" : (titleWeekly ? "ENTER WEEKLY" : (titleDeeper ? "ENTER DEEPER" : "TAP TO ENTER"))) + "</button>" +
       "<div class='btn-row'><button class='btn " + (titleDaily ? "" : "btn-alt ") + "btn-sm' id='dailybtn' type='button'>DAILY</button>" +
+      "<button class='btn " + (titleWeekly ? "" : "btn-alt ") + "btn-sm' id='weeklybtn' type='button'>WEEKLY</button>" +
       (b >= 16 ? "<button class='btn " + (titleDeeper ? "" : "btn-alt ") + "btn-sm' id='deeperbtn' type='button'>DEEPER</button>" : "") +
+      (b >= 10 ? "<button class='btn " + (titleFamiliar ? "" : "btn-alt ") + "btn-sm' id='familiarbtn' type='button'>FAMILIAR</button>" : "") +
       "<button class='btn btn-alt btn-sm' id='unlocksbtn' type='button'>UNLOCKS</button>" +
       "<button class='btn btn-alt btn-sm' id='statsbtn' type='button'>STATS</button>" +
       "<button class='btn btn-alt btn-sm' id='boardbtn' type='button'>BOARD</button>" +
