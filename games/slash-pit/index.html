@@ -68,10 +68,11 @@
     #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
     #overlay {
       position: fixed; inset: 0 0 calc(150px + env(safe-area-inset-bottom, 0px)) 0;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      text-align: center; padding: 1.2rem 1.1rem 0.8rem;
+      display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+      text-align: center; padding: max(1.15rem, 5vh) 1.1rem 1.1rem;
       background: radial-gradient(ellipse at center, rgba(6,3,3,0.86) 0%, rgba(6,3,3,0.52) 62%, rgba(6,3,3,0.36) 100%);
-      z-index: 4; overflow: auto;
+      z-index: 4; overflow: auto; -webkit-overflow-scrolling: touch;
+      touch-action: pan-y; overscroll-behavior: contain;
     }
     #overlay.hidden { display: none; }
     #overlay.hell {
@@ -162,6 +163,17 @@
     }
     .hexkey.go { background: #e85d04; color: #1a0800; border-color: #e85d04; }
     .statline { margin-top: 0.35rem; font-size: 0.82rem; color: #e8d5c0; letter-spacing: 0.06em; }
+    .menu-col {
+      display: flex; flex-direction: column; align-items: stretch;
+      gap: 0.48rem; margin-top: 0.8rem; width: min(16.5rem, 86vw);
+    }
+    .menu-col .btn { margin-top: 0; width: 100%; min-width: 0; }
+    .menu-col.tight .btn { min-height: 2.7rem; font-size: 0.92rem; }
+    .btn-play { min-height: 3.55rem; font-size: 1.2rem; letter-spacing: 0.14em; }
+    .menu-sub {
+      margin-top: 0.7rem !important; margin-bottom: 0;
+      font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: #8a7060;
+    }
 
     #gbsp {
       --dp: 108px; --bt: 60px; --arm: calc(var(--dp) / 3);
@@ -360,9 +372,12 @@
   <div id="overlay">
     <h1>SLASH PIT</h1>
     <p>One thumb. Dash-strike. Grab loot. Don't get slammed.</p>
-    <p id="bestline"></p>
-    <p id="seedline"></p>
-    <button class="btn" id="enterbtn" type="button">TAP TO ENTER</button>
+    <div class="menu-col">
+      <button class="btn btn-play" id="playbtn" type="button">PLAY</button>
+      <button class="btn btn-alt" id="modesbtn" type="button">MODES</button>
+      <button class="btn btn-alt" id="unlocksbtn" type="button">UNLOCKS</button>
+      <button class="btn btn-alt" id="codexbtn" type="button">CODEX</button>
+    </div>
   </div>
   <script>
 (function () {
@@ -389,6 +404,7 @@
   const GHOST_KEY = "slashpit-ghost";
   const BOARD_KEY = "slashpit-board";
   const FAM_KEY = "slashpit-familiar";
+  const HELP_KEY = "slashpit-seen-help";
   const WEEKLY_BEST_KEY = "slashpit-weekly-best";
   const HORDE_BEST_KEY = "slashpit-horde-best";
   const PITY_KEY = "slashpit-pity";
@@ -522,6 +538,7 @@
   let THEME = null;
   let phase = "title";
   let titleMode = "main";
+  let titleBackTo = "main";
   let depth = 1;
   let gold = 0;
   let runSeed = 0;
@@ -720,6 +737,12 @@
     try { localStorage.setItem(FAM_KEY, on ? "1" : "0"); } catch (e) {}
   }
   function familiarUnlocked() { return bestDepth() >= 10; }
+  function loadSeenHelp() {
+    try { return localStorage.getItem(HELP_KEY) === "1"; } catch (e) { return false; }
+  }
+  function saveSeenHelp() {
+    try { localStorage.setItem(HELP_KEY, "1"); } catch (e) {}
+  }
   function hasMut(id) {
     for (let i = 0; i < runMutators.length; i++) if (runMutators[i].id === id) return true;
     return false;
@@ -3708,15 +3731,60 @@
   canvas.addEventListener("pointerup", onPtrUp, { passive: false });
   canvas.addEventListener("pointercancel", onPtrUp, { passive: false });
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); }, { passive: false });
-  document.addEventListener("touchmove", function (e) { e.preventDefault(); }, { passive: false });
+  document.addEventListener("touchmove", function (e) {
+    let n = e.target;
+    while (n && n !== document.documentElement) {
+      if (n === overlay && overlay.scrollHeight > overlay.clientHeight + 2) return;
+      n = n.parentNode;
+    }
+    e.preventDefault();
+  }, { passive: false });
 
   function beginFromTitle() {
     if (titleHorde) startRun(null, { horde: true });
-    else if (titlePractice) { titleMode = "practice"; renderTitle(); }
+    else if (titlePractice) { titleMode = "practice"; titleBackTo = "modes"; renderTitle(); }
     else if (titleDaily) startRun(dailySeed(), { daily: true });
     else if (titleWeekly) startRun(weeklySeed(), { weekly: true });
     else if (titleDeeper) startRun(null, { deeper: true });
     else startRun();
+  }
+  function playFairRun() {
+    titleDaily = false;
+    titleWeekly = false;
+    titleDeeper = false;
+    titleHorde = false;
+    titlePractice = false;
+    if (!loadSeenHelp()) {
+      titleMode = "help";
+      titleBackTo = "main";
+      renderTitle();
+      return;
+    }
+    startRun();
+  }
+  function dismissHelpAndPlay() {
+    saveSeenHelp();
+    startRun();
+  }
+  function titleGoBack() {
+    if (titleMode === "seed" && seedFrom === "dead") { seedFrom = "title"; dieRun(); return; }
+    const dest = titleBackTo || "main";
+    if (dest === "main") {
+      titleDaily = false;
+      titleWeekly = false;
+      titleDeeper = false;
+      titleHorde = false;
+      titlePractice = false;
+      titleMode = "main";
+      titleBackTo = "main";
+    } else {
+      titleMode = dest;
+      titleBackTo = "main";
+    }
+    renderTitle();
+  }
+  function titleHasMode() {
+    return !!(titleDaily || titleWeekly || titleHorde || titleDeeper || titlePractice);
   }
   function restartEnded() {
     if (runPractice) startRun(null, { practice: true, boss: practiceBoss });
@@ -3731,9 +3799,11 @@
     }
     if (paused) { togglePause(); return; }
     if (phase === "title") {
+      if (titleMode === "help") { dismissHelpAndPlay(); return; }
       if (titleMode === "unlocks" || titleMode === "stats" || titleMode === "codex" || titleMode === "board" || titleMode === "practice") return;
+      if (titleMode === "modes") { if (titleHasMode()) beginFromTitle(); return; }
       if (titleMode === "seed") { confirmSeed(); return; }
-      beginFromTitle();
+      playFairRun();
       return;
     }
     if (phase === "dead" || phase === "win") { restartEnded(); return; }
@@ -3743,13 +3813,11 @@
   function pressActionB() {
     if (paused) { togglePause(); return; }
     if (phase === "title") {
-      if (titleMode === "unlocks" || titleMode === "stats" || titleMode === "seed" || titleMode === "codex" || titleMode === "board" || titleMode === "practice") {
-        if (titleMode === "seed" && seedFrom === "dead") { dieRun(); return; }
-        titleMode = "main";
-        renderTitle();
+      if (titleMode !== "main") {
+        titleGoBack();
         return;
       }
-      beginFromTitle();
+      playFairRun();
       return;
     }
     if (phase === "dead" || phase === "win") { restartEnded(); return; }
@@ -3849,7 +3917,9 @@
       clearTimeout(startHoldTimer);
       if (startDidMute || startDidSwap) return;
       if (phase === "fight" || phase === "loot" || phase === "shop" || phase === "event") togglePause();
-      else if (phase === "title" && titleMode === "main") beginFromTitle();
+      else if (phase === "title" && titleMode === "help") dismissHelpAndPlay();
+      else if (phase === "title" && titleMode === "main") playFairRun();
+      else if (phase === "title" && titleMode === "modes") { if (titleHasMode()) beginFromTitle(); }
       else if (phase === "title" && titleMode === "seed") confirmSeed();
       else if (phase === "dead" || phase === "win") restartEnded();
     }
@@ -3936,7 +4006,9 @@
     } else if (isStart) {
       e.preventDefault();
       if (phase === "fight" || phase === "loot" || phase === "shop" || phase === "event") togglePause();
-      else if (phase === "title" && titleMode === "main") beginFromTitle();
+      else if (phase === "title" && titleMode === "help") dismissHelpAndPlay();
+      else if (phase === "title" && titleMode === "main") playFairRun();
+      else if (phase === "title" && titleMode === "modes") { if (titleHasMode()) beginFromTitle(); }
       else if (phase === "title" && titleMode === "seed") confirmSeed();
       else if (phase === "dead" || phase === "win") restartEnded();
     }
@@ -3958,6 +4030,18 @@
   });
 
   function bindTitleButtons() {
+    const play = document.getElementById("playbtn");
+    if (play) play.addEventListener("click", function (e) { e.stopPropagation(); playFairRun(); });
+    const helpb = document.getElementById("helpbtn");
+    if (helpb) helpb.addEventListener("click", function (e) { e.stopPropagation(); dismissHelpAndPlay(); });
+    const modes = document.getElementById("modesbtn");
+    if (modes) modes.addEventListener("click", function (e) {
+      e.stopPropagation();
+      titleDaily = false; titleWeekly = false; titleDeeper = false; titleHorde = false; titlePractice = false;
+      titleMode = "modes";
+      titleBackTo = "main";
+      renderTitle();
+    });
     const enter = document.getElementById("enterbtn");
     const daily = document.getElementById("dailybtn");
     const unb = document.getElementById("unlocksbtn");
@@ -3985,18 +4069,19 @@
     const deeper = document.getElementById("deeperbtn");
     if (deeper) deeper.addEventListener("click", function (e) {
       e.stopPropagation();
+      if (bestDepth() < 16) { showToast("REACH DEPTH 16", "#fda4af"); return; }
       if (titleDeeper) startRun(null, { deeper: true });
       else { titleDeeper = true; titleDaily = false; titleWeekly = false; titleHorde = false; titlePractice = false; renderTitle(); }
     });
     const cdx = document.getElementById("codexbtn");
-    if (cdx) cdx.addEventListener("click", function (e) { e.stopPropagation(); titleMode = "codex"; renderTitle(); });
-    if (unb) unb.addEventListener("click", function (e) { e.stopPropagation(); titleMode = "unlocks"; renderTitle(); });
+    if (cdx) cdx.addEventListener("click", function (e) { e.stopPropagation(); titleMode = "codex"; titleBackTo = "main"; renderTitle(); });
+    if (unb) unb.addEventListener("click", function (e) { e.stopPropagation(); titleMode = "unlocks"; titleBackTo = "main"; renderTitle(); });
     const stb = document.getElementById("statsbtn");
-    if (stb) stb.addEventListener("click", function (e) { e.stopPropagation(); titleMode = "stats"; renderTitle(); });
+    if (stb) stb.addEventListener("click", function (e) { e.stopPropagation(); titleMode = "stats"; titleBackTo = "modes"; renderTitle(); });
     const brd = document.getElementById("boardbtn");
-    if (brd) brd.addEventListener("click", function (e) { e.stopPropagation(); titleMode = "board"; renderTitle(); });
+    if (brd) brd.addEventListener("click", function (e) { e.stopPropagation(); titleMode = "board"; titleBackTo = "modes"; renderTitle(); });
     const seb = document.getElementById("seedbtn");
-    if (seb) seb.addEventListener("click", function (e) { e.stopPropagation(); seedFrom = "title"; renderSeedPad(); });
+    if (seb) seb.addEventListener("click", function (e) { e.stopPropagation(); seedFrom = "title"; titleBackTo = "modes"; renderSeedPad(); });
     const horde = document.getElementById("hordebtn");
     if (horde) horde.addEventListener("click", function (e) {
       e.stopPropagation();
@@ -4010,6 +4095,7 @@
       if (bestDepth() < 8) { showToast("REACH DEPTH 8", "#fda4af"); return; }
       titleMode = "practice";
       titlePractice = true;
+      titleBackTo = "modes";
       titleHorde = false; titleDaily = false; titleWeekly = false; titleDeeper = false;
       renderTitle();
     });
@@ -4048,9 +4134,7 @@
     const back = document.getElementById("backbtn");
     if (back) back.addEventListener("click", function (e) {
       e.stopPropagation();
-      if (seedFrom === "dead" && titleMode === "seed") { seedFrom = "title"; dieRun(); return; }
-      titleMode = "main";
-      renderTitle();
+      titleGoBack();
     });
     overlay.querySelectorAll("[data-class]").forEach(function (el) {
       el.addEventListener("click", function (e) {
@@ -4109,7 +4193,7 @@
 
   overlay.addEventListener("click", function (e) {
     if (e.target && (e.target.tagName === "BUTTON" || e.target.tagName === "INPUT" || e.target.closest("button"))) return;
-    if (phase === "title" && titleMode === "main") beginFromTitle();
+    if (phase === "title" && titleMode === "help") dismissHelpAndPlay();
   });
 
   function updateFamiliar(dt) {
@@ -5767,15 +5851,62 @@
     hud.classList.add("off");
     hint.style.opacity = "0.7";
     const b = bestDepth();
+    if (titleMode === "help") {
+      overlay.innerHTML =
+        "<h2>CONTROLS</h2>" +
+        "<p>D-pad move · A slash · B dodge/parry</p>" +
+        "<div class='menu-col'>" +
+        "<button class='btn btn-play' id='helpbtn' type='button'>PLAY</button>" +
+        "<button class='btn btn-alt' id='backbtn' type='button'>BACK</button>" +
+        "</div>";
+      bindTitleButtons();
+      return;
+    }
+    if (titleMode === "modes") {
+      const hordeOpen = b >= 8;
+      const pracOpen = b >= 8;
+      const deepOpen = b >= 16;
+      const enterLabel = titleHorde ? "ENTER HORDE" : (titleDaily ? "ENTER DAILY" : (titleWeekly ? "ENTER WEEKLY" : (titleDeeper ? "ENTER DEEPER" : "")));
+      const mut = titleWeekly ? "<p id='mutline'>WEEKLY · " + weeklyMutators().map(function (m) { return m.name; }).join(" · ") + " · best " + weeklyBest().depth + "</p>"
+        : (titleDaily ? "<p id='mutline'>DAILY · " + dailyMutators().map(function (m) { return m.name; }).join(" · ") + "</p>"
+        : (titleHorde ? "<p id='mutline'>HORDE · endless waves · best " + hordeBest() + "</p>"
+        : (titleDeeper ? "<p id='mutline'>DEEPER · start at depth 9</p>" : "<p id='mutline'></p>")));
+      overlay.innerHTML =
+        "<h2>MODES</h2>" +
+        "<p>Daily and weekly share a seed. Horde is waves.</p>" +
+        mut +
+        "<div class='menu-col tight'>" +
+        "<button class='btn " + (titleDaily ? "" : "btn-alt ") + "btn-sm' id='dailybtn' type='button'>DAILY</button>" +
+        "<button class='btn " + (titleWeekly ? "" : "btn-alt ") + "btn-sm' id='weeklybtn' type='button'>WEEKLY</button>" +
+        "<button class='btn " + (titleHorde ? "" : "btn-alt ") + "btn-sm' id='hordebtn' type='button'>" + (hordeOpen ? "HORDE" : "HORDE · d8") + "</button>" +
+        "<button class='btn btn-alt btn-sm' id='practicebtn' type='button'>" + (pracOpen ? "PRACTICE" : "PRACTICE · d8") + "</button>" +
+        "<button class='btn " + (titleDeeper ? "" : "btn-alt ") + "btn-sm' id='deeperbtn' type='button'>" + (deepOpen ? "DEEPER" : "DEEPER · d16") + "</button>" +
+        "<button class='btn btn-alt btn-sm' id='seedbtn' type='button'>SEED</button>" +
+        "<button class='btn btn-alt btn-sm' id='boardbtn' type='button'>BOARD</button>" +
+        "<button class='btn btn-alt btn-sm' id='statsbtn' type='button'>STATS</button>" +
+        (enterLabel ? "<button class='btn btn-play' id='enterbtn' type='button'>" + enterLabel + "</button>" : "") +
+        "<button class='btn btn-alt btn-sm' id='backbtn' type='button'>BACK</button>" +
+        "</div>";
+      bindTitleButtons();
+      return;
+    }
     if (titleMode === "codex") {
       let lines = "";
       for (let i = 0; i < LORE_LINES.length; i++) {
         lines += "<p class='statline'>" + (loreFound[i] ? esc(LORE_LINES[i]) : "········ · ???") + "</p>";
       }
+      let achLines = "";
+      for (let i = 0; i < ACH_DEFS.length; i++) {
+        const a = ACH_DEFS[i];
+        achLines += "<p class='statline'>" + (achs[a.id] ? esc(a.name) : "········ · ???") + "</p>";
+      }
       overlay.innerHTML =
         "<h2>CODEX</h2>" +
-        "<p>" + loreCount() + "/" + LORE_LINES.length + " tablets</p>" +
+        "<p>" + loreCount() + "/" + LORE_LINES.length + " tablets · " + achCount() + "/" + ACH_DEFS.length + " achievements</p>" +
+        "<p class='menu-sub'>Lore</p>" +
         lines +
+        "<p class='menu-sub'>Achievements</p>" +
+        achLines +
         "<button class='btn btn-sm' id='backbtn' type='button'>BACK</button>";
       bindTitleButtons();
       return;
@@ -5853,39 +5984,32 @@
       overlay.innerHTML =
         "<h2>UNLOCKS</h2>" +
         "<p>Best depth " + b + " · Souls " + unlocks.souls + " · " + unlockCount() + "/" + unlockTotal() + "</p>" +
-        "<p>Starting relic (tap to equip / buy early)</p>" +
+        "<p class='menu-sub'>Class</p>" +
+        classRowHtml() +
+        "<p class='menu-sub'>Cape</p>" +
+        capeRowHtml() +
+        "<p class='menu-sub'>Familiar</p>" +
+        "<div class='btn-row'><button class='btn " + (titleFamiliar ? "" : "btn-alt ") + "btn-sm' id='familiarbtn' type='button'>" +
+        (familiarUnlocked() ? (titleFamiliar ? "FAMILIAR ON" : "FAMILIAR OFF") : "FAMILIAR · d10") + "</button></div>" +
+        "<p class='menu-sub'>Starting relic (tap to equip / buy early)</p>" +
         "<div class='unlock-grid'>" + rel + "</div>" +
-        "<p>Starting weapon — unlock at depth 8 / 16 / 24</p>" +
+        "<p class='menu-sub'>Starting weapon — unlock at depth 8 / 16 / 24</p>" +
         "<div class='unlock-grid'>" + wep + "</div>" +
         "<button class='btn btn-sm' id='backbtn' type='button'>BACK</button>";
       bindTitleButtons();
       return;
     }
-    overlay.classList.toggle("hell", !!achs.heart);
-    const enterLabel = titleHorde ? "ENTER HORDE" : (titleDaily ? "ENTER DAILY" : (titleWeekly ? "ENTER WEEKLY" : (titleDeeper ? "ENTER DEEPER" : "TAP TO ENTER")));
     overlay.innerHTML =
       "<h1>SLASH PIT</h1>" +
       (achs.heart ? "<div class='pitheart' aria-hidden='true'></div>" : "") +
       "<p>One thumb. Dash-strike. Grab loot. Don't get slammed.</p>" +
       "<p id='bestline'>" + (b ? "Best depth " + b : "No descents yet.") + " · Unlocks " + unlockCount() + "/" + unlockTotal() + " · Achs " + achCount() + "/" + ACH_DEFS.length + (hordeBest() ? " · Horde " + hordeBest() : "") + "</p>" +
-      "<p id='seedline'>TAP TO ENTER rolls a seed · DAILY uses UTC date · WEEKLY uses ISO week" + (b >= 16 ? " · DEEPER starts at 9" : "") + "</p>" +
-      (titleWeekly ? "<p id='mutline'>WEEKLY · " + weeklyMutators().map(function (m) { return m.name; }).join(" · ") + " · best " + weeklyBest().depth + "</p>"
-        : (titleDaily ? "<p id='mutline'>DAILY · " + dailyMutators().map(function (m) { return m.name; }).join(" · ") + "</p>"
-        : (titleHorde ? "<p id='mutline'>HORDE · endless waves · best " + hordeBest() + "</p>" : "<p id='mutline'></p>"))) +
-      classRowHtml() +
-      capeRowHtml() +
-      "<button class='btn' id='enterbtn' type='button'>" + enterLabel + "</button>" +
-      "<div class='btn-row'><button class='btn " + (titleDaily ? "" : "btn-alt ") + "btn-sm' id='dailybtn' type='button'>DAILY</button>" +
-      "<button class='btn " + (titleWeekly ? "" : "btn-alt ") + "btn-sm' id='weeklybtn' type='button'>WEEKLY</button>" +
-      (b >= 16 ? "<button class='btn " + (titleDeeper ? "" : "btn-alt ") + "btn-sm' id='deeperbtn' type='button'>DEEPER</button>" : "") +
-      (b >= 8 ? "<button class='btn " + (titleHorde ? "" : "btn-alt ") + "btn-sm' id='hordebtn' type='button'>HORDE</button>" : "") +
-      (b >= 8 ? "<button class='btn btn-alt btn-sm' id='practicebtn' type='button'>PRACTICE</button>" : "") +
-      (b >= 10 ? "<button class='btn " + (titleFamiliar ? "" : "btn-alt ") + "btn-sm' id='familiarbtn' type='button'>FAMILIAR</button>" : "") +
-      "<button class='btn btn-alt btn-sm' id='unlocksbtn' type='button'>UNLOCKS</button>" +
-      "<button class='btn btn-alt btn-sm' id='statsbtn' type='button'>STATS</button>" +
-      "<button class='btn btn-alt btn-sm' id='boardbtn' type='button'>BOARD</button>" +
-      "<button class='btn btn-alt btn-sm' id='codexbtn' type='button'>CODEX</button>" +
-      "<button class='btn btn-alt btn-sm' id='seedbtn' type='button'>SEED</button></div>";
+      "<div class='menu-col'>" +
+      "<button class='btn btn-play' id='playbtn' type='button'>PLAY</button>" +
+      "<button class='btn btn-alt' id='modesbtn' type='button'>MODES</button>" +
+      "<button class='btn btn-alt' id='unlocksbtn' type='button'>UNLOCKS</button>" +
+      "<button class='btn btn-alt' id='codexbtn' type='button'>CODEX</button>" +
+      "</div>";
     bindTitleButtons();
   }
 
@@ -5970,6 +6094,12 @@
 
   function showTitle() {
     titleMode = "main";
+    titleBackTo = "main";
+    titleDaily = false;
+    titleWeekly = false;
+    titleDeeper = false;
+    titleHorde = false;
+    titlePractice = false;
     runHorde = false;
     runPractice = false;
     const hell = !!achs.heart;
