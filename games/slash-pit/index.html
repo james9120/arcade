@@ -506,7 +506,7 @@
     "Each floor forgets the one above it.",
     "Souls pool at the bottom. Steel drinks first.",
     "The Warden was a knight who would not leave.",
-    "Ice came after fire. Void after ice.",
+    "Ice came after fire. Void after ice. Mire after void.",
     "A daily curse is a kindness with teeth.",
     "Relics remember the hands that dropped them.",
     "The shopkeeper smiles because he cannot die.",
@@ -614,7 +614,7 @@
     default: ["The pit keeps what it is given.", "Another soul for the drain.", "You fell. The dark did not."]
   };
   const BIOMES = ["ember", "moss", "blood", "ash", "hell"];
-  const DEEP_BIOMES = ["ember", "moss", "blood", "ash", "hell", "ice", "void"];
+  const DEEP_BIOMES = ["ember", "moss", "blood", "ash", "hell", "ice", "void", "mire"];
   const LAYOUT_IDS = ["hall", "chamber", "pillars", "arena", "lbend", "split", "treasury"];
 
   let W = 390, H = 844, dpr = 1;
@@ -727,6 +727,7 @@
   let parryFlash = 0;
   let iceSpark = [];
   let voidMotes = [];
+  let mireBubbles = [];
   let branchDoors = null;
   let branchPick = null;
   let rest = null;
@@ -1187,7 +1188,8 @@
     ash:   { bass: 87.31,  lead: 174.61, notes: [0, 2, 5, 7, 5, 2, 0, 10] },
     hell:  { bass: 82.41,  lead: 164.81, notes: [0, 1, 4, 7, 4, 1, 0, 8] },
     ice:   { bass: 130.81, lead: 261.63, notes: [0, 4, 7, 11, 7, 4, 0, 9] },
-    void:  { bass: 73.42,  lead: 146.83, notes: [0, 1, 6, 7, 6, 1, 0, 13] }
+    void:  { bass: 73.42,  lead: 146.83, notes: [0, 1, 6, 7, 6, 1, 0, 13] },
+    mire:  { bass: 92.50,  lead: 185.00, notes: [0, 3, 5, 3, 0, 7, 10, 5] }
   };
   function startDrone() {
     stopDrone();
@@ -1492,6 +1494,15 @@
     spr.heartPulse = bake(padBottom([
       ".......kkkkkkkkkk.......",".....kkRRqqqqRRRRkk.....","....kRRRRyyyyyyRRRk.....","...kRRRyyyywwyyyyRRk....","...kRRyywwwwwwyyRRRk....","..kRRRyyyyyyyyyyRRRRk...","..kRRRRyyyyyyyyRRRRRk...","...kRRRRRRqqRRRRRRRk....","...kRRRRRRRRRRRRRRk.....","....kRRRRRRRRRRRRk......",".....kRRRRRRRRRRk.......","......kRRRRRRRRk........",".......kRRRRRRk.........","........kRRRRk..........",".........kkkk..........."
     ], 20));
+    spr.leaper1 = bake([
+      "................","................",".....kkkkkk.....","....kllllllk....","...klgggggglk...","..klgwwggwwglk..","..kggkkggkkggk..","..kggggGGggggk..","...kggggggggk...","....kkggggkk....","...kGkkkkkkGk...","...kG......Gk...","....kk....kk....","................","................","................"
+    ]);
+    spr.leaper2 = bake([
+      "................","......kkkk......","....kkllllkk....","...klgggggglk...","..klgwwggwwglk..","..kggkkggkkggk..","..kggggGGggggk..","...kggggggggk...","....kkggggkk....",".....kGkkGk.....","....kG....Gk....","...kG......Gk...","...kk......kk...","................","................","................"
+    ]);
+    spr.leaper3 = bake([
+      "................","................","................","....kkkkkkkk....","...kllllllllk...","..klgggggggglk..","..klgwwggwwglk..","..kggkkggkkggk..","..kggggGGggggk..","...kkggggggkk...","..kGkkkkkkkkGk..","..kG........Gk..","...kk......kk...","................","................","................"
+    ]);
   }
 
   const THEMES = {
@@ -1550,6 +1561,14 @@
       rug: ["#1a0828", "#3a1050", "#0c0414"],
       ritual: ["#1a0830", "#4a1870", "#a78bfa"],
       grate: ["#100814", "#06040a", "#2a1838"]
+    },
+    mire: {
+      fog: "#040806",
+      floor: ["#0e1610", "#141c14", "#1a2418", "#0a100c"],
+      wall: ["#080c08", "#121810", "#1c2618", "#2a3420"],
+      rug: ["#1a2814", "#2a3c1c", "#0c140c"],
+      ritual: ["#142014", "#243818", "#65a30d"],
+      grate: ["#0c100c", "#060806", "#1a2216"]
     }
   };
 
@@ -1700,6 +1719,7 @@
     if (n <= 40) return BIOMES[Math.min(4, ((n - 1) / 8) | 0)];
     if (n <= 48) return "ice";
     if (n <= 56) return "void";
+    if (n <= 64) return "mire";
     return DEEP_BIOMES[(rng() * DEEP_BIOMES.length) | 0];
   }
 
@@ -2203,7 +2223,8 @@
       spitter: ["SPITTER · slash the bolt", "#2dd4bf"],
       bomber: ["BOMBER · walk out", "#fb923c"],
       wisp: ["WISP · wait for the glow", "#c4b5fd"],
-      golem: ["GOLEM · dodge the wave", "#a8a29e"]
+      golem: ["GOLEM · dodge the wave", "#a8a29e"],
+      leaper: ["LEAPER · watch the shadow", "#86efac"]
     };
     const tip = tips[type];
     if (!tip) return;
@@ -2401,6 +2422,7 @@
     if (type === "wisp") return { type: "wisp", hp: 16, dmg: 9, speed: 2.9, r: 0.34, cr: 0.16, range: 0.68, cd: 0.82 };
     if (type === "shade") return { type: "shade", hp: 40, dmg: 10, speed: 1.42, r: 0.42, cr: 0.28, range: 0.9, cd: 1.1 };
     if (type === "golem") return { type: "golem", hp: 118, dmg: 18, speed: 0.74, r: 0.72, cr: 0.46, range: 1.18, cd: 1.5, slam: 2.9 };
+    if (type === "leaper") return { type: "leaper", hp: 26, dmg: 10, speed: 1.15, r: 0.4, cr: 0.26, range: 3.2, cd: 1.35 };
     const cycle = Math.max(1, (depth / 8) | 0);
     if (type === "boneking") return { type: "boneking", hp: 200 + (cycle - 1) * 70, dmg: 20 + (cycle - 1) * 3, speed: 1.38 + (cycle - 1) * 0.06, r: 0.76, cr: 0.46, range: 1.1, cd: 1.08, slam: 3.1 };
     if (type === "ashwitch") return { type: "ashwitch", hp: 165 + (cycle - 1) * 60, dmg: 17 + (cycle - 1) * 3, speed: 1.62, r: 0.48, cr: 0.3, range: 2.55, cd: 1.15 };
@@ -2442,7 +2464,7 @@
   }
 
   function spawnEnemy(type, x, y, fast, elite) {
-    if (type === "knight" && depth <= 2 && !runPractice) type = "slime";
+    if ((type === "knight" || type === "leaper") && depth <= 2 && !runPractice) type = "slime";
     const d = enemyDef(type);
     const c = clampToWalkable(x, y);
     const scale = isBossType(type) || depth === 1 ? 1 : (1 + (depth - 1) * 0.07);
@@ -2458,7 +2480,8 @@
       burn: 0, burnTick: 0, slow: 0, summonT: 2.8, teleT: 2.4, casting: false,
       glow: 0, glowT: type === "wisp" ? 1.0 : 0,
       stun: 0, frost: false, stash: 0, twin: false, splitGuard: 0, pulse: 0, clangs: 0,
-      bossPhase: 1
+      bossPhase: 1,
+      hopT: 0, hopDur: 0, hopH: 0, hopWind: 0, hopMark: null
     });
     e.maxhp = e.hp;
     if (depth === 1 && type === "slime") { e.hp = e.maxhp = 18; e.dmg = 6; e.speed = 1.35; }
@@ -2498,18 +2521,18 @@
     const count = Math.min(7, 2 + ((n - 1) / 3 | 0) + (rng() < 0.35 ? 1 : 0));
     const pool = ["slime"];
     if (n >= 2) pool.push("bat");
-    if (n >= 3) pool.push("slime");
+    if (n >= 3) pool.push("slime", "leaper");
     if (n >= 4) pool.push("spitter", "brute", "wisp");
     if (n >= 5) pool.push("bomber");
     if (n >= 6) pool.push("knight");
     if (n >= 7) pool.push("golem");
-    if (n >= 10) pool.push("bat", "spitter", "knight", "wisp");
+    if (n >= 10) pool.push("bat", "spitter", "knight", "wisp", "leaper");
     if (n >= 18) pool.push("bomber", "brute", "knight", "golem");
     const list = [];
     for (let i = 0; i < count; i++) list.push(spick(pool));
     if (mutLive("swarm")) list.push(spick(pool));
     if (n <= 2) {
-      for (let i = 0; i < list.length; i++) if (list[i] === "knight") list[i] = "slime";
+      for (let i = 0; i < list.length; i++) if (list[i] === "knight" || list[i] === "leaper") list[i] = "slime";
     }
     return { list: list, fast: n >= 5 && rng() < 0.45, chest: n >= 3 && rng() < 0.34, elite: false };
   }
@@ -2533,6 +2556,7 @@
     tablets = [];
     iceSpark = [];
     voidMotes = [];
+    mireBubbles = [];
     challenge = null;
     rest = null;
     wheel = null;
@@ -2729,6 +2753,9 @@
         spawnEnemy("wisp", COLS * 0.72, ROWS * 0.36, true, false);
         spawnEnemy("wisp", COLS * 0.3, ROWS * 0.52, false, false);
       }
+      if (THEME && THEME._name === "mire" && n > 2) {
+        spawnEnemy("leaper", COLS * 0.62, ROWS * 0.38, false, false);
+      }
       if (incoming === "left") {
         if (enemies.length > 2) enemies.pop();
         spawnGem(COLS * 0.38, ROWS * 0.5, makeItem());
@@ -2791,14 +2818,14 @@
     depth = w;
     const types = ["slime"];
     if (w >= 2) types.push("bat");
-    if (w >= 3) types.push("spitter", "wisp");
+    if (w >= 3) types.push("spitter", "wisp", "leaper");
     if (w >= 4) types.push("brute");
     if (w >= 6) types.push("bomber");
     if (w >= 8) types.push("knight");
     if (w >= 10) types.push("golem");
     const n = Math.min(8, 2 + ((w - 1) / 2 | 0));
     for (let i = 0; i < n; i++) {
-      const t = w <= 2 && types[i % types.length] === "knight" ? "slime" : spick(types);
+      const t = w <= 2 && (types[i % types.length] === "knight" || types[i % types.length] === "leaper") ? "slime" : spick(types);
       spawnEnemy(t, COLS * (0.24 + rng() * 0.52), ROWS * (0.24 + rng() * 0.28), w >= 5 && rng() < 0.3, w >= 12 && rng() < 0.12);
     }
     banner = { t: 1.15, text: "WAVE " + w };
@@ -2919,7 +2946,7 @@
     const biome = THEME && THEME._name;
     let kind = null;
     if (biome === "blood" || biome === "hell") kind = "spike";
-    else if (biome === "moss") kind = "slime";
+    else if (biome === "moss" || biome === "mire") kind = "slime";
     if (!kind) return;
     let count = 1 + ((depth / 7) | 0) + (rng() < 0.4 ? 1 : 0);
     if (roomKind === "boss" || roomKind === "warden") count = Math.min(2, count);
@@ -3364,6 +3391,7 @@
     if (e.type === "brute" || e.type === "knight") base = 9;
     if (e.type === "bomber") base = 7;
     if (e.type === "wisp") base = 7;
+    if (e.type === "leaper") base = 8;
     if (e.type === "shade") return e.stash || 12;
     if (e.type === "golem") base = 16;
     if (e.type === "mimic") base = 18;
@@ -3409,7 +3437,7 @@
       floats.push({ x: e.x, y: e.y - 0.5, t: 0.6, text: "!", col: "#fb923c" });
       return;
     }
-    const col = e.type === "slime" ? "#4ade80" : e.type === "bat" ? "#a78bfa" : e.type === "wisp" ? "#c4b5fd" : e.type === "golem" ? "#a8a29e" : e.type === "spitter" ? "#2dd4bf" : e.type === "knight" || e.type === "warden" ? "#cbd5e1" : e.type === "bomber" ? "#fb923c" : e.type === "mimic" ? "#fbbf24" : e.type === "brute" ? "#c2410c" : e.type === "ashwitch" ? "#fb923c" : e.type === "boneking" ? "#e2e8f0" : e.type === "hollowtwin" ? "#c4b5fd" : e.type === "heart" ? "#fb7185" : "#9b1d20";
+    const col = e.type === "slime" || e.type === "leaper" ? "#4ade80" : e.type === "bat" ? "#a78bfa" : e.type === "wisp" ? "#c4b5fd" : e.type === "golem" ? "#a8a29e" : e.type === "spitter" ? "#2dd4bf" : e.type === "knight" || e.type === "warden" ? "#cbd5e1" : e.type === "bomber" ? "#fb923c" : e.type === "mimic" ? "#fbbf24" : e.type === "brute" ? "#c2410c" : e.type === "ashwitch" ? "#fb923c" : e.type === "boneking" ? "#e2e8f0" : e.type === "hollowtwin" ? "#c4b5fd" : e.type === "heart" ? "#fb7185" : "#9b1d20";
     burst(e.x, e.y, col, isBossType(e.type) ? 22 : 12);
     bloodBurst(e.x, e.y, isBossType(e.type) ? 18 : 10);
     floats.push({ x: e.x, y: e.y - 0.4, t: 0.7, text: "POP", col: "#ffe8a3" });
@@ -5180,6 +5208,61 @@
       return;
     }
 
+    if (e.type === "leaper") {
+      if (e.hopT > 0) {
+        e.hopT -= dt;
+        const dur = e.hopDur || 0.34;
+        const k = 1 - Math.max(0, e.hopT) / dur;
+        e.x = e.hopFromX + (e.hopToX - e.hopFromX) * k;
+        e.y = e.hopFromY + (e.hopToY - e.hopFromY) * k;
+        e.hopH = Math.sin(k * Math.PI) * 0.88;
+        if (e.hopT <= 0) {
+          const dest = clampToWalkable(e.hopToX, e.hopToY);
+          e.x = dest.x; e.y = dest.y;
+          e.hopH = 0; e.hopT = 0; e.hopMark = null; e.wind = 0;
+          burst(e.x, e.y, "#4ade80", 11);
+          shake = Math.max(shake, 4);
+          puddles.push({ x: e.x, y: e.y, t: 1.35, r: 0.72, tick: 0.2, kind: "mire" });
+          beep(90, 0.08, "triangle", 0.05);
+          if (dist(player.x, player.y, e.x, e.y) < 0.95 + player.r) {
+            hurtPlayer(e.dmg, player.x - e.x, player.y - e.y, foeCause(e));
+          }
+          e.atk = e.cd;
+        }
+        return;
+      }
+      if (e.hopWind > 0) {
+        e.hopWind -= dt;
+        e.wind = e.hopWind;
+        if (e.hopMark) {
+          e.hopMark.x += (player.x - e.hopMark.x) * Math.min(1, 1.15 * dt);
+          e.hopMark.y += (player.y - e.hopMark.y) * Math.min(1, 1.15 * dt);
+        }
+        if (e.hopWind <= 0) {
+          let tx = e.hopMark ? e.hopMark.x : player.x;
+          let ty = e.hopMark ? e.hopMark.y : player.y;
+          const dest = clampToWalkable(tx, ty);
+          e.hopFromX = e.x; e.hopFromY = e.y;
+          e.hopToX = dest.x; e.hopToY = dest.y;
+          e.hopDur = 0.34; e.hopT = 0.34; e.hopH = 0;
+        }
+        resolve(e);
+        return;
+      }
+      e.atk = Math.max(0, e.atk - dt);
+      if (d > 0.95) tryMove(e, e.x + (dx / d) * e.speed * dt, e.y + (dy / d) * e.speed * dt);
+      if (e.atk <= 0 && d < e.range + 0.4) {
+        e.hopWind = 0.48;
+        e.wind = 0.48;
+        let tx = player.x, ty = player.y;
+        const hd = Math.hypot(tx - e.x, ty - e.y) || 1;
+        if (hd > 3.2) { tx = e.x + (tx - e.x) / hd * 3.2; ty = e.y + (ty - e.y) / hd * 3.2; }
+        e.hopMark = { x: tx, y: ty };
+      }
+      resolve(e);
+      return;
+    }
+
     if (e.type === "bat") {
       e.swoopT -= dt;
       if (e.swoopT <= 0) {
@@ -5296,7 +5379,7 @@
     } else heartT = 0.02;
 
     if (enemies.length > 12) embers.length = 0;
-    else if (embers.length < 22) {
+    else if (embers.length < 22 && !(THEME && THEME._name === "mire")) {
       embers.push({ x: rnd(0, W), y: rnd(0, H * 0.7), vy: -rnd(8, 22), vx: rnd(-6, 6), t: rnd(1.5, 4), r: rnd(1, 2) });
     }
     if (THEME && THEME._name === "ice" && iceSpark.length < 20 && Math.random() < 0.45) {
@@ -5313,6 +5396,14 @@
       const m = voidMotes[i];
       m.y += m.vy * dt; m.t -= dt;
       if (m.t <= 0) voidMotes.splice(i, 1);
+    }
+    if (THEME && THEME._name === "mire" && mireBubbles.length < 16 && Math.random() < 0.4) {
+      mireBubbles.push({ x: srnd(1.1, COLS - 1.1), y: srnd(1.4, ROWS - 1.2), t: rnd(0.7, 1.8), r: rnd(1.4, 2.6) });
+    }
+    for (let i = mireBubbles.length - 1; i >= 0; i--) {
+      mireBubbles[i].t -= dt;
+      mireBubbles[i].y -= 0.22 * dt;
+      if (mireBubbles[i].t <= 0) mireBubbles.splice(i, 1);
     }
     for (let i = embers.length - 1; i >= 0; i--) {
       const m = embers[i];
@@ -5515,9 +5606,12 @@
       pdl.t -= dt;
       if (pdl.t <= 0) { puddles.splice(i, 1); continue; }
       if (dist(player.x, player.y, pdl.x, pdl.y) < pdl.r + player.r * 0.4) {
-        applyStatus("burn", 2.2);
-        pdl.tick = (pdl.tick || 0) - dt;
-        if (pdl.tick <= 0) { pdl.tick = 0.55; tickDot("burn"); }
+        if (pdl.kind === "mire") applyStatus("slow", 1.2);
+        else {
+          applyStatus("burn", 2.2);
+          pdl.tick = (pdl.tick || 0) - dt;
+          if (pdl.tick <= 0) { pdl.tick = 0.55; tickDot("burn"); }
+        }
       }
     }
     for (let i = bombs.length - 1; i >= 0; i--) {
@@ -5567,6 +5661,7 @@
         challenge.next = 4.1;
         const types = ["slime", "bat"];
         if (depth >= 5) types.push("spitter", "wisp");
+        if (depth >= 6) types.push("leaper");
         if (depth >= 8) types.push("brute");
         const n = 1 + (challenge.wave > 2 ? 1 : 0);
         for (let i = 0; i < n; i++) {
@@ -5688,11 +5783,12 @@
     const h = (tx * 48271 + ty * 11909) >>> 0;
     if (THEME && THEME._name === "ember" && (h & 7) > 1) return;
     if (THEME && THEME._name === "moss" && (h & 7) > 0) return;
-    if (THEME && (THEME._name === "ice" || THEME._name === "void") && (h & 7) > 2) return;
+    if (THEME && (THEME._name === "ice" || THEME._name === "void" || THEME._name === "mire") && (h & 7) > 2) return;
     const x = sx(tx), y = sy(ty);
     ctx.fillStyle = THEME && THEME._name === "moss" ? "rgba(40,70,20,0.35)"
       : (THEME && THEME._name === "ice" ? "rgba(180,220,240,0.22)"
-      : (THEME && THEME._name === "void" ? "rgba(80,30,110,0.35)" : "rgba(120,16,16,0.4)"));
+      : (THEME && THEME._name === "void" ? "rgba(80,30,110,0.35)"
+      : (THEME && THEME._name === "mire" ? "rgba(20,50,18,0.42)" : "rgba(120,16,16,0.4)")));
     const x0 = x + (h % (TILE - 5));
     const y0 = y + ((h >> 5) % (TILE - 5));
     ctx.fillRect(x0, y0, 3, 2);
@@ -5785,6 +5881,12 @@
           if (THEME && THEME._name === "ice" && ((tx * 3 + ty) & 3) === 0) {
             ctx.fillStyle = "rgba(224,252,255,0.16)";
             ctx.fillRect(sx(tx) + (tx * 5 + ty) % (TILE - 4), sy(ty) + (ty * 7) % (TILE - 4), 2, 2);
+          }
+          if (THEME && THEME._name === "mire" && ((tx + ty) % 2 === 0)) {
+            ctx.fillStyle = "rgba(40,80,36,0.16)";
+            ctx.fillRect(sx(tx) + 2, sy(ty) + TILE * 0.56, TILE - 4, 4);
+            ctx.fillStyle = "rgba(110,180,90,0.08)";
+            ctx.fillRect(sx(tx) + 4, sy(ty) + TILE * 0.6, TILE * 0.42, 2);
           }
         }
       }
@@ -5886,7 +5988,7 @@
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.imageSmoothingEnabled = true;
       g.clearRect(0, 0, W, H);
-      g.fillStyle = THEME && THEME._name === "void" ? "rgba(2,0,6,0.90)" : "rgba(5,2,3,0.80)";
+      g.fillStyle = THEME && THEME._name === "void" ? "rgba(2,0,6,0.90)" : (THEME && THEME._name === "mire" ? "rgba(2,8,4,0.90)" : "rgba(5,2,3,0.80)");
       g.fillRect(0, 0, W, H);
       g.globalCompositeOperation = "destination-out";
       function punch(x, y, rad, str) {
@@ -5902,10 +6004,10 @@
       for (let i = 0; i < torches.length; i++) {
         const tch = torches[i];
         const flick = busy ? 0.94 : (0.9 + Math.sin(tick * 9 + i * 1.7) * 0.08 + Math.sin(tick * 17 + i) * 0.04);
-        const dark = hasMut("darkness") ? 0.58 : 1;
+        const dark = (hasMut("darkness") ? 0.58 : 1) * (THEME && THEME._name === "mire" ? 0.72 : 1);
         punch(sx(tch.x), sy(tch.y + 0.2), TILE * 3.4 * flick * dark, 0.95);
       }
-      const darkP = hasMut("darkness") ? 0.58 : 1;
+      const darkP = (hasMut("darkness") ? 0.58 : 1) * (THEME && THEME._name === "mire" ? 0.72 : 1);
       if (phase !== "title" && player.x != null) punch(sx(player.x), sy(player.y - 0.4), TILE * 2.4 * darkP, 0.7);
       if (exitGate) punch(sx(exitGate.x), sy(exitGate.y), TILE * 2.1 * darkP, 0.75);
       g.globalCompositeOperation = "source-over";
@@ -5920,9 +6022,15 @@
       const x = sx(tch.x), y = sy(tch.y + 0.15);
       const rad = TILE * 2.2 * flick;
       const grd = ctx.createRadialGradient(x, y, 2, x, y, rad);
-      grd.addColorStop(0, "rgba(255,160,50," + (0.22 * flick) + ")");
-      grd.addColorStop(0.4, "rgba(232,93,4," + (0.10 * flick) + ")");
-      grd.addColorStop(1, "rgba(232,93,4,0)");
+      if (THEME && THEME._name === "mire") {
+        grd.addColorStop(0, "rgba(120,180,70," + (0.16 * flick) + ")");
+        grd.addColorStop(0.4, "rgba(40,80,30," + (0.08 * flick) + ")");
+        grd.addColorStop(1, "rgba(20,40,16,0)");
+      } else {
+        grd.addColorStop(0, "rgba(255,160,50," + (0.22 * flick) + ")");
+        grd.addColorStop(0.4, "rgba(232,93,4," + (0.10 * flick) + ")");
+        grd.addColorStop(1, "rgba(232,93,4,0)");
+      }
       ctx.fillStyle = grd;
       ctx.beginPath();
       ctx.arc(x, y, rad, 0, Math.PI * 2);
@@ -5948,10 +6056,10 @@
     const ghost = player.iframes > 0 && ((tick * 20) | 0) % 2 === 0 && alpha == null;
     if (ghost) ctx.globalAlpha = 0.4;
     footShadow(wx, wy, 0.7);
-    if (THEME && THEME._name === "moss" && alpha == null) {
-      ctx.fillStyle = "rgba(170,220,190,0.16)";
+    if (THEME && (THEME._name === "moss" || THEME._name === "mire") && alpha == null) {
+      ctx.fillStyle = THEME._name === "mire" ? "rgba(50,90,40,0.22)" : "rgba(170,220,190,0.16)";
       ctx.fillRect(sx(wx) - 9, sy(wy) + 2, 18, 5);
-      ctx.fillStyle = "rgba(220,255,230,0.1)";
+      ctx.fillStyle = THEME._name === "mire" ? "rgba(140,200,90,0.1)" : "rgba(220,255,230,0.1)";
       ctx.fillRect(sx(wx) - 4, sy(wy) + 3, 9, 2);
     }
     blit(heroSprite(), wx, wy, flip, flashAmt > 0);
@@ -6031,6 +6139,7 @@
     }
     if (e.type === "shade") return (e.wind > 0) ? spr.knight2 : spr.knight1;
     if (e.type === "wisp") return e.glow ? spr.wisp2 : spr.wisp1;
+    if (e.type === "leaper") return e.hopT > 0 ? spr.leaper2 : (e.hopWind > 0 ? spr.leaper3 : spr.leaper1);
     if (e.type === "golem") return (e.slam && e.slam.t > 0.2) ? spr.golemSlam : spr.golem;
     if (e.type === "boneking") return (e.slam && e.slam.t > 0.2) ? spr.bonekingSlam : spr.boneking;
     if (e.type === "ashwitch") return (e.wind > 0 || e.casting) ? spr.ashwitchCast : spr.ashwitch;
@@ -6076,7 +6185,20 @@
       ctx.restore();
     }
     const span = e.type === "boss" || e.type === "boneking" || e.type === "heart" ? 1.35 : (e.type === "warden" || e.type === "golem" || e.type === "hollowtwin") ? 1.25 : (e.type === "brute" || e.type === "knight" || e.type === "mimic") ? 1.05 : 0.7;
-    footShadow(e.x, e.y, span * (e.affix === "giant" ? 1.3 : 1));
+    if (e.type === "leaper" && e.hopMark && (e.hopWind > 0 || e.hopT > 0)) {
+      const mk = e.hopMark;
+      const k = e.hopWind > 0 ? 1 - e.hopWind / 0.48 : 1;
+      const rw = TILE * (0.38 + k * 0.42);
+      const rh = TILE * (0.16 + k * 0.16);
+      const mx = sx(mk.x), my = sy(mk.y);
+      ctx.fillStyle = "rgba(0,0,0," + (0.28 + k * 0.34) + ")";
+      ctx.fillRect(mx - rw, my - rh * 0.45, rw * 2, rh);
+      ctx.strokeStyle = "rgba(74,222,128," + (0.4 + k * 0.45 + 0.15 * Math.sin(tick * 18)) + ")";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(mx - rw, my - rh * 0.45, rw * 2, rh);
+    }
+    const hopLift = e.hopH || 0;
+    footShadow(e.x, e.y, span * (e.affix === "giant" ? 1.3 : 1) * (hopLift > 0 ? 0.72 + hopLift * 0.12 : 1));
     if (e.wind > 0) {
       ctx.save();
       ctx.strokeStyle = "rgba(255,244,200," + (0.5 + 0.45 * Math.sin(tick * 22)) + ")";
@@ -6092,7 +6214,7 @@
     let escale = e.type === "warden" ? 1.5 : (e.type === "boneking" ? 1.15 : (e.type === "golem" ? 1.2 : (e.type === "hollowtwin" ? (e.twin ? 0.82 : 1.08) : (e.type === "heart" ? 1.62 + Math.sin((e.pulse || 0) * 6.2) * 0.1 : 1))));
     if (e.affix === "giant") escale *= 1.3;
     if (e.type === "shade") ctx.globalAlpha = 0.42;
-    blit(s, e.x, e.y, e.flip, (hurt && e.flash > 0) || guardOpen, escale);
+    blit(s, e.x, e.y - hopLift, e.flip, (hurt && e.flash > 0) || guardOpen, escale);
     if (e.type === "shade") ctx.globalAlpha = 1;
     if (guardOpen) {
       ctx.save();
@@ -6101,7 +6223,7 @@
       ctx.restore();
     } else if (e.wind > 0 && e.type !== "boss") {
       ctx.globalAlpha = 0.55;
-      blit(s, e.x, e.y, e.flip, true, escale);
+      blit(s, e.x, e.y - hopLift, e.flip, true, escale);
       ctx.globalAlpha = 1;
     }
     if (e.frost) {
@@ -6131,9 +6253,9 @@
       ctx.restore();
     }
     if (e.type === "knight" || e.type === "warden") drawShieldGleam(e, escale);
-    if (e.elite) blit(spr.star, e.x - (e.affixTag ? 0.36 : 0), e.y - 1.15, false, false);
+    if (e.elite) blit(spr.star, e.x - (e.affixTag ? 0.36 : 0), e.y - hopLift - 1.15, false, false);
     const above = (s.h * (TILE / 16) * escale) + 6;
-    drawHpPip(e.x, e.y, e.hp, e.maxhp, above, e.affixTag);
+    drawHpPip(e.x, e.y - hopLift, e.hp, e.maxhp, above, e.affixTag);
   }
 
   function drawChest() {
@@ -6432,10 +6554,11 @@
 
     puddles.forEach(function (pdl) {
       const a = 0.22 + 0.18 * Math.sin(tick * 8 + pdl.x);
-      ctx.fillStyle = "rgba(232,93,4," + a + ")";
+      const mire = pdl.kind === "mire";
+      ctx.fillStyle = mire ? "rgba(74,222,128," + a + ")" : "rgba(232,93,4," + a + ")";
       const pr = pdl.r * TILE;
       ctx.fillRect(sx(pdl.x) - pr, sy(pdl.y) - pr * 0.45, pr * 2, pr * 0.9);
-      ctx.fillStyle = "rgba(253,230,138," + (a + 0.1) + ")";
+      ctx.fillStyle = mire ? "rgba(190,255,170," + (a + 0.08) + ")" : "rgba(253,230,138," + (a + 0.1) + ")";
       ctx.fillRect(sx(pdl.x) - pr * 0.4, sy(pdl.y) - pr * 0.2, pr * 0.8, pr * 0.35);
     });
     bombs.forEach(function (b) {
@@ -6536,6 +6659,14 @@
       ctx.globalAlpha = clamp(m.t, 0, 1) * 0.4;
       ctx.fillStyle = "#6b21a8";
       ctx.fillRect(m.x, m.y, m.r, m.r);
+      ctx.globalAlpha = 1;
+    });
+    mireBubbles.forEach(function (b) {
+      ctx.globalAlpha = clamp(b.t * 1.4, 0, 0.55);
+      ctx.fillStyle = "#4ade80";
+      ctx.fillRect(sx(b.x), sy(b.y), b.r, b.r);
+      ctx.fillStyle = "#166534";
+      ctx.fillRect(sx(b.x) + 1, sy(b.y) - 1, 1, 1);
       ctx.globalAlpha = 1;
     });
     if (parryFlash > 0) {
