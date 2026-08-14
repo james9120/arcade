@@ -299,12 +299,29 @@
     #relictray {
       position: fixed; left: 0.55rem;
       top: calc(2.55rem + env(safe-area-inset-top, 0px));
-      z-index: 3; pointer-events: none;
-      font-size: 0.62rem; letter-spacing: 0.06em; text-transform: uppercase;
-      color: #8a7060; line-height: 1.25; max-width: 46vw;
+      z-index: 3; pointer-events: auto; touch-action: manipulation;
+      font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase;
+      color: #8a7060; line-height: 1.3; max-width: 42vw;
+      background: rgba(20,10,8,0.72); border: 1px solid #3a2018;
+      padding: 3px 6px; border-radius: 4px; display: none;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     #relictray .on { color: #fde68a; font-weight: 800; }
     #relictray .off { color: #6a5a50; }
+    #relictray.open {
+      font-size: 11px; max-width: 54vw; white-space: normal;
+      overflow: visible; background: rgba(20,10,8,0.94); border-color: #e85d04;
+    }
+    #streakline {
+      margin-top: 0.4rem; font-size: 0.82rem; font-weight: 800;
+      letter-spacing: 0.2em; color: #fde68a;
+      text-shadow: 0 0 14px #e85d0488, 0 2px 0 #3a0c08;
+      animation: streakpop 0.85s ease-in-out infinite;
+    }
+    @keyframes streakpop {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.08); opacity: 0.88; }
+    }
     #chalhud {
       position: fixed; left: 50%; transform: translateX(-50%);
       top: calc(3.45rem + env(safe-area-inset-top, 0px));
@@ -369,6 +386,7 @@
       </div>
       <div class="gb-mid">
         <button type="button" id="gbstart" class="gb-start">START</button>
+        <button type="button" id="gbselect" class="gb-bag">SEL</button>
         <button type="button" id="gbbag" class="gb-bag">BAG</button>
       </div>
       <div class="gb-right">
@@ -419,6 +437,7 @@
   const DMG_KEY = "slashpit-dmgnum";
   const PITY_KEY = "slashpit-pity";
   const CAPE_KEY = "slashpit-cape";
+  const STREAK_KEY = "slashpit-streak";
   const CAPES = [
     { id: "cyan", name: "CYAN", col: "#22d3ee", dark: [14, 100, 122], lite: [34, 211, 238] },
     { id: "blood", name: "BLOOD", col: "#ef4444", dark: [88, 10, 14], lite: [220, 38, 38], need: 16 },
@@ -657,6 +676,12 @@
   let finishSpin = 0;
   let boardSaved = false;
   let roomLootMin = null;
+  let roomPath = [];
+  let wheel = null;
+  let loadoutOpenT = 0;
+  let playStreak = 0;
+  let lastPlayDepth = 0;
+  let runIsPlay = false;
 
   const ptr = { down: false, x: 0, y: 0, sx: 0, sy: 0, t: 0, id: null };
   const pad = { x: 0, y: 0, id: null, a: false, b: false };
@@ -964,6 +989,7 @@
   loreFound = loadLore();
   lastGhost = loadGhost();
   titleFamiliar = loadFamiliar();
+  try { playStreak = +localStorage.getItem(STREAK_KEY) || 0; } catch (e) { playStreak = 0; }
   capeId = loadCape();
 
   function relicUnlocked(id) {
@@ -1885,10 +1911,45 @@
   function syncRelicTray() {
     const el = document.getElementById("relictray");
     if (!el) return;
-    if (phase === "title" || phase === "dead" || phase === "win") { el.innerHTML = ""; return; }
-    const a = slots.relic ? slots.relic.name : "—";
+    if (phase === "title" || phase === "dead" || phase === "win") {
+      el.innerHTML = "";
+      el.classList.remove("open");
+      el.style.display = "none";
+      return;
+    }
+    el.style.display = "block";
+    const w = slots.weapon ? slots.weapon.name : "—";
+    const a = slots.armor ? slots.armor.name : "—";
+    const r = slots.relic ? slots.relic.name : "—";
     const b = slots.bag ? slots.bag.name : "—";
-    el.innerHTML = "<span class='on'>" + esc(a) + "</span><br><span class='off'>" + esc(b) + "</span>";
+    const open = loadoutOpenT > 0;
+    el.classList.toggle("open", open);
+    if (open) {
+      el.innerHTML =
+        "<div class='on'>WEP · " + esc(w) + "</div>" +
+        "<div class='on'>ARM · " + esc(a) + "</div>" +
+        "<div class='on'>REL · " + esc(r) + "</div>" +
+        "<div class='" + (slots.bag ? "on" : "off") + "'>BAG · " + esc(b) + "</div>";
+    } else {
+      el.innerHTML = "<span class='on'>" + esc(w) + "</span> · <span class='on'>" + esc(a) + "</span> · <span class='on'>" + esc(r) + "</span>";
+    }
+  }
+  function peekLoadout() {
+    if (!inRun()) return;
+    loadoutOpenT = 2;
+    syncRelicTray();
+  }
+  function saveStreak(n) {
+    playStreak = Math.max(0, n | 0);
+    try { localStorage.setItem(STREAK_KEY, String(playStreak)); } catch (e) {}
+  }
+  function notePlayDeath(d) {
+    if (!runIsPlay) return;
+    if (lastPlayDepth > 0) {
+      if (d > lastPlayDepth) saveStreak(playStreak + 1);
+      else if (d < lastPlayDepth) saveStreak(0);
+    }
+    lastPlayDepth = d;
   }
   function syncPauseGlyph() {
     const el = document.getElementById("pauseglyph");
@@ -2112,6 +2173,10 @@
       e.range = (e.range || 0.9) * 1.15;
       e.hp = e.maxhp = Math.round(e.maxhp * 1.3);
     }
+    if (!coached.affix) {
+      coached.affix = 1;
+      coachQ.push(["ELITE · " + AFFIX[id].name.toUpperCase(), "#fde68a"]);
+    }
   }
   function maybeClearRoom() {
     if (enemies.length || phase !== "fight" || (challenge && !challenge.done) || pendingClear) return;
@@ -2213,6 +2278,7 @@
     voidMotes = [];
     challenge = null;
     rest = null;
+    wheel = null;
     branchDoors = null;
     doorAnim = 0;
     finishSpin = 0;
@@ -2297,8 +2363,14 @@
       banner = { t: 1.15, text: "REST" };
       stopDrone();
     } else if (roomKind === "event") {
-      const ev = spick(["shrine", "mimic", "elite"]);
-      if (ev === "shrine") {
+      const ev = rng() < 0.2 ? "wheel" : spick(["shrine", "mimic", "elite"]);
+      if (ev === "wheel") {
+        phase = "event";
+        const p = clampToWalkable(COLS * 0.5, ROWS * 0.48);
+        wheel = { x: p.x, y: p.y, used: false, spinning: false, ang: 0, vel: 0 };
+        banner = { t: 1.15, text: "FORTUNE" };
+        stopDrone();
+      } else if (ev === "shrine") {
         phase = "event";
         const a = clampToWalkable(COLS * 0.32, ROWS * 0.48);
         const b = clampToWalkable(COLS * 0.68, ROWS * 0.48);
@@ -2415,10 +2487,27 @@
     syncPauseGlyph();
     syncRelicTray();
     if (!runHorde && !runPractice) {
+      noteRoomPath();
       if (n >= 8) unlockAch("depth8");
       if (n >= 16) unlockAch("depth16");
     }
     syncHud();
+  }
+  function noteRoomPath() {
+    let ch = "C";
+    if (roomKind === "shop") ch = "S";
+    else if (roomKind === "rest") ch = "R";
+    else if (roomKind === "boss" || roomKind === "heart") ch = "B";
+    else if (roomKind === "event") {
+      let elite = false;
+      for (let i = 0; i < enemies.length; i++) if (enemies[i].elite) elite = true;
+      ch = elite ? "!" : "E";
+    } else {
+      for (let i = 0; i < enemies.length; i++) {
+        if (enemies[i].elite) { ch = "!"; break; }
+      }
+    }
+    roomPath.push(ch);
   }
 
   function spawnHordeWave() {
@@ -2844,6 +2933,53 @@
     syncHud();
   }
 
+  function spinWheel() {
+    if (shopActLatch > 0) return;
+    if (!wheel || wheel.used || wheel.spinning) return;
+    shopActLatch = 0.22;
+    wheel.spinning = true;
+    wheel.vel = 16 + rng() * 10;
+    sfx("buy");
+    showToast("SPIN", "#fde68a", 0.65);
+  }
+  function resolveWheel(id) {
+    if (!wheel) return;
+    if (id === "heal") {
+      const add = Math.round(player.maxhp * 0.42);
+      player.hp = Math.min(player.maxhp, player.hp + add);
+      showToast("WHEEL · HEAL +" + add, "#86efac");
+      sfx("pickup");
+    } else if (id === "gold") {
+      addGold(18 + depth * 4, wheel.x, wheel.y);
+      showToast("WHEEL · GOLD", "#fbbf24");
+      sfx("pickup");
+    } else if (id === "curse") {
+      player.cursed = true;
+      showToast("WHEEL · CURSE", "#a78bfa");
+      sfx("hurt");
+      screenFlash(0.16, "168,85,247");
+    } else {
+      applyItem(makeItem("epic"));
+    }
+    burst(wheel.x, wheel.y, id === "curse" ? "#a78bfa" : "#fde68a", 16);
+    exitGate = { x: doorTile.x, y: doorTile.y };
+    doorAnim = 0.55;
+    syncHud();
+  }
+  function tickWheel(dt) {
+    if (!wheel || !wheel.spinning) return;
+    const TAU = Math.PI * 2;
+    wheel.ang += wheel.vel * dt;
+    wheel.vel *= Math.exp(-2.35 * dt);
+    if (wheel.vel < 0.55) {
+      wheel.vel = 0;
+      wheel.spinning = false;
+      wheel.used = true;
+      const ids = ["heal", "gold", "curse", "epic"];
+      const a = ((-wheel.ang) % TAU + TAU) % TAU;
+      resolveWheel(ids[(a / (TAU / 4)) | 0]);
+    }
+  }
   function triggerMimic() {
     if (!chest || !chest.mimic) return;
     const x = chest.x, y = chest.y;
@@ -3365,6 +3501,10 @@
       rest.sel = nearest;
       if (nd < 1.4) { useRest(rest.opts[rest.sel].id); return; }
     }
+    if (phase === "event" && wheel && !wheel.used) {
+      spinWheel();
+      return;
+    }
     if (phase === "event" && shrine && !shrine.used) {
       let nearest = shrine.sel, nd = 99;
       for (let i = 0; i < shrine.opts.length; i++) {
@@ -3531,9 +3671,13 @@
     runWeekly = !!(opts && opts.weekly);
     runHorde = !!(opts && opts.horde);
     runPractice = !!(opts && opts.practice);
+    runIsPlay = !(opts && (opts.deeper || opts.weekly || opts.horde || opts.practice || opts.daily));
     practiceBoss = (opts && opts.boss) || "boss";
     runMutators = (runHorde || runPractice) ? [] : (runWeekly ? weeklyMutators() : ((opts && opts.daily) ? dailyMutators() : []));
     lastKind = "combat";
+    roomPath = [];
+    wheel = null;
+    loadoutOpenT = 0;
     titleDaily = false;
     titleDeeper = false;
     titleWeekly = false;
@@ -3598,6 +3742,7 @@
     stopDrone();
     if (first) {
       sfx("death");
+      notePlayDeath(depth);
       if (runHorde) saveHordeBest(hordeWave);
       if (!runPractice && !runHorde) {
         saveBest(depth);
@@ -3762,6 +3907,10 @@
           return;
         }
       }
+    }
+    if (wheel && !wheel.used && dist(w.x, w.y, wheel.x, wheel.y) < 1.4) {
+      spinWheel();
+      return;
     }
     if (shrine && !shrine.used) {
       for (let i = 0; i < shrine.opts.length; i++) {
@@ -4035,6 +4184,25 @@
       bagEl.addEventListener("pointerup", bagUp, { passive: false });
       bagEl.addEventListener("pointercancel", bagUp, { passive: false });
     }
+    const selEl = document.getElementById("gbselect");
+    if (selEl) {
+      selEl.addEventListener("pointerdown", function (e) {
+        halt(e);
+        selEl.classList.add("pressed");
+        peekLoadout();
+      }, { passive: false });
+      function selUp(e) { halt(e); selEl.classList.remove("pressed"); }
+      selEl.addEventListener("pointerup", selUp, { passive: false });
+      selEl.addEventListener("pointercancel", selUp, { passive: false });
+    }
+    const trayEl = document.getElementById("relictray");
+    if (trayEl) {
+      trayEl.addEventListener("pointerdown", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        peekLoadout();
+      }, { passive: false });
+    }
     const pauseG = document.getElementById("pauseglyph");
     if (pauseG) {
       pauseG.addEventListener("click", function (e) {
@@ -4087,9 +4255,15 @@
     const isB = e.code === "KeyZ" || e.code === "KeyJ";
     const isStart = e.code === "Enter";
     const isBag = e.code === "KeyC" || e.code === "KeyQ";
+    const isSel = e.code === "KeyE" || e.code === "ShiftLeft";
     if (isBag) {
       e.preventDefault();
       if (inRun()) swapRelics();
+      return;
+    }
+    if (isSel) {
+      e.preventDefault();
+      peekLoadout();
       return;
     }
     if (isA) {
@@ -4680,6 +4854,11 @@
       }
     }
     flushCoach();
+    if (loadoutOpenT > 0) {
+      loadoutOpenT -= dt;
+      if (loadoutOpenT <= 0) { loadoutOpenT = 0; syncRelicTray(); }
+    }
+    tickWheel(dt);
     if (wipeT > 0) wipeT = Math.max(0, wipeT - dt);
     if (finishSpin > 0) finishSpin = Math.max(0, finishSpin - dt * 3.6);
     if (paused) return;
@@ -5622,6 +5801,50 @@
     ctx.fillStyle = "rgba(253,230,138," + pulse + ")";
     ctx.fillRect(x - 2, y - 18, 4, 2);
   }
+  function drawWheel() {
+    if (!wheel) return;
+    const x = sx(wheel.x), y = sy(wheel.y);
+    const R = Math.round(TILE * 1.12);
+    const cols = ["#4ade80", "#fbbf24", "#a78bfa", "#fb923c"];
+    const labs = ["HP", "G", "X", "E"];
+    const TAU = Math.PI * 2;
+    footShadow(wheel.x, wheel.y, 0.95);
+    for (let py = -R; py <= R; py += 2) {
+      for (let px = -R; px <= R; px += 2) {
+        if (px * px + py * py > R * R) continue;
+        let a = Math.atan2(px, -py) - wheel.ang;
+        a = ((a % TAU) + TAU) % TAU;
+        ctx.fillStyle = cols[(a / (TAU / 4)) | 0];
+        ctx.fillRect(x + px, y + py, 2, 2);
+      }
+    }
+    ctx.fillStyle = "#1a1008";
+    ctx.fillRect(x - R - 1, y - 1, R * 2 + 2, 2);
+    ctx.fillRect(x - 1, y - R - 1, 2, R * 2 + 2);
+    ctx.fillStyle = "#f3e8de";
+    ctx.fillRect(x - 3, y - 3, 6, 6);
+    ctx.fillStyle = "#fde68a";
+    ctx.fillRect(x - 4, y - R - 8, 8, 4);
+    ctx.fillRect(x - 2, y - R - 4, 4, 4);
+    ctx.font = "800 8px ui-sans-serif, system-ui";
+    ctx.textAlign = "center";
+    for (let i = 0; i < 4; i++) {
+      const mid = (i + 0.5) * (TAU / 4) + wheel.ang;
+      const lx = x + Math.sin(mid) * (R * 0.55);
+      const ly = y - Math.cos(mid) * (R * 0.55);
+      ctx.fillStyle = "#1a1008";
+      ctx.fillText(labs[i], lx, ly + 3);
+    }
+    if (!wheel.used && !wheel.spinning) {
+      ctx.fillStyle = "#fde68a";
+      ctx.font = "800 10px ui-sans-serif, system-ui";
+      ctx.fillText("SPIN", x, y + R + 14);
+    } else if (wheel.used) {
+      ctx.fillStyle = "#8a7060";
+      ctx.font = "700 9px ui-sans-serif, system-ui";
+      ctx.fillText("DONE", x, y + R + 14);
+    }
+  }
   function drawShrineOpt(o, i) {
     footShadow(o.x, o.y, 0.7);
     blit(spr.shrine, o.x, o.y, false, false);
@@ -5744,6 +5967,7 @@
       blit(spr.keeper, shop.keeper.x, shop.keeper.y, false, false);
     }});
     if (shop && shop.refresh) list.push({ y: shop.refresh.y, draw: drawShopRefresh });
+    if (wheel) list.push({ y: wheel.y, draw: drawWheel });
     if (shrine) shrine.opts.forEach(function (o, i) { list.push({ y: o.y, draw: function () { drawShrineOpt(o, i); } }); });
     if (rest) {
       list.push({ y: rest.fire.y, draw: function () { drawCampfire(rest.fire); } });
@@ -5921,10 +6145,11 @@
 
   function drawMinimap() {
     if (!MAP.length || player.dead) return;
+    const hist = roomPath.slice(-8);
     const cell = 3;
     const pad = 3;
-    const mw = COLS * cell + pad * 2;
-    const mh = ROWS * cell + pad * 2 + 12;
+    const mw = Math.max(COLS * cell + pad * 2, hist.length * 10 + pad * 2);
+    const mh = ROWS * cell + pad * 2 + 20;
     const deck = document.getElementById("gbsp");
     const bot = deck ? Math.max(140, deck.offsetHeight) : 168;
     const x = 8;
@@ -5959,12 +6184,16 @@
     ctx.fillStyle = "#c4b4a4";
     ctx.font = "700 8px ui-sans-serif, system-ui";
     ctx.textAlign = "left";
-    ctx.fillText((roomKind || "ROOM").toUpperCase(), x + pad, y + mh - 3);
-    const pipY = y + mh - 8;
-    const pip0 = x + mw - pad - 8 * 4;
-    for (let i = 0; i < 8; i++) {
-      ctx.fillStyle = i === ((depth - 1) % 8) ? "#e85d04" : "#3a2018";
-      ctx.fillRect(pip0 + i * 4, pipY, 3, 3);
+    ctx.fillText((roomKind || "ROOM").toUpperCase(), x + pad, y + mh - 12);
+    ctx.font = "800 8px ui-monospace, ui-sans-serif, system-ui";
+    ctx.textAlign = "center";
+    for (let i = 0; i < hist.length; i++) {
+      const ch = hist[i];
+      const last = i === hist.length - 1;
+      ctx.fillStyle = last
+        ? (ch === "!" ? "#fda4af" : ch === "B" ? "#fb923c" : ch === "S" ? "#fbbf24" : ch === "R" ? "#86efac" : ch === "E" ? "#c4b5fd" : "#fde68a")
+        : "#6a5a50";
+      ctx.fillText(ch, x + pad + 5 + i * 10, y + mh - 3);
     }
   }
 
@@ -6175,6 +6404,7 @@
       "<h1>SLASH PIT</h1>" +
       (achs.heart ? "<div class='pitheart' aria-hidden='true'></div>" : "") +
       "<p>One thumb. Dash-strike. Grab loot. Don't get slammed.</p>" +
+      (playStreak > 0 ? "<p id='streakline'>STREAK x" + playStreak + "</p>" : "") +
       "<p id='bestline'>" + (b ? "Best depth " + b : "No descents yet.") + " · Unlocks " + unlockCount() + "/" + unlockTotal() + " · Achs " + achCount() + "/" + ACH_DEFS.length + (hordeBest() ? " · Horde " + hordeBest() : "") + "</p>" +
       "<div class='menu-col'>" +
       "<button class='btn btn-play' id='playbtn' type='button'>PLAY</button>" +
