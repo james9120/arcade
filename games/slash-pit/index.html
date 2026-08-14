@@ -43,6 +43,7 @@
     #hptext { font-variant-numeric: tabular-nums; }
     #goldtext { color: #fbbf24; font-weight: 700; font-variant-numeric: tabular-nums; }
     #combotext { color: #fde68a; font-weight: 800; min-width: 2.4rem; text-align: center; }
+    #clocktext { color: #fde68a; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: 0.06em; }
     #roomtext { font-weight: 700; }
     #mutebtn {
       position: fixed; right: 0.55rem;
@@ -73,6 +74,27 @@
       z-index: 4; overflow: auto;
     }
     #overlay.hidden { display: none; }
+    #overlay.hell {
+      background: radial-gradient(ellipse at center, rgba(42,4,4,0.90) 0%, rgba(16,2,2,0.58) 62%, rgba(8,0,0,0.40) 100%);
+    }
+    #overlay.hell h1 { text-shadow: 0 0 26px #ef444466, 0 4px 0 #3a0c08; }
+    .pitheart {
+      width: 12px; height: 12px; margin: 0.5rem auto 0; position: relative;
+      background: #ef4444; transform: rotate(45deg);
+      box-shadow: 0 0 10px #ef444488;
+      animation: pitbeat 0.7s ease-in-out infinite;
+    }
+    .pitheart:before, .pitheart:after {
+      content: ""; position: absolute; width: 12px; height: 12px;
+      background: #ef4444; border-radius: 50%;
+    }
+    .pitheart:before { left: -6px; top: 0; }
+    .pitheart:after { left: 0; top: -6px; }
+    @keyframes pitbeat {
+      0%, 100% { transform: rotate(45deg) scale(1); }
+      50% { transform: rotate(45deg) scale(1.22); }
+    }
+    .cape-dot { display: inline-block; width: 0.55rem; height: 0.55rem; margin-right: 0.28rem; vertical-align: -0.05rem; box-shadow: inset 0 0 0 1px #0008; }
     #hud.off { visibility: hidden; }
     #overlay h1 {
       margin: 0; font-size: clamp(2.2rem, 11vw, 3.6rem);
@@ -111,14 +133,17 @@
     #hint { display: none; }
     #pauseov {
       position: fixed; inset: 0 0 calc(150px + env(safe-area-inset-bottom, 0px)) 0;
-      display: none; align-items: center; justify-content: center;
-      background: rgba(6,3,3,0.55); z-index: 7; pointer-events: none;
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      background: rgba(6,3,3,0.55); z-index: 7; pointer-events: none; gap: 0.7rem;
     }
     #pauseov.on { display: flex; }
+    #pauseov.canquit { pointer-events: auto; }
     #pauseov span {
       font-size: clamp(2rem, 10vw, 3.2rem); font-weight: 900; letter-spacing: 0.18em;
       color: #fde68a; text-shadow: 0 4px 0 #3a0c08, 0 0 22px #e85d0466;
     }
+    #quitbtn { display: none; margin-top: 0.2rem; pointer-events: auto; }
+    #pauseov.canquit #quitbtn { display: inline-block; }
     #seedin {
       margin-top: 0.55rem; width: 12.5rem; min-height: 2.6rem;
       border: 1px solid #5a3a20; background: #1a100c; color: #fde68a;
@@ -296,13 +321,14 @@
       <span id="hptext">100 / 100</span>
       <span id="goldtext">0 G</span>
       <span id="combotext"></span>
+      <span id="clocktext">00:00</span>
       <span id="roomtext">DEPTH 1</span>
     </div>
   </div>
   <div id="relictray"></div>
   <div id="chalhud"></div>
   <div id="toast"></div>
-  <div id="pauseov"><span>PAUSED</span></div>
+  <div id="pauseov"><span>PAUSED</span><button class="btn btn-alt btn-sm" id="quitbtn" type="button">QUIT</button></div>
   <div id="hint">D-PAD MOVE · A SLASH · HOLD A CHARGE · B DODGE / PARRY</div>
   <div id="gbsp">
     <div class="gb-lip"></div>
@@ -346,6 +372,7 @@
   const hptext = document.getElementById("hptext");
   const goldtext = document.getElementById("goldtext");
   const combotext = document.getElementById("combotext");
+  const clocktext = document.getElementById("clocktext");
   const roomtext = document.getElementById("roomtext");
   const toastEl = document.getElementById("toast");
   const overlay = document.getElementById("overlay");
@@ -363,6 +390,22 @@
   const BOARD_KEY = "slashpit-board";
   const FAM_KEY = "slashpit-familiar";
   const WEEKLY_BEST_KEY = "slashpit-weekly-best";
+  const HORDE_BEST_KEY = "slashpit-horde-best";
+  const CAPE_KEY = "slashpit-cape";
+  const CAPES = [
+    { id: "cyan", name: "CYAN", col: "#22d3ee", dark: [14, 100, 122], lite: [34, 211, 238] },
+    { id: "blood", name: "BLOOD", col: "#ef4444", dark: [88, 10, 14], lite: [220, 38, 38], need: 16 },
+    { id: "gold", name: "GOLD", col: "#fbbf24", dark: [146, 90, 12], lite: [251, 191, 36], heart: true },
+    { id: "void", name: "VOID", col: "#a78bfa", dark: [36, 24, 72], lite: [139, 92, 246], need: 32 }
+  ];
+  const PRACTICE_BOSSES = [
+    { id: "boss", name: "PIT LORD", depth: 8, theme: "ash" },
+    { id: "boneking", name: "BONE KING", depth: 16, theme: "ice" },
+    { id: "ashwitch", name: "ASH WITCH", depth: 24, theme: "hell" },
+    { id: "hollowtwin", name: "HOLLOW TWIN", depth: 32, theme: "void" },
+    { id: "heart", name: "HEART", depth: 40, theme: "blood", heart: true }
+  ];
+  const HERO_CAPE_KEYS = ["hero", "heroW1", "heroW2", "heroW3", "heroW4", "heroSlash", "heroBack"];
   const MUTATORS = [
     { id: "swarm", name: "Swarm", desc: "+1 enemy" },
     { id: "glass", name: "Glass", desc: "half HP" },
@@ -543,7 +586,20 @@
   let titleDeeper = false;
   let titleWeekly = false;
   let titleFamiliar = false;
+  let titleHorde = false;
+  let titlePractice = false;
   let runWeekly = false;
+  let runHorde = false;
+  let runPractice = false;
+  let practiceBoss = "boss";
+  let hordeWave = 0;
+  let hordeNext = 20;
+  let runTime = 0;
+  let clockShown = -1;
+  let boardSort = "depth";
+  let knightHints = 0;
+  let capeId = "cyan";
+  let heroBase = {};
   let familiarOn = false;
   let familiar = null;
   let heartT = 0;
@@ -664,6 +720,56 @@
     for (let i = 0; i < runMutators.length; i++) if (runMutators[i].id === id) return true;
     return false;
   }
+  function mutLive(id) {
+    if ((id === "glass" || id === "swarm") && depth < 2 && !ngPlus) return false;
+    return hasMut(id);
+  }
+  function fmtTime(t) {
+    t = Math.max(0, t | 0);
+    const m = (t / 60) | 0, sec = t % 60;
+    return (m < 10 ? "0" : "") + m + ":" + (sec < 10 ? "0" : "") + sec;
+  }
+  function syncClock() {
+    if (!clocktext) return;
+    const sec = runTime | 0;
+    if (sec === clockShown) return;
+    clockShown = sec;
+    clocktext.textContent = fmtTime(runTime);
+  }
+  function hordeBest() {
+    try { return +localStorage.getItem(HORDE_BEST_KEY) || 0; } catch (e) { return 0; }
+  }
+  function saveHordeBest(n) {
+    if (!runHorde) return;
+    try { if (n > hordeBest()) localStorage.setItem(HORDE_BEST_KEY, String(n)); } catch (e) {}
+  }
+  function capeDef(id) {
+    for (let i = 0; i < CAPES.length; i++) if (CAPES[i].id === id) return CAPES[i];
+    return CAPES[0];
+  }
+  function capeUnlocked(id) {
+    const c = capeDef(id);
+    if (c.heart) return !!achs.heart;
+    return bestDepth() >= (c.need || 0);
+  }
+  function loadCape() {
+    try {
+      const id = localStorage.getItem(CAPE_KEY) || "cyan";
+      return capeUnlocked(id) ? id : "cyan";
+    } catch (e) { return "cyan"; }
+  }
+  function saveCape(id) {
+    try { localStorage.setItem(CAPE_KEY, id); } catch (e) {}
+  }
+  function practiceDef(id) {
+    for (let i = 0; i < PRACTICE_BOSSES.length; i++) if (PRACTICE_BOSSES[i].id === id) return PRACTICE_BOSSES[i];
+    return PRACTICE_BOSSES[0];
+  }
+  function practiceUnlocked(id) {
+    const d = practiceDef(id);
+    if (d.heart) return !!achs.heart;
+    return bestDepth() >= 8;
+  }
   function mutNames() {
     return runMutators.map(function (m) { return m.name; }).join(" · ");
   }
@@ -705,7 +811,7 @@
   }
   function addBoardRun() {
     const arr = loadBoard();
-    arr.push({ depth: depth, gold: gold, cls: pickedClass, seed: seedLabel(runSeed), date: Date.now() });
+    arr.push({ depth: depth, gold: gold, cls: pickedClass, seed: seedLabel(runSeed), date: Date.now(), time: runTime | 0 });
     arr.sort(function (a, b) { return (b.depth - a.depth) || (b.gold - a.gold); });
     saveBoard(arr.slice(0, 10));
   }
@@ -817,6 +923,7 @@
   loreFound = loadLore();
   lastGhost = loadGhost();
   titleFamiliar = loadFamiliar();
+  capeId = loadCape();
 
   function relicUnlocked(id) {
     const def = START_RELICS.filter(function (r) { return r.id === id; })[0];
@@ -1600,10 +1707,7 @@
       recap.push("START · " + rdef.name);
     }
     recap.push("CLASS · " + klass.name.toUpperCase());
-    if (hasMut("glass")) {
-      player.maxhp = Math.max(1, Math.round(player.maxhp * 0.5));
-      player.hp = player.maxhp;
-    }
+    player._glassApplied = false;
     player.iceVx = 0; player.iceVy = 0; player.parryWin = 0;
     syncRelicTray();
   }
@@ -1860,7 +1964,7 @@
     if (ngPlus) n = Math.max(1, Math.round(n * 1.3));
     if (hasMut("rich")) n = Math.max(1, n * 2);
     gold += n;
-    bumpStat("gold", n);
+    if (!runPractice) bumpStat("gold", n);
     if (x != null) {
       coins.push({ x: x, y: y, t: 0, n: n });
       floats.push({ x: x, y: y - 0.5, t: 0.7, text: "+" + n, col: "#fbbf24" });
@@ -1895,6 +1999,7 @@
   }
 
   function spawnEnemy(type, x, y, fast, elite) {
+    if (type === "knight" && depth <= 2 && !runPractice) type = "slime";
     const d = enemyDef(type);
     const c = clampToWalkable(x, y);
     const scale = isBossType(type) || depth === 1 ? 1 : (1 + (depth - 1) * 0.07);
@@ -1909,11 +2014,11 @@
       elite: !!elite, swoopT: 0, sx: c.x, sy: c.y,
       burn: 0, burnTick: 0, summonT: 2.8, teleT: 2.4, casting: false,
       glow: 0, glowT: type === "wisp" ? 1.15 : 0,
-      stun: 0, frost: false, stash: 0, twin: false, splitGuard: 0, pulse: 0
+      stun: 0, frost: false, stash: 0, twin: false, splitGuard: 0, pulse: 0, clangs: 0
     });
     e.maxhp = e.hp;
     if (depth === 1 && type === "slime") { e.hp = e.maxhp = 18; e.dmg = 6; e.speed = 1.35; }
-    if (hasMut("glass") && type !== "shade") {
+    if (mutLive("glass") && type !== "shade") {
       e.hp = Math.max(1, Math.round(e.hp * 0.5));
       e.maxhp = e.hp;
     }
@@ -1939,7 +2044,7 @@
   function buildPack(n) {
     if (n === 1) {
       const first = ["slime", "slime"];
-      if (hasMut("swarm")) first.push("slime");
+      if (mutLive("swarm")) first.push("slime");
       return { list: first, fast: false, chest: false, elite: false };
     }
     if (n % 8 === 0) return { list: ["boss"], fast: false, chest: false, elite: false };
@@ -1955,7 +2060,10 @@
     if (n >= 18) pool.push("bomber", "brute", "knight", "golem");
     const list = [];
     for (let i = 0; i < count; i++) list.push(spick(pool));
-    if (hasMut("swarm")) list.push(spick(pool));
+    if (mutLive("swarm")) list.push(spick(pool));
+    if (n <= 2) {
+      for (let i = 0; i < list.length; i++) if (list[i] === "knight") list[i] = "slime";
+    }
     return { list: list, fast: n >= 5 && rng() < 0.45, chest: n >= 3 && rng() < 0.34, elite: false };
   }
 
@@ -1991,12 +2099,23 @@
     roomLootMin = incoming === "right" ? (n >= 8 ? "rare" : "common") : null;
     const chEl = document.getElementById("chalhud");
     if (chEl) { chEl.classList.remove("on"); chEl.textContent = ""; }
-    roomKind = decideKind(n);
+    if (runPractice) {
+      const pb = practiceDef(practiceBoss);
+      n = pb.depth;
+      depth = n;
+      roomKind = "boss";
+    } else if (runHorde) {
+      roomKind = "combat";
+    } else {
+      roomKind = decideKind(n);
+    }
     lastKind = roomKind;
-    const forced = n === 1 ? { layout: "hall", theme: "ember" }
+    const forced = runHorde ? { layout: "arena", theme: "ash" }
+      : (runPractice ? { layout: "arena", theme: practiceDef(practiceBoss).theme }
+      : (n === 1 ? { layout: "hall", theme: "ember" }
       : (roomKind === "heart" ? { layout: "arena", theme: "blood" }
       : (roomKind === "shop" || roomKind === "rest" ? { layout: "chamber" }
-      : (roomKind === "warden" || roomKind === "challenge" ? { layout: "arena" } : null)));
+      : (roomKind === "warden" || roomKind === "challenge" ? { layout: "arena" } : null)))));
     buildMap(n, forced);
     player.x = spawnTile.x; player.y = spawnTile.y;
     player.tx = null; player.ty = null; player.dash = null;
@@ -2005,8 +2124,27 @@
     player.vx = 0; player.vy = 0;
     combo = Math.min(combo, 3);
     if (familiar) { familiar.x = player.x - 0.65; familiar.y = player.y - 0.45; familiar.peck = Math.max(familiar.peck || 0, 0.4); }
+    if (hasMut("glass") && (n >= 2 || ngPlus) && !player._glassApplied) {
+      player.maxhp = Math.max(1, Math.round(player.maxhp * 0.5));
+      player.hp = Math.min(player.hp, player.maxhp);
+      player._glassApplied = true;
+      if (n === 2 && !ngPlus) showToast("GLASS · HALF HP", "#fda4af");
+    }
+    if (hasMut("swarm") && n === 2 && !ngPlus) showToast("SWARM", "#fde68a");
 
-    if (roomKind === "shop") {
+    if (runPractice) {
+      phase = "fight";
+      lastBoss = practiceBoss;
+      spawnEnemy(practiceBoss, COLS * 0.5, ROWS * 0.42, false, false);
+      banner = { t: 1.25, text: "PRACTICE · " + bossTitle(practiceBoss) };
+      startDrone();
+    } else if (runHorde) {
+      phase = "fight";
+      if (!hordeWave) hordeWave = 1;
+      hordeNext = 20;
+      spawnHordeWave();
+      startDrone();
+    } else if (roomKind === "shop") {
       phase = "shop";
       openShop();
       banner = { t: 1.0, text: "SHOP" };
@@ -2140,15 +2278,80 @@
       addGold(8 + n, COLS * 0.5, ROWS * 0.5);
       spawnGem(COLS * 0.46, ROWS * 0.48, makeItem());
     }
-    placeSecret();
-    placeHazards();
-    placeTablets();
-    placeDeathGhost(n);
+    if (!runHorde && !runPractice) {
+      placeSecret();
+      placeHazards();
+      placeTablets();
+      placeDeathGhost(n);
+    }
     syncPauseGlyph();
     syncRelicTray();
-    if (n >= 8) unlockAch("depth8");
-    if (n >= 16) unlockAch("depth16");
+    if (!runHorde && !runPractice) {
+      if (n >= 8) unlockAch("depth8");
+      if (n >= 16) unlockAch("depth16");
+    }
     syncHud();
+  }
+
+  function spawnHordeWave() {
+    const w = Math.max(1, hordeWave);
+    depth = w;
+    const types = ["slime"];
+    if (w >= 2) types.push("bat");
+    if (w >= 3) types.push("spitter", "wisp");
+    if (w >= 4) types.push("brute");
+    if (w >= 6) types.push("bomber");
+    if (w >= 8) types.push("knight");
+    if (w >= 10) types.push("golem");
+    const n = Math.min(8, 2 + ((w - 1) / 2 | 0));
+    for (let i = 0; i < n; i++) {
+      const t = w <= 2 && types[i % types.length] === "knight" ? "slime" : spick(types);
+      spawnEnemy(t, COLS * (0.24 + rng() * 0.52), ROWS * (0.24 + rng() * 0.28), w >= 5 && rng() < 0.3, w >= 12 && rng() < 0.12);
+    }
+    banner = { t: 0.75, text: "WAVE " + w };
+    const chEl = document.getElementById("chalhud");
+    if (chEl) { chEl.classList.add("on"); chEl.textContent = "WAVE " + w; }
+    saveHordeBest(w);
+  }
+  function openHordeShop() {
+    enemies = [];
+    shots = [];
+    bombs = [];
+    phase = "shop";
+    stopDrone();
+    openShop();
+    banner = { t: 1.0, text: "BOOTH" };
+    showToast("WAVE " + hordeWave + " · SHOP", "#fbbf24");
+    sfx("shop");
+  }
+  function resumeHorde() {
+    gems.forEach(function (g) { applyItem(g.item); });
+    gems = [];
+    shop = null;
+    exitGate = null;
+    branchDoors = null;
+    phase = "fight";
+    hordeWave++;
+    hordeNext = 20;
+    spawnHordeWave();
+    startDrone();
+  }
+  function tickHorde(dt) {
+    if (!runHorde || phase !== "fight" || player.dead) return;
+    hordeNext -= dt;
+    const chEl = document.getElementById("chalhud");
+    if (chEl) {
+      chEl.classList.add("on");
+      chEl.textContent = "WAVE " + hordeWave + " · " + Math.max(0, Math.ceil(hordeNext)) + "s";
+    }
+    if (hordeNext > 0) return;
+    if (hordeWave > 0 && hordeWave % 5 === 0) {
+      openHordeShop();
+      return;
+    }
+    hordeWave++;
+    hordeNext = 20;
+    spawnHordeWave();
   }
 
   function placeSecret() {
@@ -2294,7 +2497,10 @@
   function setPaused(on) {
     paused = !!on;
     const el = document.getElementById("pauseov");
-    if (el) el.classList.toggle("on", paused);
+    if (el) {
+      el.classList.toggle("on", paused);
+      el.classList.toggle("canquit", paused && (runPractice || runHorde));
+    }
     if (paused) {
       player.charging = false;
       player.chargeT = 0;
@@ -2488,6 +2694,17 @@
   }
 
   function clearRoom() {
+    if (runPractice) {
+      phase = "win";
+      stopDrone();
+      sfx("clear");
+      showPracticeWin();
+      return;
+    }
+    if (runHorde) {
+      banner = { t: 0.55, text: "WAVE CLEAR" };
+      return;
+    }
     phase = "loot";
     stopDrone();
     sfx("clear");
@@ -2547,6 +2764,7 @@
   }
 
   function nextRoom(pick) {
+    if (runHorde) { resumeHorde(); return; }
     gems.forEach(function (g) { applyItem(g.item); });
     gems = [];
     branchPick = pick || null;
@@ -2674,12 +2892,18 @@
     syncHud();
   }
 
+  function shieldOpen(e) {
+    if (e.vuln > 0 || e.wind > 0) return true;
+    if (e.slam && e.slam.t > 0) return true;
+    return false;
+  }
   function knightBlocked(e) {
     if (e.type !== "knight" && e.type !== "warden") return false;
-    if (e.vuln > 0) return false;
+    if (shieldOpen(e)) return false;
     const fx = Math.cos(e.face || 0), fy = Math.sin(e.face || 0);
     const dx = player.x - e.x, dy = player.y - e.y;
-    return (dx * fx + dy * fy) > 0.12;
+    const len = Math.hypot(dx, dy) || 1;
+    return (dx * fx + dy * fy) / len > -0.34;
   }
 
   function bumpCombo() {
@@ -2786,11 +3010,30 @@
       return;
     }
     if ((e.type === "knight" || e.type === "warden") && knightBlocked(e)) {
-      floats.push({ x: e.x, y: e.y - 0.55, t: 0.55, text: "CLANG", col: "#cbd5e1" });
-      sfx("clang");
-      shake = Math.max(shake, 2);
-      return;
+      if (player.heavy > 0 || player.parryWin > 0) {
+        e.vuln = Math.max(e.vuln || 0, 0.55);
+        e.clangs = 0;
+        floats.push({ x: e.x, y: e.y - 0.7, t: 0.65, text: "BREAK", col: "#fde68a" });
+      } else {
+        e.clangs = (e.clangs || 0) + 1;
+        let tip = "CLANG";
+        if (knightHints < 3) {
+          tip = knightHints % 2 === 0 ? "HIT THE BACK" : "WAIT, THEN SLASH";
+          knightHints++;
+        }
+        if (e.clangs >= 4) {
+          e.vuln = Math.max(e.vuln || 0, 1.2);
+          e.clangs = 0;
+          tip = "OPEN";
+          floats.push({ x: e.x, y: e.y - 0.95, t: 0.7, text: "SHIELD DOWN", col: "#fde68a" });
+        }
+        floats.push({ x: e.x, y: e.y - 0.55, t: 0.7, text: tip, col: tip === "CLANG" ? "#cbd5e1" : "#fde68a" });
+        sfx("clang");
+        shake = Math.max(shake, 2);
+        return;
+      }
     }
+    if (e.type === "knight" || e.type === "warden") e.clangs = 0;
     e.hp -= dmg;
     e.flash = 0.12;
     bumpCombo();
@@ -3033,7 +3276,7 @@
     best.wind = 0;
     best.atk = (best.cd || 1) + 0.4;
     best.stun = 0.72;
-    best.vuln = 0.9;
+    best.vuln = (best.type === "knight" || best.type === "warden") ? 1.15 : 0.9;
     if (best.slam) best.slam = null;
     if (best.casting) { best.casting = false; best.teleT = 1.5; }
     player.slashCd = 0;
@@ -3067,7 +3310,10 @@
     hptext.textContent = Math.max(0, Math.ceil(player.hp)) + " / " + Math.ceil(player.maxhp);
     goldtext.textContent = gold + " G";
     combotext.textContent = combo >= 8 ? "FIN" : (combo >= 2 ? "x" + combo : "");
-    roomtext.textContent = (ngPlus ? "NG+ " : "") + "DEPTH " + depth + (runMutators.length ? " · " + mutNames() : "");
+    if (runHorde) roomtext.textContent = "WAVE " + hordeWave;
+    else if (runPractice) roomtext.textContent = "PRACTICE";
+    else roomtext.textContent = (ngPlus ? "NG+ " : "") + "DEPTH " + depth + (runMutators.length ? " · " + mutNames() : "");
+    syncClock();
   }
 
   function startRun(seed, opts) {
@@ -3077,11 +3323,20 @@
     rng = makeRng(runSeed);
     ngPlus = !!(opts && opts.deeper);
     runWeekly = !!(opts && opts.weekly);
-    runMutators = runWeekly ? weeklyMutators() : ((opts && opts.daily) ? dailyMutators() : []);
+    runHorde = !!(opts && opts.horde);
+    runPractice = !!(opts && opts.practice);
+    practiceBoss = (opts && opts.boss) || "boss";
+    runMutators = (runHorde || runPractice) ? [] : (runWeekly ? weeklyMutators() : ((opts && opts.daily) ? dailyMutators() : []));
     lastKind = "combat";
     titleDaily = false;
     titleDeeper = false;
     titleWeekly = false;
+    titleHorde = false;
+    titlePractice = false;
+    runTime = 0;
+    clockShown = -1;
+    hordeWave = runHorde ? 1 : 0;
+    hordeNext = 20;
     setPaused(false);
     overlay.classList.add("hidden");
     hud.classList.remove("off");
@@ -3090,17 +3345,25 @@
     bumpStat("runs", 1);
     runEnded = false;
     boardSaved = false;
+    knightHints = 0;
     lastGhost = loadGhost();
     resetPlayer();
     familiarOn = familiarUnlocked() && loadFamiliar();
-    familiar = familiarOn ? { x: spawnTile.x - 0.65, y: spawnTile.y - 0.45, peck: 0.8, bob: 0 } : null;
-    startRoom(ngPlus ? 9 : 1);
+    familiar = familiarOn && !runPractice ? { x: spawnTile.x - 0.65, y: spawnTile.y - 0.45, peck: 0.8, bob: 0 } : null;
+    if (runPractice) startRoom(practiceDef(practiceBoss).depth);
+    else if (runHorde) startRoom(1);
+    else startRoom(ngPlus ? 9 : 1);
     syncHud();
+    syncClock();
     syncPauseGlyph();
-    if (ngPlus) unlockAch("ngplus");
-    if (runWeekly) showToast("WEEKLY · " + mutNames(), "#fde68a");
-    else if (runMutators.length) showToast("DAILY · " + mutNames(), "#7dd3fc");
-    else showToast(ngPlus ? "DEEPER · SEED " + seedLabel(runSeed) : "SEED " + seedLabel(runSeed), ngPlus ? "#d8b4fe" : "#c4b4a4");
+    if (runPractice) showToast("PRACTICE · " + bossTitle(practiceBoss), "#fde68a");
+    else if (runHorde) showToast("HORDE", "#fb923c");
+    else if (ngPlus) unlockAch("ngplus");
+    if (!runPractice && !runHorde) {
+      if (runWeekly) showToast("WEEKLY · " + mutNames(), "#fde68a");
+      else if (runMutators.length) showToast("DAILY · " + mutNames(), "#7dd3fc");
+      else showToast(ngPlus ? "DEEPER · SEED " + seedLabel(runSeed) : "SEED " + seedLabel(runSeed), ngPlus ? "#d8b4fe" : "#c4b4a4");
+    }
     setTimeout(checkSetBonus, 900);
   }
 
@@ -3120,14 +3383,17 @@
     stopDrone();
     if (first) {
       sfx("death");
-      saveBest(depth);
-      saveWeeklyBest(depth);
-      if (depth > runStats.best) { runStats.best = depth; saveStats(); }
-      saveGhost({ seed: runSeed, depth: depth, x: player.x, y: player.y, gold: gold });
-      lastGhost = loadGhost();
+      if (runHorde) saveHordeBest(hordeWave);
+      if (!runPractice && !runHorde) {
+        saveBest(depth);
+        saveWeeklyBest(depth);
+        if (depth > runStats.best) { runStats.best = depth; saveStats(); }
+        saveGhost({ seed: runSeed, depth: depth, x: player.x, y: player.y, gold: gold });
+        lastGhost = loadGhost();
+      }
     }
-    const gained = depth + ((gold / 10) | 0);
-    if (first) {
+    const gained = runPractice ? 0 : (runHorde ? hordeWave + ((gold / 12) | 0) : depth + ((gold / 10) | 0));
+    if (first && !runPractice) {
       unlocks.souls += gained;
       saveUnlocks(unlocks);
     }
@@ -3142,19 +3408,38 @@
     const nextW = START_WEAPONS.filter(function (w) { return w.need > 0 && best < w.need; })[0];
     const unlockProg = "Unlocks " + unlockCount() + "/" + unlockTotal() +
       (nextW ? " · next blade at depth " + nextW.need : " · all blades unlocked");
+    const clock = fmtTime(runTime);
+    let headline = "YOU DIED";
+    let recapLine = "Depth " + depth + " · " + gold + " G · Best " + best + " · " + clock;
+    if (runPractice) {
+      headline = "PRACTICE OVER";
+      recapLine = bossTitle(practiceBoss) + " · " + clock;
+    } else if (runHorde) {
+      headline = "HORDE OVER";
+      recapLine = "Wave " + hordeWave + " · best " + hordeBest() + " · " + gold + " G · " + clock;
+    }
     overlay.innerHTML =
-      "<h2>YOU DIED</h2>" +
-      "<p>Depth " + depth + " · " + gold + " G · Best " + best + "</p>" +
-      "<p id='seedline'>SEED " + seedLabel(runSeed) + " · +" + gained + " souls (" + unlocks.souls + ")" + (runWeekly ? " · WEEKLY " + isoWeekKey() + " best " + weeklyBest().depth : "") + "</p>" +
+      "<h2>" + headline + "</h2>" +
+      "<p>" + recapLine + "</p>" +
+      "<p id='seedline'>SEED " + seedLabel(runSeed) + (runPractice ? "" : (" · +" + gained + " souls (" + unlocks.souls + ")")) + (runWeekly ? " · WEEKLY " + isoWeekKey() + " best " + weeklyBest().depth : "") + (runHorde ? " · HORDE BEST " + hordeBest() : "") + "</p>" +
       "<p>" + esc(unlockProg) + "</p>" +
       (recap.length ? "<div class='recap'>" + recap.map(esc).join("<br>") + "</div>" : "<p>No loot this run.</p>") +
       "<div class='btn-row'><button class='btn btn-sm' id='again' type='button'>PLAY AGAIN</button>" +
+      (runPractice || runHorde ? "<button class='btn btn-alt btn-sm' id='titleback' type='button'>TITLE</button>" :
       "<button class='btn btn-alt btn-sm' id='daily' type='button'>DAILY</button>" +
       "<button class='btn btn-alt btn-sm' id='saverun' type='button'>" + (boardSaved ? "SAVED" : "SAVE RUN") + "</button>" +
       "<button class='btn btn-alt btn-sm' id='copyseed' type='button'>COPY SEED</button>" +
-      "<button class='btn btn-alt btn-sm' id='enterseed' type='button'>ENTER SEED</button></div>";
-    document.getElementById("again").addEventListener("click", function (ev) { ev.stopPropagation(); startRun(); });
-    document.getElementById("daily").addEventListener("click", function (ev) { ev.stopPropagation(); startRun(dailySeed(), { daily: true }); });
+      "<button class='btn btn-alt btn-sm' id='enterseed' type='button'>ENTER SEED</button>") + "</div>";
+    document.getElementById("again").addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      if (runPractice) startRun(null, { practice: true, boss: practiceBoss });
+      else if (runHorde) startRun(null, { horde: true });
+      else startRun();
+    });
+    const dailyBtn = document.getElementById("daily");
+    if (dailyBtn) dailyBtn.addEventListener("click", function (ev) { ev.stopPropagation(); startRun(dailySeed(), { daily: true }); });
+    const titleBack = document.getElementById("titleback");
+    if (titleBack) titleBack.addEventListener("click", function (ev) { ev.stopPropagation(); showTitle(); });
     const saveBtn = document.getElementById("saverun");
     if (saveBtn) saveBtn.addEventListener("click", function (ev) {
       ev.stopPropagation();
@@ -3165,8 +3450,39 @@
       showToast("SAVED TO BOARD", "#fde68a");
       sfx("pickup");
     });
-    document.getElementById("copyseed").addEventListener("click", function (ev) { ev.stopPropagation(); copySeed(); });
-    document.getElementById("enterseed").addEventListener("click", function (ev) { ev.stopPropagation(); seedFrom = "dead"; renderSeedPad(); });
+    const cs = document.getElementById("copyseed");
+    if (cs) cs.addEventListener("click", function (ev) { ev.stopPropagation(); copySeed(); });
+    const es = document.getElementById("enterseed");
+    if (es) es.addEventListener("click", function (ev) { ev.stopPropagation(); seedFrom = "dead"; renderSeedPad(); });
+  }
+
+  function showPracticeWin() {
+    runEnded = true;
+    phase = "win";
+    stopDrone();
+    hud.classList.add("off");
+    hint.style.opacity = "0";
+    overlay.classList.remove("hidden");
+    syncPauseGlyph();
+    syncRelicTray();
+    overlay.innerHTML =
+      "<h2>PRACTICE CLEAR</h2>" +
+      "<p>" + esc(bossTitle(practiceBoss)) + " · " + fmtTime(runTime) + "</p>" +
+      "<div class='btn-row'><button class='btn btn-sm' id='again' type='button'>AGAIN</button>" +
+      "<button class='btn btn-alt btn-sm' id='titleback' type='button'>TITLE</button></div>";
+    const ag = document.getElementById("again");
+    if (ag) ag.addEventListener("click", function (ev) { ev.stopPropagation(); startRun(null, { practice: true, boss: practiceBoss }); });
+    const tb = document.getElementById("titleback");
+    if (tb) tb.addEventListener("click", function (ev) { ev.stopPropagation(); showTitle(); });
+  }
+
+  function quitToTitle() {
+    setPaused(false);
+    stopDrone();
+    player.dead = false;
+    runEnded = true;
+    showTitle();
+    showToast("QUIT", "#c4b4a4");
   }
 
   function esc(s) {
@@ -3279,9 +3595,16 @@
   document.addEventListener("touchmove", function (e) { e.preventDefault(); }, { passive: false });
 
   function beginFromTitle() {
-    if (titleDaily) startRun(dailySeed(), { daily: true });
+    if (titleHorde) startRun(null, { horde: true });
+    else if (titlePractice) { titleMode = "practice"; renderTitle(); }
+    else if (titleDaily) startRun(dailySeed(), { daily: true });
     else if (titleWeekly) startRun(weeklySeed(), { weekly: true });
     else if (titleDeeper) startRun(null, { deeper: true });
+    else startRun();
+  }
+  function restartEnded() {
+    if (runPractice) startRun(null, { practice: true, boss: practiceBoss });
+    else if (runHorde) startRun(null, { horde: true });
     else startRun();
   }
   function pressActionA() {
@@ -3292,19 +3615,19 @@
     }
     if (paused) { togglePause(); return; }
     if (phase === "title") {
-      if (titleMode === "unlocks" || titleMode === "stats" || titleMode === "codex" || titleMode === "board") return;
+      if (titleMode === "unlocks" || titleMode === "stats" || titleMode === "codex" || titleMode === "board" || titleMode === "practice") return;
       if (titleMode === "seed") { confirmSeed(); return; }
       beginFromTitle();
       return;
     }
-    if (phase === "dead" || phase === "win") { startRun(); return; }
+    if (phase === "dead" || phase === "win") { restartEnded(); return; }
     if (phase === "shop" || phase === "event") { interactOrSlash(); return; }
     startCharge();
   }
   function pressActionB() {
     if (paused) { togglePause(); return; }
     if (phase === "title") {
-      if (titleMode === "unlocks" || titleMode === "stats" || titleMode === "seed" || titleMode === "codex" || titleMode === "board") {
+      if (titleMode === "unlocks" || titleMode === "stats" || titleMode === "seed" || titleMode === "codex" || titleMode === "board" || titleMode === "practice") {
         if (titleMode === "seed" && seedFrom === "dead") { dieRun(); return; }
         titleMode = "main";
         renderTitle();
@@ -3313,7 +3636,7 @@
       beginFromTitle();
       return;
     }
-    if (phase === "dead" || phase === "win") { startRun(); return; }
+    if (phase === "dead" || phase === "win") { restartEnded(); return; }
     if (tryParry()) return;
     padDodge();
   }
@@ -3411,7 +3734,7 @@
       if (phase === "fight" || phase === "loot" || phase === "shop" || phase === "event") togglePause();
       else if (phase === "title" && titleMode === "main") beginFromTitle();
       else if (phase === "title" && titleMode === "seed") confirmSeed();
-      else if (phase === "dead" || phase === "win") startRun();
+      else if (phase === "dead" || phase === "win") restartEnded();
     }
     startEl.addEventListener("pointerup", startUp, { passive: false });
     startEl.addEventListener("pointercancel", startUp, { passive: false });
@@ -3498,7 +3821,7 @@
       if (phase === "fight" || phase === "loot" || phase === "shop" || phase === "event") togglePause();
       else if (phase === "title" && titleMode === "main") beginFromTitle();
       else if (phase === "title" && titleMode === "seed") confirmSeed();
-      else if (phase === "dead" || phase === "win") startRun();
+      else if (phase === "dead" || phase === "win") restartEnded();
     }
   });
   window.addEventListener("keyup", function (e) {
@@ -3525,13 +3848,13 @@
     if (daily) daily.addEventListener("click", function (e) {
       e.stopPropagation();
       if (titleDaily) startRun(dailySeed(), { daily: true });
-      else { titleDaily = true; titleWeekly = false; titleDeeper = false; renderTitle(); showToast("DAILY · " + dailyMutators().map(function (m) { return m.name; }).join(" · "), "#7dd3fc"); }
+      else { titleDaily = true; titleWeekly = false; titleDeeper = false; titleHorde = false; titlePractice = false; renderTitle(); showToast("DAILY · " + dailyMutators().map(function (m) { return m.name; }).join(" · "), "#7dd3fc"); }
     });
     const weekly = document.getElementById("weeklybtn");
     if (weekly) weekly.addEventListener("click", function (e) {
       e.stopPropagation();
       if (titleWeekly) startRun(weeklySeed(), { weekly: true });
-      else { titleWeekly = true; titleDaily = false; titleDeeper = false; renderTitle(); showToast("WEEKLY · " + weeklyMutators().map(function (m) { return m.name; }).join(" · "), "#fde68a"); }
+      else { titleWeekly = true; titleDaily = false; titleDeeper = false; titleHorde = false; titlePractice = false; renderTitle(); showToast("WEEKLY · " + weeklyMutators().map(function (m) { return m.name; }).join(" · "), "#fde68a"); }
     });
     const fam = document.getElementById("familiarbtn");
     if (fam) fam.addEventListener("click", function (e) {
@@ -3546,7 +3869,7 @@
     if (deeper) deeper.addEventListener("click", function (e) {
       e.stopPropagation();
       if (titleDeeper) startRun(null, { deeper: true });
-      else { titleDeeper = true; titleDaily = false; titleWeekly = false; renderTitle(); }
+      else { titleDeeper = true; titleDaily = false; titleWeekly = false; titleHorde = false; titlePractice = false; renderTitle(); }
     });
     const cdx = document.getElementById("codexbtn");
     if (cdx) cdx.addEventListener("click", function (e) { e.stopPropagation(); titleMode = "codex"; renderTitle(); });
@@ -3557,6 +3880,54 @@
     if (brd) brd.addEventListener("click", function (e) { e.stopPropagation(); titleMode = "board"; renderTitle(); });
     const seb = document.getElementById("seedbtn");
     if (seb) seb.addEventListener("click", function (e) { e.stopPropagation(); seedFrom = "title"; renderSeedPad(); });
+    const horde = document.getElementById("hordebtn");
+    if (horde) horde.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (bestDepth() < 8) { showToast("REACH DEPTH 8", "#fda4af"); return; }
+      if (titleHorde) startRun(null, { horde: true });
+      else { titleHorde = true; titleDaily = false; titleWeekly = false; titleDeeper = false; titlePractice = false; renderTitle(); showToast("HORDE · WAVES", "#fb923c"); }
+    });
+    const prac = document.getElementById("practicebtn");
+    if (prac) prac.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (bestDepth() < 8) { showToast("REACH DEPTH 8", "#fda4af"); return; }
+      titleMode = "practice";
+      titlePractice = true;
+      titleHorde = false; titleDaily = false; titleWeekly = false; titleDeeper = false;
+      renderTitle();
+    });
+    const bsort = document.getElementById("boardsort");
+    if (bsort) bsort.addEventListener("click", function (e) {
+      e.stopPropagation();
+      boardSort = boardSort === "time" ? "depth" : "time";
+      renderTitle();
+    });
+    overlay.querySelectorAll("[data-cape]").forEach(function (el) {
+      el.addEventListener("click", function (e) {
+        e.stopPropagation();
+        const id = el.getAttribute("data-cape");
+        if (!capeUnlocked(id)) {
+          const c = capeDef(id);
+          showToast(c.heart ? "TAKE THE HEART" : "REACH DEPTH " + c.need, "#fda4af");
+          return;
+        }
+        applyCape(id);
+        saveCape(id);
+        renderTitle();
+        showToast("CAPE · " + capeDef(id).name, capeDef(id).col);
+      });
+    });
+    overlay.querySelectorAll("[data-boss]").forEach(function (el) {
+      el.addEventListener("click", function (e) {
+        e.stopPropagation();
+        const id = el.getAttribute("data-boss");
+        if (!practiceUnlocked(id)) {
+          showToast(practiceDef(id).heart ? "TAKE THE HEART" : "REACH DEPTH 8", "#fda4af");
+          return;
+        }
+        startRun(null, { practice: true, boss: id });
+      });
+    });
     const back = document.getElementById("backbtn");
     if (back) back.addEventListener("click", function (e) {
       e.stopPropagation();
@@ -3687,8 +4058,21 @@
     }
     const dx = player.x - e.x, dy = player.y - e.y;
     const d = Math.hypot(dx, dy) || 1;
-    e.flip = dx < 0;
-    if (e.type !== "spitter") e.face = Math.atan2(dy, dx);
+    if (e.type === "knight" || e.type === "warden") {
+      const want = Math.atan2(dy, dx);
+      if (e.wind > 0 || e.vuln > 0 || (e.slam && e.slam.t > 0)) {
+        e.flip = Math.cos(e.face || 0) < 0;
+      } else {
+        let diff = want - (e.face || 0);
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        e.face = (e.face || 0) + clamp(diff, -2.6 * dt, 2.6 * dt);
+        e.flip = Math.cos(e.face) < 0;
+      }
+    } else {
+      e.flip = dx < 0;
+      if (e.type !== "spitter") e.face = Math.atan2(dy, dx);
+    }
 
     if (e.type === "wisp") {
       e.glowT -= dt;
@@ -3903,7 +4287,7 @@
           if (dist(player.x, player.y, e.x, e.y) < e.range + player.r + 0.38) {
             hurtPlayer(e.dmg, player.x - e.x, player.y - e.y);
           }
-          e.vuln = 0.5;
+          e.vuln = 0.35;
           e.atk = e.cd;
         }
       } else {
@@ -3925,7 +4309,7 @@
           hurtPlayer(e.dmg, player.x - e.x, player.y - e.y);
         }
         e.atk = e.cd;
-        if (e.type === "warden") e.vuln = 0.55;
+        if (e.type === "warden") e.vuln = 0.35;
       }
     } else {
       e.atk = Math.max(0, e.atk - dt);
@@ -3949,6 +4333,11 @@
     if (wipeT > 0) wipeT = Math.max(0, wipeT - dt);
     if (finishSpin > 0) finishSpin = Math.max(0, finishSpin - dt * 3.6);
     if (paused) return;
+    if (!player.dead && (phase === "fight" || phase === "loot" || phase === "shop" || phase === "event")) {
+      runTime += dt;
+      syncClock();
+    }
+    if (runHorde) tickHorde(dt);
     if (doorAnim > 0) doorAnim = Math.max(0, doorAnim - dt);
     if (banner.t > 0) banner.t -= dt;
     shake = Math.max(0, shake - dt * 22);
@@ -4678,7 +5067,7 @@
   }
 
   function drawShieldGleam(e, scale) {
-    if (e.vuln > 0) return;
+    if (shieldOpen(e)) return;
     const fx = Math.cos(e.face || 0), fy = Math.sin(e.face || 0);
     const gx = sx(e.x + fx * 0.42 * (scale || 1));
     const gy = sy(e.y - 0.38 + fy * 0.32);
@@ -4708,13 +5097,28 @@
     }
     const span = e.type === "boss" || e.type === "boneking" || e.type === "heart" ? 1.35 : (e.type === "warden" || e.type === "golem" || e.type === "hollowtwin") ? 1.25 : (e.type === "brute" || e.type === "knight" || e.type === "mimic") ? 1.05 : 0.7;
     footShadow(e.x, e.y, span);
+    if (e.wind > 0) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,244,200," + (0.5 + 0.45 * Math.sin(tick * 22)) + ")";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(sx(e.x), sy(e.y) + 3, TILE * (0.34 + e.r * 0.14), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
     const s = enemySprite(e);
     const hurt = e.flash > 0 || e.wind > 0;
+    const guardOpen = (e.type === "knight" || e.type === "warden") && shieldOpen(e);
     const escale = e.type === "warden" ? 1.5 : (e.type === "boneking" ? 1.15 : (e.type === "golem" ? 1.2 : (e.type === "hollowtwin" ? (e.twin ? 0.82 : 1.08) : (e.type === "heart" ? 1.62 + Math.sin((e.pulse || 0) * 6.2) * 0.1 : 1))));
     if (e.type === "shade") ctx.globalAlpha = 0.42;
-    blit(s, e.x, e.y, e.flip, hurt && e.flash > 0, escale);
+    blit(s, e.x, e.y, e.flip, (hurt && e.flash > 0) || guardOpen, escale);
     if (e.type === "shade") ctx.globalAlpha = 1;
-    if (e.wind > 0 && e.type !== "boss") {
+    if (guardOpen) {
+      ctx.save();
+      ctx.globalAlpha = 0.4 + 0.28 * Math.sin(tick * 16);
+      blit(s, e.x, e.y, e.flip, true, escale * 1.04);
+      ctx.restore();
+    } else if (e.wind > 0 && e.type !== "boss") {
       ctx.globalAlpha = 0.55;
       blit(s, e.x, e.y, e.flip, true, escale);
       ctx.globalAlpha = 1;
@@ -4923,7 +5327,7 @@
         ctx.fillStyle = "#fbbf24";
         ctx.font = "700 10px ui-sans-serif, system-ui";
         ctx.textAlign = "center";
-        ctx.fillText("NEXT", sx(exitGate.x), sy(exitGate.y) + TILE * 0.85);
+        ctx.fillText(runHorde ? "FIGHT" : "NEXT", sx(exitGate.x), sy(exitGate.y) + TILE * 0.85);
       }
       drawBorderWalls();
     }
@@ -5192,6 +5596,7 @@
   function renderTitle() {
     phase = "title";
     overlay.classList.remove("hidden");
+    overlay.classList.toggle("hell", !!achs.heart);
     hud.classList.add("off");
     hint.style.opacity = "0.7";
     const b = bestDepth();
@@ -5209,17 +5614,42 @@
       return;
     }
     if (titleMode === "board") {
-      const rows = loadBoard();
+      const rows = loadBoard().slice();
+      if (boardSort === "time") {
+        rows.sort(function (a, b) {
+          const ta = a.time == null ? 1e9 : +a.time, tb = b.time == null ? 1e9 : +b.time;
+          return ta - tb || (b.depth - a.depth);
+        });
+      } else {
+        rows.sort(function (a, b) { return (b.depth - a.depth) || (b.gold - a.gold); });
+      }
       let lines = "";
       if (!rows.length) lines = "<p class='statline'>NO RUNS SAVED</p>";
       for (let i = 0; i < rows.length; i++) {
         const r = rows[i];
-        lines += "<p class='statline'>" + (i + 1) + ". D" + r.depth + " · " + r.gold + "G · " + esc(r.cls || "knight") + " · " + esc(r.seed) + " · " + esc(boardDate(r.date)) + "</p>";
+        const tm = r.time == null ? "—" : fmtTime(r.time);
+        lines += "<p class='statline'>" + (i + 1) + ". D" + r.depth + " · " + r.gold + "G · " + tm + " · " + esc(r.cls || "knight") + " · " + esc(r.seed) + " · " + esc(boardDate(r.date)) + "</p>";
       }
       overlay.innerHTML =
         "<h2>BOARD</h2>" +
-        "<p>Top 10 local runs</p>" +
+        "<p>Top 10 local runs · sort by " + (boardSort === "time" ? "time" : "depth") + "</p>" +
         lines +
+        "<div class='btn-row'><button class='btn btn-alt btn-sm' id='boardsort' type='button'>" + (boardSort === "time" ? "SORT DEPTH" : "SORT TIME") + "</button>" +
+        "<button class='btn btn-sm' id='backbtn' type='button'>BACK</button></div>";
+      bindTitleButtons();
+      return;
+    }
+    if (titleMode === "practice") {
+      let chips = "";
+      PRACTICE_BOSSES.forEach(function (pb) {
+        const open = practiceUnlocked(pb.id);
+        chips += "<button type='button' class='unlock-chip" + (open ? "" : " lock") + "' data-boss='" + pb.id + "'>" +
+          (open ? pb.name : pb.name + " · " + (pb.heart ? "HEART" : "d8")) + "</button>";
+      });
+      overlay.innerHTML =
+        "<h2>PRACTICE</h2>" +
+        "<p>Full HP · no gold persist · START pause then QUIT</p>" +
+        "<div class='unlock-grid'>" + chips + "</div>" +
         "<button class='btn btn-sm' id='backbtn' type='button'>BACK</button>";
       bindTitleButtons();
       return;
@@ -5233,6 +5663,7 @@
         "<p class='statline'>KILLS · " + runStats.kills + "</p>" +
         "<p class='statline'>SECRETS · " + runStats.secrets + "</p>" +
         "<p class='statline'>WEEKLY BEST · " + weeklyBest().depth + " · " + weeklyBest().week + "</p>" +
+        "<p class='statline'>HORDE BEST · " + hordeBest() + " waves</p>" +
         "<button class='btn btn-sm' id='backbtn' type='button'>BACK</button>";
       bindTitleButtons();
       return;
@@ -5263,18 +5694,25 @@
       bindTitleButtons();
       return;
     }
+    overlay.classList.toggle("hell", !!achs.heart);
+    const enterLabel = titleHorde ? "ENTER HORDE" : (titleDaily ? "ENTER DAILY" : (titleWeekly ? "ENTER WEEKLY" : (titleDeeper ? "ENTER DEEPER" : "TAP TO ENTER")));
     overlay.innerHTML =
       "<h1>SLASH PIT</h1>" +
+      (achs.heart ? "<div class='pitheart' aria-hidden='true'></div>" : "") +
       "<p>One thumb. Dash-strike. Grab loot. Don't get slammed.</p>" +
-      "<p id='bestline'>" + (b ? "Best depth " + b : "No descents yet.") + " · Unlocks " + unlockCount() + "/" + unlockTotal() + " · Achs " + achCount() + "/" + ACH_DEFS.length + "</p>" +
+      "<p id='bestline'>" + (b ? "Best depth " + b : "No descents yet.") + " · Unlocks " + unlockCount() + "/" + unlockTotal() + " · Achs " + achCount() + "/" + ACH_DEFS.length + (hordeBest() ? " · Horde " + hordeBest() : "") + "</p>" +
       "<p id='seedline'>TAP TO ENTER rolls a seed · DAILY uses UTC date · WEEKLY uses ISO week" + (b >= 16 ? " · DEEPER starts at 9" : "") + "</p>" +
       (titleWeekly ? "<p id='mutline'>WEEKLY · " + weeklyMutators().map(function (m) { return m.name; }).join(" · ") + " · best " + weeklyBest().depth + "</p>"
-        : (titleDaily ? "<p id='mutline'>DAILY · " + dailyMutators().map(function (m) { return m.name; }).join(" · ") + "</p>" : "<p id='mutline'></p>")) +
+        : (titleDaily ? "<p id='mutline'>DAILY · " + dailyMutators().map(function (m) { return m.name; }).join(" · ") + "</p>"
+        : (titleHorde ? "<p id='mutline'>HORDE · endless waves · best " + hordeBest() + "</p>" : "<p id='mutline'></p>"))) +
       classRowHtml() +
-      "<button class='btn' id='enterbtn' type='button'>" + (titleDaily ? "ENTER DAILY" : (titleWeekly ? "ENTER WEEKLY" : (titleDeeper ? "ENTER DEEPER" : "TAP TO ENTER"))) + "</button>" +
+      capeRowHtml() +
+      "<button class='btn' id='enterbtn' type='button'>" + enterLabel + "</button>" +
       "<div class='btn-row'><button class='btn " + (titleDaily ? "" : "btn-alt ") + "btn-sm' id='dailybtn' type='button'>DAILY</button>" +
       "<button class='btn " + (titleWeekly ? "" : "btn-alt ") + "btn-sm' id='weeklybtn' type='button'>WEEKLY</button>" +
       (b >= 16 ? "<button class='btn " + (titleDeeper ? "" : "btn-alt ") + "btn-sm' id='deeperbtn' type='button'>DEEPER</button>" : "") +
+      (b >= 8 ? "<button class='btn " + (titleHorde ? "" : "btn-alt ") + "btn-sm' id='hordebtn' type='button'>HORDE</button>" : "") +
+      (b >= 8 ? "<button class='btn btn-alt btn-sm' id='practicebtn' type='button'>PRACTICE</button>" : "") +
       (b >= 10 ? "<button class='btn " + (titleFamiliar ? "" : "btn-alt ") + "btn-sm' id='familiarbtn' type='button'>FAMILIAR</button>" : "") +
       "<button class='btn btn-alt btn-sm' id='unlocksbtn' type='button'>UNLOCKS</button>" +
       "<button class='btn btn-alt btn-sm' id='statsbtn' type='button'>STATS</button>" +
@@ -5282,6 +5720,18 @@
       "<button class='btn btn-alt btn-sm' id='codexbtn' type='button'>CODEX</button>" +
       "<button class='btn btn-alt btn-sm' id='seedbtn' type='button'>SEED</button></div>";
     bindTitleButtons();
+  }
+
+  function capeRowHtml() {
+    let html = "<div class='unlock-grid'>";
+    CAPES.forEach(function (c) {
+      const open = capeUnlocked(c.id);
+      const on = capeId === c.id;
+      html += "<button type='button' class='unlock-chip" + (on ? " on" : "") + (open ? "" : " lock") + "' data-cape='" + c.id + "'>" +
+        "<span class='cape-dot' style='background:" + c.col + "'></span>" + (open ? c.name : c.name + " · " + (c.heart ? "HEART" : "d" + c.need)) + "</button>";
+    });
+    html += "</div>";
+    return html;
   }
 
   function classRowHtml() {
@@ -5353,9 +5803,12 @@
 
   function showTitle() {
     titleMode = "main";
-    buildMap(3, { layout: "chamber", theme: "ember" });
-    THEME = THEMES.ember;
-    THEME._name = "ember";
+    runHorde = false;
+    runPractice = false;
+    const hell = !!achs.heart;
+    buildMap(3, { layout: "chamber", theme: hell ? "hell" : "ember" });
+    THEME = hell ? THEMES.hell : THEMES.ember;
+    THEME._name = hell ? "hell" : "ember";
     resetPlayer();
     player.x = spawnTile.x;
     player.y = spawnTile.y;
@@ -5368,15 +5821,67 @@
     hptext.textContent = khp + " / " + khp;
     goldtext.textContent = "0 G";
     combotext.textContent = "";
+    if (clocktext) clocktext.textContent = "00:00";
     roomtext.textContent = "DEPTH —";
     renderTitle();
     syncPauseGlyph();
     syncRelicTray();
   }
 
+  function snapshotHero() {
+    HERO_CAPE_KEYS.forEach(function (k) {
+      if (spr[k] && !heroBase[k]) heroBase[k] = spr[k];
+    });
+  }
+  function nearRgb(r, g, b, tgt) {
+    return Math.abs(r - tgt[0]) < 10 && Math.abs(g - tgt[1]) < 10 && Math.abs(b - tgt[2]) < 10;
+  }
+  function remapCape(src, cap) {
+    const c = document.createElement("canvas");
+    c.width = src.w; c.height = src.h;
+    const g = c.getContext("2d");
+    g.drawImage(src.c, 0, 0);
+    const img = g.getImageData(0, 0, src.w, src.h);
+    const lite = PAL.C, dark = PAL.c;
+    for (let y = 7; y < src.h; y++) {
+      for (let x = 0; x < src.w; x++) {
+        const i = (y * src.w + x) * 4;
+        if (img.data[i + 3] < 10) continue;
+        const r = img.data[i], gg = img.data[i + 1], bb = img.data[i + 2];
+        if (nearRgb(r, gg, bb, lite)) { img.data[i] = cap.lite[0]; img.data[i + 1] = cap.lite[1]; img.data[i + 2] = cap.lite[2]; }
+        else if (nearRgb(r, gg, bb, dark)) { img.data[i] = cap.dark[0]; img.data[i + 1] = cap.dark[1]; img.data[i + 2] = cap.dark[2]; }
+      }
+    }
+    g.putImageData(img, 0, 0);
+    return { c: c, f: src.f, w: src.w, h: src.h };
+  }
+  function applyCape(id) {
+    const cap = capeDef(capeUnlocked(id) ? id : "cyan");
+    capeId = cap.id;
+    snapshotHero();
+    HERO_CAPE_KEYS.forEach(function (k) {
+      if (heroBase[k]) spr[k] = remapCape(heroBase[k], cap);
+    });
+  }
+
   loadMute();
   initSprites();
   initExtraSprites();
+  applyCape(capeId);
+  const quitEl = document.getElementById("quitbtn");
+  if (quitEl) {
+    quitEl.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (runPractice || runHorde) quitToTitle();
+    });
+  }
+  const pauseEl = document.getElementById("pauseov");
+  if (pauseEl) {
+    pauseEl.addEventListener("click", function (e) {
+      if (e.target && e.target.id === "quitbtn") return;
+      if (paused) togglePause();
+    });
+  }
   resize();
   showTitle();
   pid = requestAnimationFrame(loop);
