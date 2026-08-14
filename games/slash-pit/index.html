@@ -136,8 +136,15 @@
       position: fixed; inset: 0 0 calc(150px + env(safe-area-inset-bottom, 0px)) 0;
       display: none; flex-direction: column; align-items: center; justify-content: center;
       background: rgba(6,3,3,0.55); z-index: 7; pointer-events: none; gap: 0.7rem;
+      visibility: hidden; opacity: 0;
     }
-    #pauseov.on { display: flex; }
+    #pauseov.hidden, #pauseov[hidden] {
+      display: none !important; visibility: hidden; opacity: 0; pointer-events: none;
+    }
+    #pauseov.on { display: flex; visibility: visible; opacity: 1; }
+    #pauseov.on.hidden, #pauseov.on[hidden] {
+      display: none !important; visibility: hidden; opacity: 0; pointer-events: none;
+    }
     #pauseov.canquit { pointer-events: auto; }
     #pauseov span {
       font-size: clamp(2rem, 10vw, 3.2rem); font-weight: 900; letter-spacing: 0.18em;
@@ -170,6 +177,7 @@
     .menu-col .btn { margin-top: 0; width: 100%; min-width: 0; }
     .menu-col.tight .btn { min-height: 2.7rem; font-size: 0.92rem; }
     .btn-play { min-height: 3.55rem; font-size: 1.2rem; letter-spacing: 0.14em; }
+    #overlay > .btn-play { width: min(16.5rem, 86vw); margin-top: 0.85rem; }
     .menu-sub {
       margin-top: 0.7rem !important; margin-bottom: 0;
       font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: #8a7060;
@@ -340,7 +348,7 @@
   <div id="relictray"></div>
   <div id="chalhud"></div>
   <div id="toast"></div>
-  <div id="pauseov"><span>PAUSED</span><button class="btn btn-alt btn-sm" id="quitbtn" type="button">QUIT</button></div>
+  <div id="pauseov" class="hidden" hidden aria-hidden="true"></div>
   <div id="hint">D-PAD MOVE · A SLASH · HOLD A CHARGE · B DODGE / PARRY</div>
   <div id="gbsp">
     <div class="gb-lip"></div>
@@ -407,6 +415,8 @@
   const HELP_KEY = "slashpit-seen-help";
   const WEEKLY_BEST_KEY = "slashpit-weekly-best";
   const HORDE_BEST_KEY = "slashpit-horde-best";
+  const VIBE_KEY = "slashpit-vibrate";
+  const DMG_KEY = "slashpit-dmgnum";
   const PITY_KEY = "slashpit-pity";
   const CAPE_KEY = "slashpit-cape";
   const CAPES = [
@@ -548,6 +558,9 @@
   let flash = 0;
   let banner = { t: 0, text: "" };
   let toastT = 0;
+  let toastQ = [];
+  let vibrateOn = true;
+  let dmgNums = true;
   let pid = 0;
   let tick = 0;
   let spawnTile = { x: 5.5, y: 12.5 };
@@ -902,9 +915,8 @@
     if (!def) return;
     achs[id] = 1;
     saveAchs();
-    const toast = function () { showToast("ACHIEVEMENT · " + def.name, "#fde68a"); sfx("clear"); };
-    if (toastT > 0) setTimeout(toast, 1450);
-    else toast();
+    showToast("ACHIEVEMENT · " + def.name, "#fde68a");
+    sfx("clear");
   }
   let achs = loadAchs();
 
@@ -978,9 +990,25 @@
     try { localStorage.setItem(MUTE_KEY, muted ? "1" : "0"); } catch (e) {}
     syncMuteBtn();
   }
+  function loadVibrate() {
+    try { vibrateOn = localStorage.getItem(VIBE_KEY) !== "0"; } catch (e) { vibrateOn = true; }
+  }
+  function persistVibrate() {
+    try { localStorage.setItem(VIBE_KEY, vibrateOn ? "1" : "0"); } catch (e) {}
+  }
+  function loadDmgNums() {
+    try { dmgNums = localStorage.getItem(DMG_KEY) !== "0"; } catch (e) { dmgNums = true; }
+  }
+  function persistDmgNums() {
+    try { localStorage.setItem(DMG_KEY, dmgNums ? "1" : "0"); } catch (e) {}
+  }
   function vibe(ms) {
-    if (muted) return;
+    if (!vibrateOn) return;
     try { if (navigator.vibrate) navigator.vibrate(ms); } catch (err) {}
+  }
+  function dmgFloat(x, y, text, col, t) {
+    if (!dmgNums) return;
+    floats.push({ x: x, y: y, t: t == null ? 0.7 : t, text: String(text), col: col });
   }
   function syncMuteBtn() {
     if (!muteBtn) return;
@@ -1101,12 +1129,12 @@
     try { if (drone.o3) drone.o3.stop(); } catch (e) {}
     drone = null;
   }
-  function toggleMute() {
+  function toggleMute(silent) {
     muted = !muted;
     persistMute();
     if (muted) stopDrone();
     else if (phase === "fight") startDrone();
-    showToast(muted ? "MUTE" : "SOUND ON", "#c4b4a4");
+    if (!silent) showToast(muted ? "MUTE" : "SOUND ON", "#c4b4a4");
   }
 
   function viewSize() {
@@ -1911,12 +1939,27 @@
     }
   }
 
-  function showToast(msg, color, dur) {
+  function hideToast() {
+    toastT = 0;
+    toastQ.length = 0;
+    if (toastEl) toastEl.classList.remove("show");
+  }
+  function paintToast(msg, color, dur) {
+    if (!toastEl) return;
     toastEl.textContent = msg;
     toastEl.style.color = color || "#f3e8de";
     toastEl.style.borderColor = color || "#5a3a20";
     toastEl.classList.add("show");
     toastT = dur || 1.4;
+  }
+  function showToast(msg, color, dur) {
+    if (phase === "title" && titleMode === "help") return;
+    if (toastT > 0.08) {
+      toastQ.push([msg, color, dur || 1.4]);
+      if (toastQ.length > 4) toastQ.shift();
+      return;
+    }
+    paintToast(msg, color, dur);
   }
   function coachFoe(type) {
     const tips = {
@@ -1981,7 +2024,7 @@
     const dmg = kind === "poison" ? 3 : 4;
     player.hp -= dmg;
     screenFlash(0.08, kind === "poison" ? "74,222,128" : "251,146,60");
-    floats.push({ x: player.x, y: player.y - 0.7, t: 0.55, text: "" + dmg, col: kind === "poison" ? "#4ade80" : "#fb923c" });
+    dmgFloat(player.x, player.y - 0.7, "" + dmg, kind === "poison" ? "#4ade80" : "#fb923c", 0.55);
     if (player.hp <= 0) { player.hp = 0; player.dead = true; dieRun(); }
     syncHud();
   }
@@ -2566,12 +2609,42 @@
     e.hp = e.maxhp = Math.max(22, 28 + depth * 2);
   }
 
+  function inRun() {
+    return phase === "fight" || phase === "loot" || phase === "shop" || phase === "event";
+  }
+  function hidePauseOverlay() {
+    paused = false;
+    const el = document.getElementById("pauseov");
+    if (!el) return;
+    el.classList.remove("on", "canquit");
+    el.classList.add("hidden");
+    el.setAttribute("hidden", "");
+    el.setAttribute("aria-hidden", "true");
+    el.style.display = "none";
+    el.innerHTML = "";
+  }
   function setPaused(on) {
+    if (on && (!inRun() || player.dead || phase === "title" || phase === "dead" || phase === "win")) {
+      hidePauseOverlay();
+      return;
+    }
     paused = !!on;
     const el = document.getElementById("pauseov");
     if (el) {
       el.classList.toggle("on", paused);
       el.classList.toggle("canquit", paused && (runPractice || runHorde));
+      el.classList.toggle("hidden", !paused);
+      if (paused) {
+        el.removeAttribute("hidden");
+        el.setAttribute("aria-hidden", "false");
+        el.style.display = "flex";
+        if (!el.querySelector("span")) {
+          el.innerHTML = "<span>PAUSED</span><button class='btn btn-alt btn-sm' id='quitbtn' type='button'>QUIT</button>";
+        }
+      } else {
+        hidePauseOverlay();
+        return;
+      }
     }
     if (paused) {
       player.charging = false;
@@ -2580,8 +2653,10 @@
     }
   }
   function togglePause() {
-    if (player.dead) return;
-    if (phase !== "fight" && phase !== "loot" && phase !== "shop" && phase !== "event") return;
+    if (player.dead || !inRun()) {
+      hidePauseOverlay();
+      return;
+    }
     setPaused(!paused);
     if (paused) showToast("PAUSED", "#fde68a");
   }
@@ -2955,7 +3030,7 @@
     const len = Math.hypot(ox, oy) || 1;
     tryMove(player, player.x + (ox / len) * 0.7, player.y + (oy / len) * 0.7);
     player.dash = null;
-    floats.push({ x: player.x, y: player.y - 0.7, t: 0.7, text: "" + dmg, col: "#fda4af" });
+    dmgFloat(player.x, player.y - 0.7, "" + dmg, "#fda4af", 0.7);
     if (player.hp <= 0) {
       player.hp = 0;
       player.dead = true;
@@ -3124,11 +3199,7 @@
     if (player.leech > 0) {
       player.hp = Math.min(player.maxhp, player.hp + dmg * player.leech);
     }
-    floats.push({
-      x: e.x + rnd(-0.2, 0.2), y: e.y - e.r - 0.25, t: 0.75,
-      text: crit ? dmg + "!" : "" + dmg,
-      col: crit ? "#fde68a" : "#fff7ed"
-    });
+    dmgFloat(e.x + rnd(-0.2, 0.2), e.y - e.r - 0.25, crit ? dmg + "!" : "" + dmg, crit ? "#fde68a" : "#fff7ed", 0.75);
     burst(e.x, e.y, crit ? "#fde68a" : "#fb923c", crit ? 8 : 5);
     shake = Math.max(shake, crit ? 6 : 3);
     screenFlash(player.heavy > 0 ? 0.1 : 0.05, crit || player.heavy > 0 ? "253,230,138" : "251,146,60");
@@ -3507,6 +3578,8 @@
     const first = !runEnded;
     runEnded = true;
     phase = "dead";
+    hidePauseOverlay();
+    hideToast();
     stopDrone();
     if (first) {
       sfx("death");
@@ -3537,30 +3610,33 @@
       (nextW ? " · next blade at depth " + nextW.need : " · all blades unlocked");
     const clock = fmtTime(runTime);
     let headline = "YOU DIED";
-    let recapLine = "Depth " + depth + " · " + gold + " G · Best " + best + " · " + clock;
-    if (runPractice) {
-      headline = "PRACTICE OVER";
-      recapLine = bossTitle(practiceBoss) + " · " + clock;
-    } else if (runHorde) {
-      headline = "HORDE OVER";
-      recapLine = "Wave " + hordeWave + " · best " + hordeBest() + " · " + gold + " G · " + clock;
-    }
+    if (runPractice) headline = "PRACTICE OVER";
+    else if (runHorde) headline = "HORDE OVER";
+    const recapLine = "Depth " + depth + " · " + clock + " · " + gold + " G";
     const canPity = first && !runPractice && !runHorde && depth < 3 && !runRarePlus && !pityState();
+    let extra = "";
+    if (runPractice) extra = " · " + esc(bossTitle(practiceBoss));
+    else extra = " · +" + gained + " souls (" + unlocks.souls + ")";
+    if (runWeekly) extra += " · WEEKLY " + isoWeekKey() + " best " + weeklyBest().depth;
+    if (runHorde) extra += " · HORDE BEST " + hordeBest();
+    if (!runPractice && !runHorde) extra += " · Best " + best;
     overlay.innerHTML =
       "<h2>" + headline + "</h2>" +
       "<p>" + recapLine + "</p>" +
-      "<p id='seedline'>SEED " + seedLabel(runSeed) + (runPractice ? "" : (" · +" + gained + " souls (" + unlocks.souls + ")")) + (runWeekly ? " · WEEKLY " + isoWeekKey() + " best " + weeklyBest().depth : "") + (runHorde ? " · HORDE BEST " + hordeBest() : "") + "</p>" +
+      "<p id='seedline'>SEED " + seedLabel(runSeed) + extra + "</p>" +
+      "<button class='btn btn-play' id='again' type='button'>PLAY AGAIN</button>" +
       "<p>" + esc(unlockProg) + "</p>" +
       (canPity ? "<p style='color:#86efac'>Early wipe · take a free common relic next run.</p>" : "") +
       (recap.length ? "<div class='recap'>" + recap.map(esc).join("<br>") + "</div>" : "<p>No loot this run.</p>") +
-      "<div class='btn-row'><button class='btn btn-sm' id='again' type='button'>PLAY AGAIN</button>" +
+      "<div class='btn-row'>" +
       (canPity ? "<button class='btn btn-alt btn-sm' id='pitybtn' type='button'>PITY RELIC</button>" : "") +
       (runPractice || runHorde ? "<button class='btn btn-alt btn-sm' id='titleback' type='button'>TITLE</button>" :
       "<button class='btn btn-alt btn-sm' id='daily' type='button'>DAILY</button>" +
       "<button class='btn btn-alt btn-sm' id='saverun' type='button'>" + (boardSaved ? "SAVED" : "SAVE RUN") + "</button>" +
       "<button class='btn btn-alt btn-sm' id='copyseed' type='button'>COPY SEED</button>" +
       "<button class='btn btn-alt btn-sm' id='enterseed' type='button'>ENTER SEED</button>") + "</div>";
-    document.getElementById("again").addEventListener("click", function (ev) {
+    const againBtn = document.getElementById("again");
+    if (againBtn) againBtn.addEventListener("click", function (ev) {
       ev.stopPropagation();
       if (runPractice) startRun(null, { practice: true, boss: practiceBoss });
       else if (runHorde) startRun(null, { horde: true });
@@ -3598,6 +3674,8 @@
   function showPracticeWin() {
     runEnded = true;
     phase = "win";
+    hidePauseOverlay();
+    hideToast();
     stopDrone();
     hud.classList.add("off");
     hint.style.opacity = "0";
@@ -3616,7 +3694,8 @@
   }
 
   function quitToTitle() {
-    setPaused(false);
+    hidePauseOverlay();
+    hideToast();
     stopDrone();
     player.dead = false;
     runEnded = true;
@@ -3639,8 +3718,9 @@
   }
 
   function tapAt(px, py) {
-    if (paused) { togglePause(); return; }
-    if (phase !== "fight" && phase !== "loot" && phase !== "shop" && phase !== "event") return;
+    if (paused && inRun()) { togglePause(); return; }
+    if (paused) hidePauseOverlay();
+    if (!inRun()) return;
     const w = screenToWorld(px, py);
     for (let i = gems.length - 1; i >= 0; i--) {
       if (dist(w.x, w.y, gems[i].x, gems[i].y) < 1.15) { pickup(gems[i]); return; }
@@ -3757,6 +3837,7 @@
     if (!loadSeenHelp()) {
       titleMode = "help";
       titleBackTo = "main";
+      hideToast();
       renderTitle();
       return;
     }
@@ -3792,15 +3873,16 @@
     else startRun();
   }
   function pressActionA() {
-    if (startHeld && (phase === "fight" || phase === "loot" || phase === "shop" || phase === "event")) {
+    if (startHeld && inRun()) {
       startDidSwap = true;
       swapRelics();
       return;
     }
-    if (paused) { togglePause(); return; }
+    if (paused && inRun()) { togglePause(); return; }
+    if (paused) hidePauseOverlay();
     if (phase === "title") {
       if (titleMode === "help") { dismissHelpAndPlay(); return; }
-      if (titleMode === "unlocks" || titleMode === "stats" || titleMode === "codex" || titleMode === "board" || titleMode === "practice") return;
+      if (titleMode === "unlocks" || titleMode === "stats" || titleMode === "codex" || titleMode === "board" || titleMode === "practice" || titleMode === "settings") return;
       if (titleMode === "modes") { if (titleHasMode()) beginFromTitle(); return; }
       if (titleMode === "seed") { confirmSeed(); return; }
       playFairRun();
@@ -3811,7 +3893,8 @@
     startCharge();
   }
   function pressActionB() {
-    if (paused) { togglePause(); return; }
+    if (paused && inRun()) { togglePause(); return; }
+    if (paused) hidePauseOverlay();
     if (phase === "title") {
       if (titleMode !== "main") {
         titleGoBack();
@@ -3906,6 +3989,7 @@
       startDidMute = false;
       startDidSwap = false;
       startHoldTimer = setTimeout(function () {
+        if (!inRun()) return;
         startDidMute = true;
         toggleMute();
       }, 450);
@@ -3916,7 +4000,7 @@
       startHeld = false;
       clearTimeout(startHoldTimer);
       if (startDidMute || startDidSwap) return;
-      if (phase === "fight" || phase === "loot" || phase === "shop" || phase === "event") togglePause();
+      if (inRun()) togglePause();
       else if (phase === "title" && titleMode === "help") dismissHelpAndPlay();
       else if (phase === "title" && titleMode === "main") playFairRun();
       else if (phase === "title" && titleMode === "modes") { if (titleHasMode()) beginFromTitle(); }
@@ -3930,7 +4014,7 @@
       bagEl.addEventListener("pointerdown", function (e) {
         halt(e);
         bagEl.classList.add("pressed");
-        if (phase === "fight" || phase === "loot" || phase === "shop" || phase === "event") swapRelics();
+        if (inRun()) swapRelics();
       }, { passive: false });
       function bagUp(e) { halt(e); bagEl.classList.remove("pressed"); }
       bagEl.addEventListener("pointerup", bagUp, { passive: false });
@@ -3940,7 +4024,7 @@
     if (pauseG) {
       pauseG.addEventListener("click", function (e) {
         e.stopPropagation();
-        if (phase === "fight" || phase === "loot" || phase === "shop" || phase === "event") togglePause();
+        if (inRun()) togglePause();
       });
     }
     root.addEventListener("contextmenu", halt, { passive: false });
@@ -3990,7 +4074,7 @@
     const isBag = e.code === "KeyC" || e.code === "KeyQ";
     if (isBag) {
       e.preventDefault();
-      if (phase === "fight" || phase === "loot" || phase === "shop" || phase === "event") swapRelics();
+      if (inRun()) swapRelics();
       return;
     }
     if (isA) {
@@ -4005,7 +4089,7 @@
       pressActionB();
     } else if (isStart) {
       e.preventDefault();
-      if (phase === "fight" || phase === "loot" || phase === "shop" || phase === "event") togglePause();
+      if (inRun()) togglePause();
       else if (phase === "title" && titleMode === "help") dismissHelpAndPlay();
       else if (phase === "title" && titleMode === "main") playFairRun();
       else if (phase === "title" && titleMode === "modes") { if (titleHasMode()) beginFromTitle(); }
@@ -4024,24 +4108,34 @@
   window.addEventListener("resize", resize);
   if (window.visualViewport) window.visualViewport.addEventListener("resize", resize);
 
-  muteBtn.addEventListener("click", function (e) {
+  if (muteBtn) muteBtn.addEventListener("click", function (e) {
     e.stopPropagation();
     toggleMute();
   });
 
+  function onTap(id, fn) {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    el.addEventListener("click", function (e) { e.stopPropagation(); fn(e, el); });
+    return el;
+  }
   function bindTitleButtons() {
-    const play = document.getElementById("playbtn");
-    if (play) play.addEventListener("click", function (e) { e.stopPropagation(); playFairRun(); });
-    const helpb = document.getElementById("helpbtn");
-    if (helpb) helpb.addEventListener("click", function (e) { e.stopPropagation(); dismissHelpAndPlay(); });
-    const modes = document.getElementById("modesbtn");
-    if (modes) modes.addEventListener("click", function (e) {
-      e.stopPropagation();
+    onTap("playbtn", function () { playFairRun(); });
+    onTap("helpbtn", function () { dismissHelpAndPlay(); });
+    onTap("modesbtn", function () {
       titleDaily = false; titleWeekly = false; titleDeeper = false; titleHorde = false; titlePractice = false;
       titleMode = "modes";
       titleBackTo = "main";
       renderTitle();
     });
+    onTap("settingsbtn", function () {
+      titleMode = "settings";
+      titleBackTo = "modes";
+      renderTitle();
+    });
+    onTap("setmute", function () { toggleMute(true); renderTitle(); });
+    onTap("setvibe", function () { vibrateOn = !vibrateOn; persistVibrate(); renderTitle(); });
+    onTap("setdmg", function () { dmgNums = !dmgNums; persistDmgNums(); renderTitle(); });
     const enter = document.getElementById("enterbtn");
     const daily = document.getElementById("dailybtn");
     const unb = document.getElementById("unlocksbtn");
@@ -4221,7 +4315,7 @@
     const dmg = Math.max(2, 3 + ((depth / 5) | 0));
     best.hp -= dmg;
     best.flash = 0.1;
-    floats.push({ x: best.x, y: best.y - 0.45, t: 0.5, text: "" + dmg, col: "#c4b5fd" });
+    dmgFloat(best.x, best.y - 0.45, "" + dmg, "#c4b5fd", 0.5);
     burst(best.x, best.y, "#a78bfa", 4);
     beep(640, 0.04, "square", 0.03, 380);
     if (best.type === "hollowtwin" && !best.twin && best.hp <= best.maxhp * 0.5) {
@@ -4547,7 +4641,13 @@
     shopActLatch = Math.max(0, shopActLatch - dt);
     if (toastT > 0) {
       toastT -= dt;
-      if (toastT <= 0) toastEl.classList.remove("show");
+      if (toastT <= 0) {
+        if (toastEl) toastEl.classList.remove("show");
+        if (toastQ.length) {
+          const n = toastQ.shift();
+          paintToast(n[0], n[1], n[2]);
+        }
+      }
     }
     flushCoach();
     if (wipeT > 0) wipeT = Math.max(0, wipeT - dt);
@@ -5846,12 +5946,15 @@
 
   function renderTitle() {
     phase = "title";
+    hidePauseOverlay();
+    if (!overlay) return;
     overlay.classList.remove("hidden");
     overlay.classList.toggle("hell", !!achs.heart);
-    hud.classList.add("off");
-    hint.style.opacity = "0.7";
+    if (hud) hud.classList.add("off");
+    if (hint) hint.style.opacity = "0.7";
     const b = bestDepth();
     if (titleMode === "help") {
+      hideToast();
       overlay.innerHTML =
         "<h2>CONTROLS</h2>" +
         "<p>D-pad move · A slash · B dodge/parry</p>" +
@@ -5884,7 +5987,21 @@
         "<button class='btn btn-alt btn-sm' id='seedbtn' type='button'>SEED</button>" +
         "<button class='btn btn-alt btn-sm' id='boardbtn' type='button'>BOARD</button>" +
         "<button class='btn btn-alt btn-sm' id='statsbtn' type='button'>STATS</button>" +
+        "<button class='btn btn-alt btn-sm' id='settingsbtn' type='button'>SETTINGS</button>" +
         (enterLabel ? "<button class='btn btn-play' id='enterbtn' type='button'>" + enterLabel + "</button>" : "") +
+        "<button class='btn btn-alt btn-sm' id='backbtn' type='button'>BACK</button>" +
+        "</div>";
+      bindTitleButtons();
+      return;
+    }
+    if (titleMode === "settings") {
+      overlay.innerHTML =
+        "<h2>SETTINGS</h2>" +
+        "<p>Saved on this phone.</p>" +
+        "<div class='menu-col tight'>" +
+        "<button class='btn " + (muted ? "btn-alt " : "") + "btn-sm' id='setmute' type='button'>" + (muted ? "SOUND OFF" : "SOUND ON") + "</button>" +
+        "<button class='btn " + (vibrateOn ? "" : "btn-alt ") + "btn-sm' id='setvibe' type='button'>" + (vibrateOn ? "VIBRATE ON" : "VIBRATE OFF") + "</button>" +
+        "<button class='btn " + (dmgNums ? "" : "btn-alt ") + "btn-sm' id='setdmg' type='button'>" + (dmgNums ? "DAMAGE NUMBERS ON" : "DAMAGE NUMBERS OFF") + "</button>" +
         "<button class='btn btn-alt btn-sm' id='backbtn' type='button'>BACK</button>" +
         "</div>";
       bindTitleButtons();
@@ -6093,6 +6210,8 @@
   }
 
   function showTitle() {
+    hidePauseOverlay();
+    hideToast();
     titleMode = "main";
     titleBackTo = "main";
     titleDaily = false;
@@ -6162,21 +6281,21 @@
   }
 
   loadMute();
+  loadVibrate();
+  loadDmgNums();
+  hidePauseOverlay();
   initSprites();
   initExtraSprites();
   applyCape(capeId);
-  const quitEl = document.getElementById("quitbtn");
-  if (quitEl) {
-    quitEl.addEventListener("click", function (e) {
-      e.stopPropagation();
-      if (runPractice || runHorde) quitToTitle();
-    });
-  }
   const pauseEl = document.getElementById("pauseov");
   if (pauseEl) {
     pauseEl.addEventListener("click", function (e) {
-      if (e.target && e.target.id === "quitbtn") return;
-      if (paused) togglePause();
+      if (e.target && (e.target.id === "quitbtn" || (e.target.closest && e.target.closest("#quitbtn")))) {
+        e.stopPropagation();
+        if (runPractice || runHorde) quitToTitle();
+        return;
+      }
+      if (paused && inRun()) togglePause();
     });
   }
   resize();
