@@ -549,26 +549,26 @@
     { r: "rare", name: "Ember Cleaver", dmg: 11, special: "heavy-fire" },
     { r: "rare", name: "Widow Blade", dmg: 13, special: "fast" },
     { r: "epic", name: "Hellfang", dmg: 18, special: "fire" },
-    { r: "epic", name: "Soul Reaver", dmg: 16 },
+    { r: "epic", name: "Frost Fang", dmg: 16, special: "ice" },
     { r: "epic", name: "Ash Reaper", dmg: 17, special: "heavy-fire" },
     { r: "rare", name: "Tide Cutter", dmg: 10, onSlash: "wave", special: "fast" },
     { r: "epic", name: "Grave Hook", dmg: 19, special: "heavy" }
   ];
   const ARMORS = [
-    { r: "junk", name: "Rag Wrap", hp: 8 },
-    { r: "junk", name: "Scrap Plate", hp: 10 },
-    { r: "junk", name: "Twine Vest", hp: 8 },
-    { r: "common", name: "Iron Hide", hp: 16 },
-    { r: "common", name: "Bone Mail", hp: 18 },
-    { r: "common", name: "Pit Leather", hp: 15 },
-    { r: "rare", name: "Ember Plate", hp: 28 },
-    { r: "rare", name: "Blood Mail", hp: 30 },
-    { r: "rare", name: "Scale Guard", hp: 26 },
-    { r: "epic", name: "Pit Carapace", hp: 45 },
-    { r: "epic", name: "Infernal Shell", hp: 42 },
-    { r: "epic", name: "Void Mail", hp: 40 },
-    { r: "rare", name: "Witch Veil", hp: 24 },
-    { r: "epic", name: "Bone Cage", hp: 48 }
+    { r: "junk", name: "Rag Wrap", hp: 8, special: "light" },
+    { r: "junk", name: "Scrap Plate", hp: 10, special: "stout" },
+    { r: "junk", name: "Twine Vest", hp: 8, special: "light" },
+    { r: "common", name: "Iron Hide", hp: 16, special: "stout" },
+    { r: "common", name: "Bone Mail", hp: 18, special: "stout" },
+    { r: "common", name: "Pit Leather", hp: 15, special: "light" },
+    { r: "rare", name: "Ember Plate", hp: 28, special: "stout-ember" },
+    { r: "rare", name: "Blood Mail", hp: 30, special: "stout" },
+    { r: "rare", name: "Scale Guard", hp: 26, special: "stout" },
+    { r: "epic", name: "Pit Carapace", hp: 45, special: "stout" },
+    { r: "epic", name: "Infernal Shell", hp: 42, special: "stout-ember" },
+    { r: "epic", name: "Void Mail", hp: 40, special: "stout-void" },
+    { r: "rare", name: "Witch Veil", hp: 24, special: "light" },
+    { r: "epic", name: "Bone Cage", hp: 48, special: "stout" }
   ];
   const RELICS = [
     { r: "junk", name: "Frayed Charm", stat: "crit", v: 0.03 },
@@ -578,14 +578,14 @@
     { r: "common", name: "Crit Tooth", stat: "crit", v: 0.06 },
     { r: "common", name: "Leech Chip", stat: "leech", v: 0.06 },
     { r: "rare", name: "Leech Stone", stat: "leech", v: 0.10 },
-    { r: "rare", name: "Ghost Step", stat: "dodge", v: 0.18 },
+    { r: "rare", name: "Ghost Step", stat: "dodge", v: 0.18, onDodge: "ghost" },
     { r: "rare", name: "Ember Band", stat: "speed", v: 1.1 },
     { r: "epic", name: "Pit Crown", stat: "crit", v: 0.12 },
     { r: "epic", name: "Void Heart", stat: "leech", v: 0.16 },
     { r: "epic", name: "Ash Greaves", stat: "speed", v: 1.5 },
-    { r: "epic", name: "Blink Dust", stat: "dodge", v: 0.28 },
+    { r: "epic", name: "Blink Dust", stat: "dodge", v: 0.28, onDodge: "blink" },
     { r: "rare", name: "Cinder Fuse", stat: "dodge", v: 0.12, onDodge: "bomb" },
-    { r: "epic", name: "Hex Coin", stat: "crit", v: 0.09 }
+    { r: "epic", name: "Hex Coin", stat: "crit", v: 0.09, onCrit: "hex" }
   ];
   const START_RELICS = [
     { id: "leech", name: "Leech Fang", need: 4, cost: 18, stat: "leech", v: 0.08, desc: "+8% leech", r: "common" },
@@ -1915,7 +1915,6 @@
   function itemBonus(it) {
     if (it.kind === "flask") return "heal " + it.heal + " hp";
     if (it.onSlash === "wave") return "+" + it.dmg + " dmg · WAVE" + (it.special === "fast" || (it.special && it.special.indexOf("fast") >= 0) ? " · FAST" : "");
-    if (it.onDodge === "bomb") return "dodge bomb";
     if (it.kind === "weapon") {
       let s = "+" + it.dmg + " dmg";
       const spec = it.special || "";
@@ -1926,11 +1925,30 @@
       if (it.rarity === "epic") s += " · REACH";
       return s;
     }
-    if (it.kind === "armor") return "+" + it.hp + " hp";
+    if (it.kind === "armor") {
+      let s = "+" + it.hp + " hp";
+      const spec = it.special || "";
+      if (spec === "stout" || spec.indexOf("stout") >= 0) s += " · STOUT";
+      if (spec === "light" || spec.indexOf("light") >= 0) s += " · LIGHT";
+      if (spec === "ember" || spec.indexOf("ember") >= 0 || spec.indexOf("ash") >= 0) s += " · ASH";
+      if (spec === "frost" || spec.indexOf("frost") >= 0) s += " · FROST";
+      if (spec === "void" || spec.indexOf("void") >= 0) s += " · VOID";
+      return s;
+    }
     if (it.stat === "speed") return "+" + it.v + " spd";
-    if (it.stat === "crit") return "+" + Math.round(it.v * 100) + "% crit";
+    if (it.stat === "crit") {
+      let s = "+" + Math.round(it.v * 100) + "% crit";
+      if (it.onCrit === "hex") s += " · HEX";
+      return s;
+    }
     if (it.stat === "leech") return "+" + Math.round(it.v * 100) + "% leech";
-    if (it.stat === "dodge") return "-" + Math.round(it.v * 100) + "% dodge cd";
+    if (it.stat === "dodge") {
+      let s = "-" + Math.round(it.v * 100) + "% dodge cd";
+      if (it.onDodge === "bomb") s += " · BOMB";
+      if (it.onDodge === "ghost") s += " · GHOST";
+      if (it.onDodge === "blink") s += " · BLINK";
+      return s;
+    }
     return "";
   }
 
@@ -1950,6 +1968,18 @@
       knock: heavy ? 0.52 : 0.28,
       cone: heavy ? -0.02 : fast ? 0.34 : 0.18,
       splash: heavy ? 1.55 : fast ? 0.95 : 1.25
+    };
+  }
+  function armorFeel() {
+    const a = slots.armor;
+    const spec = (a && a.special) || "";
+    return {
+      spec: spec,
+      stout: spec === "stout" || spec.indexOf("stout") >= 0,
+      light: spec === "light" || spec.indexOf("light") >= 0,
+      ember: spec === "ember" || spec.indexOf("ember") >= 0 || spec.indexOf("ash") >= 0,
+      frost: spec === "frost" || spec.indexOf("frost") >= 0,
+      void: spec === "void" || spec.indexOf("void") >= 0
     };
   }
   function slashReach() {
@@ -2019,7 +2049,7 @@
       } else {
         slots.bag = it;
         recap.push("BAG · " + it.name);
-        showToast("BAG SWAP · " + it.name, "#7dd3fc");
+        showToast("BAG SWAP · " + it.name + "  " + itemBonus(it), "#7dd3fc");
         checkSetBonus();
         syncRelicTray();
         return "bag";
@@ -2061,7 +2091,7 @@
     slots.relic = slots.bag;
     slots.bag = a;
     wearRelic(slots.relic);
-    showToast("EQUIP · " + (slots.relic.name || "RELIC"), "#7dd3fc");
+    showToast("EQUIP · " + (slots.relic.name || "RELIC") + "  " + itemBonus(slots.relic), "#7dd3fc");
     sfx("pickup");
     syncRelicTray();
     checkSetBonus();
@@ -2218,13 +2248,17 @@
   }
   function applyStatus(kind, dur) {
     if (depth === 1 || player.dead) return;
+    const af = armorFeel();
+    if (kind === "burn" && af.ember) dur *= 0.38;
+    if (kind === "slow" && (af.void || af.frost)) dur *= 0.4;
+    if (!(dur > 0.34)) return;
     if (kind === "poison") player.poison = Math.max(player.poison || 0, dur);
     else if (kind === "burn") player.burn = Math.max(player.burn || 0, dur);
     else if (kind === "slow") player.slow = Math.max(player.slow || 0, dur);
   }
   function tickDot(kind) {
     if (player.dead || player.iframes > 0) return;
-    const dmg = kind === "poison" ? 3 : 4;
+    const dmg = kind === "poison" ? 3 : (kind === "burn" && armorFeel().ember ? 2 : 4);
     player.hp -= dmg;
     screenFlash(0.08, kind === "poison" ? "74,222,128" : "251,146,60");
     dmgFloat(player.x, player.y - 0.7, "" + dmg, kind === "poison" ? "#4ade80" : "#fb923c", 0.55);
@@ -3360,7 +3394,8 @@
   }
   function hurtPlayer(dmg, ox, oy, src) {
     if (player.iframes > 0 || player.dead) return;
-    if (player.cursed) dmg = Math.round(dmg * 1.35);
+    const af = armorFeel();
+    if (player.cursed) dmg = Math.round(dmg * (af.void ? 1.12 : 1.35));
     player.hp -= dmg;
     player.iframes = 0.35;
     player.flash = 0.18;
@@ -3373,7 +3408,24 @@
     else if (src === "burn" || (THEME && THEME._name === "ember")) applyStatus("burn", 2.4);
     if (THEME && THEME._name === "ash") applyStatus("slow", 2.2);
     const len = Math.hypot(ox, oy) || 1;
-    tryMove(player, player.x + (ox / len) * 0.7, player.y + (oy / len) * 0.7);
+    let kb = 0.7;
+    if (af.stout) kb *= 0.4;
+    else if (af.light) kb *= 1.06;
+    tryMove(player, player.x + (ox / len) * kb, player.y + (oy / len) * kb);
+    if (af.ember && depth > 1 && src !== "poison" && src !== "burn" && src !== "hazard") {
+      let best = null, bestD = 2.2;
+      for (let i = 0; i < enemies.length; i++) {
+        const e = enemies[i];
+        if (e.hp <= 0) continue;
+        const d = dist(player.x, player.y, e.x, e.y);
+        if (d < bestD) { bestD = d; best = e; }
+      }
+      if (best) {
+        best.burn = Math.max(best.burn || 0, 1.8);
+        burst(best.x, best.y, "#fb923c", 4);
+        floats.push({ x: best.x, y: best.y - 0.55, t: 0.5, text: "ASH", col: "#fb923c" });
+      }
+    }
     player.dash = null;
     dmgFloat(player.x, player.y - 0.7, "" + dmg, "#fda4af", 0.7);
     if (player.hp <= 0) {
@@ -3549,6 +3601,13 @@
     dmgFloat(e.x + rnd(-0.2, 0.2), e.y - e.r - 0.25, crit ? dmg + "!" : "" + dmg, crit ? "#fde68a" : "#fff7ed", 0.75);
     burst(e.x, e.y, crit ? "#fde68a" : "#fb923c", crit ? 8 : 5);
     if (feel.fire) burst(e.x, e.y, "#f97316", 3);
+    if (feel.ice) burst(e.x, e.y, "#7dd3fc", 4);
+    if (crit && slots.relic && slots.relic.onCrit === "hex" && depth > 1) {
+      e.slow = Math.max(e.slow || 0, 1.8);
+      e.frost = true;
+      burst(e.x, e.y, "#a78bfa", 5);
+      floats.push({ x: e.x, y: e.y - e.r - 0.55, t: 0.55, text: "HEX", col: "#a78bfa" });
+    }
     shake = Math.max(shake, crit ? 6 : 3);
     screenFlash(player.heavy > 0 ? 0.1 : 0.05, crit || player.heavy > 0 ? "253,230,138" : "251,146,60");
     if (player.heavy > 0) hitstop = Math.max(hitstop, 0.04);
@@ -3569,12 +3628,19 @@
     if (paused || player.dodgeCd > 0 || player.dead || phase === "title") return;
     player.charging = false; player.chargeT = 0; player.chargeReady = false;
     const len = Math.hypot(dx, dy) || 1;
-    const dsp = player.dodgeSpd || 14.5;
+    const af = armorFeel();
+    const rel = slots.relic;
+    const blink = !!(rel && rel.onDodge === "blink");
+    const ghost = !!(rel && rel.onDodge === "ghost");
+    let dsp = player.dodgeSpd || 14.5;
+    if (af.stout) dsp *= 0.9;
+    if (af.light) dsp *= 1.08;
+    if (blink) dsp *= 1.28;
     player.vx = (dx / len) * dsp;
     player.vy = (dy / len) * dsp;
-    player.iframes = Math.max(player.iframes, 0.22);
+    player.iframes = Math.max(player.iframes, ghost ? 0.5 : blink ? 0.34 : 0.22);
     player.dodgeCd = player.dodgeMax;
-    player.dodging = 0.18;
+    player.dodging = ghost ? 0.26 : blink ? 0.22 : 0.18;
     player.dash = null;
     player.tx = null;
     player.face = Math.atan2(dy, dx);
@@ -3583,8 +3649,16 @@
     player.dashTrail = hasDashTrail();
     player.trailHits = [];
     player.trailGhost = 0;
-    burst(player.x, player.y, player.dashTrail ? "#fb923c" : "#67e8f9", 6);
-    ghosts.push({ x: player.x, y: player.y, t: 0.2, flip: player.flip });
+    burst(player.x, player.y, player.dashTrail ? "#fb923c" : (blink ? "#c4b5fd" : ghost ? "#e2e8f0" : "#67e8f9"), blink || ghost ? 9 : 6);
+    ghosts.push({ x: player.x, y: player.y, t: ghost ? 0.38 : 0.2, flip: player.flip });
+    if (blink) {
+      tryMove(player, player.x + (dx / len) * 1.05, player.y + (dy / len) * 1.05);
+      ghosts.push({ x: player.x, y: player.y, t: 0.28, flip: player.flip });
+      floats.push({ x: player.x, y: player.y - 0.7, t: 0.45, text: "BLINK", col: "#c4b5fd" });
+    } else if (ghost) {
+      ghosts.push({ x: player.x - (dx / len) * 0.35, y: player.y - (dy / len) * 0.35, t: 0.32, flip: player.flip });
+      floats.push({ x: player.x, y: player.y - 0.7, t: 0.45, text: "GHOST", col: "#e2e8f0" });
+    }
     if (player.dashTrail) tickDashTrail();
     slashBolts();
     sfx("dodge");
@@ -5242,7 +5316,9 @@
         const dx = player.tx - player.x, dy = player.ty - player.y;
         const d = Math.hypot(dx, dy);
         const slowM = player.slow > 0 ? 0.55 : 1;
-        const spd = (player.dash ? player.speed * 2.6 : player.speed) * slowM;
+        const af = armorFeel();
+        const armM = af.stout ? 0.88 : af.light ? 1.12 : 1;
+        const spd = (player.dash ? player.speed * 2.6 : player.speed) * slowM * armM;
         if (d < 0.12) { player.x = player.tx; player.y = player.ty; player.tx = null; }
         else {
           tryMove(player, player.x + (dx / d) * spd * dt, player.y + (dy / d) * spd * dt);
