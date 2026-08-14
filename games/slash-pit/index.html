@@ -231,6 +231,45 @@
     }
     .gb-start:focus { outline: none; }
     .gb-start.pressed { color: #c4b4a4; box-shadow: inset 2px 2px 0 #0a0806, inset -1px -1px 0 #3a3028; transform: translateY(1px); }
+    .gb-mid { display: flex; flex-direction: column; align-items: center; gap: 6px; align-self: flex-end; margin: 0 0 10px; }
+    .gb-mid .gb-start { align-self: auto; margin: 0; }
+    .gb-bag {
+      width: 36px; height: 14px; border: 0; padding: 0;
+      background: #2a2420; color: #8a7060; font-size: 7px; font-weight: 800; letter-spacing: 0.12em;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      box-shadow: inset 2px 2px 0 #0a0806, inset -2px -2px 0 #4a3a30, 0 2px 0 #0a0806;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    .gb-bag:focus { outline: none; }
+    .gb-bag.pressed { color: #c4b4a4; box-shadow: inset 2px 2px 0 #0a0806, inset -1px -1px 0 #3a3028; transform: translateY(1px); }
+    #pauseglyph {
+      position: fixed; right: 0.55rem;
+      top: calc(0.5rem + env(safe-area-inset-top, 0px) + 40px);
+      width: 34px; height: 28px; z-index: 6;
+      border: 1px solid #5a3a20; background: rgba(20,10,8,0.88);
+      color: #e8d5c0; border-radius: 8px; font-size: 11px; line-height: 1;
+      pointer-events: auto; touch-action: manipulation; font-weight: 900;
+      letter-spacing: 0.02em; display: none;
+    }
+    #relictray {
+      position: fixed; left: 0.55rem;
+      top: calc(2.55rem + env(safe-area-inset-top, 0px));
+      z-index: 3; pointer-events: none;
+      font-size: 0.62rem; letter-spacing: 0.06em; text-transform: uppercase;
+      color: #8a7060; line-height: 1.25; max-width: 46vw;
+    }
+    #relictray .on { color: #fde68a; font-weight: 800; }
+    #relictray .off { color: #6a5a50; }
+    #chalhud {
+      position: fixed; left: 50%; transform: translateX(-50%);
+      top: calc(3.55rem + env(safe-area-inset-top, 0px));
+      z-index: 3; pointer-events: none;
+      font-size: 0.82rem; font-weight: 800; letter-spacing: 0.12em;
+      color: #fde68a; text-shadow: 0 2px 0 #3a0c08;
+      display: none;
+    }
+    #chalhud.on { display: block; }
+    #mutline { margin-top: 0.35rem; font-size: 0.72rem; letter-spacing: 0.1em; color: #7dd3fc; text-transform: uppercase; min-height: 1.05em; }
     @media (max-height: 540px) {
       #gbsp { --dp: 84px; --bt: 48px; }
       .gb-legend { display: none; }
@@ -250,6 +289,7 @@
 <body>
   <canvas id="c"></canvas>
   <button id="mutebtn" type="button" aria-label="Mute">♪</button>
+  <button id="pauseglyph" type="button" aria-label="Pause">❚❚</button>
   <div id="hud">
     <div class="hpwrap"><div class="hpfill" id="hpfill"></div></div>
     <div class="row">
@@ -259,15 +299,17 @@
       <span id="roomtext">DEPTH 1</span>
     </div>
   </div>
+  <div id="relictray"></div>
+  <div id="chalhud"></div>
   <div id="toast"></div>
   <div id="pauseov"><span>PAUSED</span></div>
-  <div id="hint">D-PAD MOVE · A SLASH · HOLD A CHARGE · B DODGE</div>
+  <div id="hint">D-PAD MOVE · A SLASH · HOLD A CHARGE · B DODGE / PARRY</div>
   <div id="gbsp">
     <div class="gb-lip"></div>
     <div class="gb-tray">
       <div class="gb-screw s1"></div>
       <div class="gb-screw s2"></div>
-      <div class="gb-legend">D-PAD MOVE · A SLASH · HOLD A CHARGE · B DODGE</div>
+      <div class="gb-legend">D-PAD MOVE · A SLASH · HOLD A CHARGE · B DODGE / PARRY</div>
       <div class="gb-left">
         <div id="dpad" class="dpad">
           <div class="dpad-v"></div>
@@ -279,7 +321,10 @@
           <div class="dpad-arr r"></div>
         </div>
       </div>
-      <button type="button" id="gbstart" class="gb-start">START</button>
+      <div class="gb-mid">
+        <button type="button" id="gbstart" class="gb-start">START</button>
+        <button type="button" id="gbbag" class="gb-bag">BAG</button>
+      </div>
       <div class="gb-right">
         <button type="button" id="btnB" class="gb-btn gb-b">B</button>
         <button type="button" id="btnA" class="gb-btn gb-a">A</button>
@@ -313,6 +358,29 @@
   const ACH_KEY = "slashpit-achs";
   const STATS_KEY = "slashpit-stats";
   const CLASS_KEY = "slashpit-class";
+  const LORE_KEY = "slashpit-lore";
+  const GHOST_KEY = "slashpit-ghost";
+  const MUTATORS = [
+    { id: "swarm", name: "Swarm", desc: "+1 enemy" },
+    { id: "glass", name: "Glass", desc: "half HP" },
+    { id: "rich", name: "Rich", desc: "2x gold · no shops" },
+    { id: "darkness", name: "Darkness", desc: "smaller torch" },
+    { id: "fury", name: "Fury", desc: "faster foes" }
+  ];
+  const LORE_LINES = [
+    "The pit was dug by kings who feared the sky.",
+    "Each floor forgets the one above it.",
+    "Souls pool at the bottom. Steel drinks first.",
+    "The Warden was a knight who would not leave.",
+    "Ice came after fire. Void after ice.",
+    "A daily curse is a kindness with teeth.",
+    "Relics remember the hands that dropped them.",
+    "The shopkeeper smiles because he cannot die.",
+    "Ghosts keep the gold they could not spend.",
+    "The tablet says: you were here before.",
+    "Hell is only the fifth room of eight.",
+    "Parry the last breath, not the first swing."
+  ];
   const CLASSES = [
     { id: "knight", name: "Knight", need: 0, hp: 100, speed: 5.8, dmg: 14, dodgeMax: 0.65, dodgeSpd: 14.5, desc: "Balanced steel" },
     { id: "rogue", name: "Rogue", need: 8, hp: 80, speed: 7.15, dmg: 11, dodgeMax: 0.40, dodgeSpd: 17.8, desc: "Faster · frailer · snap dodge" },
@@ -397,6 +465,7 @@
     { id: "hell", name: "Hellfang", dmg: 18, need: 24 }
   ];
   const BIOMES = ["ember", "moss", "blood", "ash", "hell"];
+  const DEEP_BIOMES = ["ember", "moss", "blood", "ash", "hell", "ice", "void"];
   const LAYOUT_IDS = ["hall", "chamber", "pillars", "arena", "lbend", "split", "treasury"];
 
   let W = 390, H = 844, dpr = 1;
@@ -465,6 +534,18 @@
   let pickedClass = "knight";
   let runEnded = false;
   let runStats = { runs: 0, best: 0, gold: 0, kills: 0, secrets: 0 };
+  let runMutators = [];
+  let titleDaily = false;
+  let titleDeeper = false;
+  let challenge = null;
+  let tablets = [];
+  let loreFound = {};
+  let lastGhost = null;
+  let startHeld = false;
+  let startDidSwap = false;
+  let parryFlash = 0;
+  let iceSpark = [];
+  let voidMotes = [];
 
   const ptr = { down: false, x: 0, y: 0, sx: 0, sy: 0, t: 0, id: null };
   const pad = { x: 0, y: 0, id: null, a: false, b: false };
@@ -502,6 +583,51 @@
   function dailySeed() {
     const d = new Date();
     return hashSeed("daily-" + d.getUTCFullYear() + "-" + (d.getUTCMonth() + 1) + "-" + d.getUTCDate());
+  }
+  function dailyMutators() {
+    const r = makeRng(dailySeed() ^ 0xA11CE);
+    const n = r() < 0.42 ? 2 : 1;
+    const pool = MUTATORS.slice();
+    const out = [];
+    for (let i = 0; i < n && pool.length; i++) {
+      const idx = (r() * pool.length) | 0;
+      out.push(pool.splice(idx, 1)[0]);
+    }
+    return out;
+  }
+  function hasMut(id) {
+    for (let i = 0; i < runMutators.length; i++) if (runMutators[i].id === id) return true;
+    return false;
+  }
+  function mutNames() {
+    return runMutators.map(function (m) { return m.name; }).join(" · ");
+  }
+  function loadLore() {
+    try {
+      const raw = localStorage.getItem(LORE_KEY);
+      if (!raw) return {};
+      const o = JSON.parse(raw);
+      return o && typeof o === "object" ? o : {};
+    } catch (e) { return {}; }
+  }
+  function saveLore() {
+    try { localStorage.setItem(LORE_KEY, JSON.stringify(loreFound)); } catch (e) {}
+  }
+  function loreCount() {
+    let n = 0;
+    for (let i = 0; i < LORE_LINES.length; i++) if (loreFound[i]) n++;
+    return n;
+  }
+  function loadGhost() {
+    try {
+      const raw = localStorage.getItem(GHOST_KEY);
+      if (!raw) return null;
+      const o = JSON.parse(raw);
+      return o && o.depth ? o : null;
+    } catch (e) { return null; }
+  }
+  function saveGhost(o) {
+    try { localStorage.setItem(GHOST_KEY, JSON.stringify(o)); } catch (e) {}
   }
   function seedLabel(n) {
     return (n >>> 0).toString(16).toUpperCase().padStart(8, "0");
@@ -603,6 +729,8 @@
   runStats = loadStats();
   if (bestDepth() > runStats.best) { runStats.best = bestDepth(); saveStats(); }
   pickedClass = loadClass();
+  loreFound = loadLore();
+  lastGhost = loadGhost();
 
   function relicUnlocked(id) {
     const def = START_RELICS.filter(function (r) { return r.id === id; })[0];
@@ -678,7 +806,9 @@
     moss:  { bass: 98.00,  lead: 196.00, notes: [0, 2, 7, 2, 0, 5, 9, 5] },
     blood: { bass: 146.83, lead: 293.66, notes: [0, 3, 5, 7, 5, 3, 0, 7] },
     ash:   { bass: 87.31,  lead: 174.61, notes: [0, 2, 5, 7, 5, 2, 0, 10] },
-    hell:  { bass: 82.41,  lead: 164.81, notes: [0, 1, 4, 7, 4, 1, 0, 8] }
+    hell:  { bass: 82.41,  lead: 164.81, notes: [0, 1, 4, 7, 4, 1, 0, 8] },
+    ice:   { bass: 130.81, lead: 261.63, notes: [0, 4, 7, 11, 7, 4, 0, 9] },
+    void:  { bass: 73.42,  lead: 146.83, notes: [0, 1, 6, 7, 6, 1, 0, 13] }
   };
   function startDrone() {
     stopDrone();
@@ -1017,6 +1147,22 @@
       rug: ["#4a0808", "#8a1010", "#2a0404"],
       ritual: ["#3a0808", "#8a1018", "#ef4444"],
       grate: ["#140808", "#080404", "#3a1818"]
+    },
+    ice: {
+      fog: "#071018",
+      floor: ["#1a2834", "#223440", "#2a3e4c", "#121c24"],
+      wall: ["#0e161c", "#1a2830", "#2a3c48", "#3e5460"],
+      rug: ["#1a3040", "#2a4860", "#0e1820"],
+      ritual: ["#163040", "#2a6080", "#7dd3fc"],
+      grate: ["#121820", "#080c10", "#2a3844"]
+    },
+    void: {
+      fog: "#040208",
+      floor: ["#120816", "#1a0c1e", "#221028", "#0c0610"],
+      wall: ["#0a0610", "#1a1020", "#2a1834", "#3c2450"],
+      rug: ["#1a0828", "#3a1050", "#0c0414"],
+      ritual: ["#1a0830", "#4a1870", "#a78bfa"],
+      grate: ["#100814", "#06040a", "#2a1838"]
     }
   };
 
@@ -1165,7 +1311,9 @@
 
   function biomeFor(n) {
     if (n <= 40) return BIOMES[Math.min(4, ((n - 1) / 8) | 0)];
-    return BIOMES[(rng() * BIOMES.length) | 0];
+    if (n <= 48) return "ice";
+    if (n <= 56) return "void";
+    return DEEP_BIOMES[(rng() * DEEP_BIOMES.length) | 0];
   }
 
   function isSolidChar(ch) {
@@ -1313,7 +1461,7 @@
       epicPulse: false, epicPulseT: 0,
       poison: 0, burn: 0, slow: 0, poisonTick: 0, burnTick: 0, cursed: false
     });
-    slots = { weapon: null, armor: null, relic: null };
+    slots = { weapon: null, armor: null, relic: null, bag: null };
     setFlags = { junk: false, common: false, rare: false, epic: false };
     recap = [];
     gold = 0;
@@ -1335,6 +1483,12 @@
       recap.push("START · " + rdef.name);
     }
     recap.push("CLASS · " + klass.name.toUpperCase());
+    if (hasMut("glass")) {
+      player.maxhp = Math.max(1, Math.round(player.maxhp * 0.5));
+      player.hp = player.maxhp;
+    }
+    player.iceVx = 0; player.iceVy = 0; player.parryWin = 0;
+    syncRelicTray();
   }
 
   function rollRarity(min) {
@@ -1404,20 +1558,84 @@
         slots.armor = it;
       }
     } else {
-      if (it.stat === "speed") player.speed += it.v;
-      if (it.stat === "crit") player.crit += it.v;
-      if (it.stat === "leech") player.leech += it.v;
-      if (it.stat === "dodge") player.dodgeMax = Math.max(0.28, player.dodgeMax * (1 - it.v));
-      if (it.kind === "relic" || it.stat) slots.relic = it;
+      if (!slots.relic) {
+        wearRelic(it);
+        slots.relic = it;
+      } else if (!slots.bag) {
+        slots.bag = it;
+        recap.push("BAG · " + it.name);
+        showToast("BAG · " + it.name + "  " + itemBonus(it), "#7dd3fc");
+        checkSetBonus();
+        syncRelicTray();
+        return "bag";
+      } else {
+        slots.bag = it;
+        recap.push("BAG · " + it.name);
+        showToast("BAG SWAP · " + it.name, "#7dd3fc");
+        checkSetBonus();
+        syncRelicTray();
+        return "bag";
+      }
     }
     recap.push(RARITY[it.rarity] ? RARITY[it.rarity].label + " · " + it.name : it.name);
     showToast((RARITY[it.rarity] ? RARITY[it.rarity].label + " · " : "") + it.name + "  " + itemBonus(it), (RARITY[it.rarity] && RARITY[it.rarity].color) || "#f3e8de");
     checkSetBonus();
+    syncRelicTray();
     return used;
+  }
+  function wearRelic(it) {
+    if (!it) return;
+    if (it.stat === "speed") player.speed += it.v;
+    if (it.stat === "crit") player.crit += it.v;
+    if (it.stat === "leech") player.leech += it.v;
+    if (it.stat === "dodge") player.dodgeMax = Math.max(0.28, player.dodgeMax * (1 - it.v));
+    if (it.stat === "hp") { player.maxhp += it.v; player.hp += it.v; }
+  }
+  function stripRelic(it) {
+    if (!it) return;
+    if (it.stat === "speed") player.speed -= it.v;
+    if (it.stat === "crit") player.crit -= it.v;
+    if (it.stat === "leech") player.leech -= it.v;
+    if (it.stat === "dodge" && it.v) player.dodgeMax = Math.min(1.4, player.dodgeMax / (1 - it.v));
+    if (it.stat === "hp") {
+      player.maxhp = Math.max(1, player.maxhp - it.v);
+      player.hp = Math.min(player.hp, player.maxhp);
+    }
+  }
+  function swapRelics() {
+    if (player.dead) return;
+    if (!slots.bag) {
+      showToast(slots.relic ? "BAG EMPTY" : "NO RELICS", "#8a7060");
+      return;
+    }
+    stripRelic(slots.relic);
+    const a = slots.relic;
+    slots.relic = slots.bag;
+    slots.bag = a;
+    wearRelic(slots.relic);
+    showToast("EQUIP · " + (slots.relic.name || "RELIC"), "#7dd3fc");
+    sfx("pickup");
+    syncRelicTray();
+    checkSetBonus();
+    syncHud();
+  }
+  function syncRelicTray() {
+    const el = document.getElementById("relictray");
+    if (!el) return;
+    if (phase === "title" || phase === "dead" || phase === "win") { el.innerHTML = ""; return; }
+    const a = slots.relic ? slots.relic.name : "—";
+    const b = slots.bag ? slots.bag.name : "—";
+    el.innerHTML = "<span class='on'>" + esc(a) + "</span><br><span class='off'>" + esc(b) + "</span>";
+  }
+  function syncPauseGlyph() {
+    const el = document.getElementById("pauseglyph");
+    if (!el) return;
+    const play = phase === "fight" || phase === "loot" || phase === "shop" || phase === "event";
+    el.style.display = play ? "block" : "none";
   }
 
   function checkSetBonus() {
-    const items = [slots.weapon, slots.armor, slots.relic].filter(function (x) { return x && x.rarity; });
+    const items = [slots.weapon, slots.armor, slots.relic, slots.bag].filter(function (x) { return x && x.rarity; });
     const counts = { junk: 0, common: 0, rare: 0, epic: 0 };
     items.forEach(function (it) { if (counts[it.rarity] != null) counts[it.rarity]++; });
     const order = ["epic", "rare", "common", "junk"];
@@ -1523,6 +1741,7 @@
   function addGold(n, x, y) {
     n = Math.max(1, n | 0);
     if (ngPlus) n = Math.max(1, Math.round(n * 1.3));
+    if (hasMut("rich")) n = Math.max(1, n * 2);
     gold += n;
     bumpStat("gold", n);
     if (x != null) {
@@ -1547,6 +1766,7 @@
     if (type === "mimic") return { type: "mimic", hp: 70, dmg: 16, speed: 1.55, r: 0.5, cr: 0.34, range: 0.9, cd: 0.95 };
     if (type === "warden") return { type: "warden", hp: 120, dmg: 18, speed: 1.2, r: 0.64, cr: 0.4, range: 1.12, cd: 1.18, slam: 2.6 };
     if (type === "wisp") return { type: "wisp", hp: 16, dmg: 9, speed: 2.9, r: 0.34, cr: 0.16, range: 0.68, cd: 0.82 };
+    if (type === "shade") return { type: "shade", hp: 40, dmg: 10, speed: 1.42, r: 0.42, cr: 0.28, range: 0.9, cd: 1.1 };
     if (type === "golem") return { type: "golem", hp: 118, dmg: 18, speed: 0.74, r: 0.72, cr: 0.46, range: 1.18, cd: 1.5, slam: 2.9 };
     const cycle = Math.max(1, (depth / 8) | 0);
     if (type === "boneking") return { type: "boneking", hp: 200 + (cycle - 1) * 70, dmg: 20 + (cycle - 1) * 3, speed: 1.38 + (cycle - 1) * 0.06, r: 0.76, cr: 0.46, range: 1.1, cd: 1.08, slam: 3.1 };
@@ -1568,10 +1788,16 @@
       bob: rnd(0, 6.2), flip: false, face: 0, vuln: 0, boom: 0,
       elite: !!elite, swoopT: 0, sx: c.x, sy: c.y,
       burn: 0, burnTick: 0, summonT: 2.8, teleT: 2.4, casting: false,
-      glow: 0, glowT: type === "wisp" ? 1.15 : 0
+      glow: 0, glowT: type === "wisp" ? 1.15 : 0,
+      stun: 0, frost: false, stash: 0
     });
     e.maxhp = e.hp;
     if (depth === 1 && type === "slime") { e.hp = e.maxhp = 18; e.dmg = 6; e.speed = 1.35; }
+    if (hasMut("glass") && type !== "shade") {
+      e.hp = Math.max(1, Math.round(e.hp * 0.5));
+      e.maxhp = e.hp;
+    }
+    if (hasMut("fury") && type !== "shade") e.speed *= 1.35;
     enemies.push(e);
     return e;
   }
@@ -1581,13 +1807,18 @@
     if (ngPlus && n === 9) return "combat";
     if (n % 8 === 0) return "boss";
     if (n % 4 === 0) return "warden";
-    if (n > 3 && lastKind !== "event" && lastKind !== "shop" && rng() < 0.18) return "shop";
-    if (n > 2 && lastKind !== "shop" && lastKind !== "event" && rng() < 0.16) return "event";
+    if (n > 4 && lastKind !== "challenge" && lastKind !== "shop" && lastKind !== "event" && rng() < 0.11) return "challenge";
+    if (!hasMut("rich") && n > 3 && lastKind !== "event" && lastKind !== "shop" && lastKind !== "challenge" && rng() < 0.18) return "shop";
+    if (n > 2 && lastKind !== "shop" && lastKind !== "event" && lastKind !== "challenge" && rng() < 0.16) return "event";
     return "combat";
   }
 
   function buildPack(n) {
-    if (n === 1) return { list: ["slime", "slime"], fast: false, chest: false, elite: false };
+    if (n === 1) {
+      const first = ["slime", "slime"];
+      if (hasMut("swarm")) first.push("slime");
+      return { list: first, fast: false, chest: false, elite: false };
+    }
     if (n % 8 === 0) return { list: ["boss"], fast: false, chest: false, elite: false };
     const count = Math.min(7, 2 + ((n - 1) / 3 | 0) + (rng() < 0.35 ? 1 : 0));
     const pool = ["slime"];
@@ -1601,6 +1832,7 @@
     if (n >= 18) pool.push("bomber", "brute", "knight", "golem");
     const list = [];
     for (let i = 0; i < count; i++) list.push(spick(pool));
+    if (hasMut("swarm")) list.push(spick(pool));
     return { list: list, fast: n >= 5 && rng() < 0.45, chest: n >= 3 && rng() < 0.34, elite: false };
   }
 
@@ -1620,14 +1852,20 @@
     puddles = [];
     bombs = [];
     hazards = [];
+    tablets = [];
+    iceSpark = [];
+    voidMotes = [];
+    challenge = null;
     doorAnim = 0;
     paused = false;
     setPaused(false);
+    const chEl = document.getElementById("chalhud");
+    if (chEl) { chEl.classList.remove("on"); chEl.textContent = ""; }
     roomKind = decideKind(n);
     lastKind = roomKind;
     const forced = n === 1 ? { layout: "hall", theme: "ember" }
       : (roomKind === "shop" ? { layout: "chamber" }
-      : (roomKind === "warden" ? { layout: "arena" } : null));
+      : (roomKind === "warden" || roomKind === "challenge" ? { layout: "arena" } : null));
     buildMap(n, forced);
     player.x = spawnTile.x; player.y = spawnTile.y;
     player.tx = null; player.ty = null; player.dash = null;
@@ -1675,6 +1913,12 @@
         banner = { t: 1.1, text: "ELITE" };
         startDrone();
       }
+    } else if (roomKind === "challenge") {
+      phase = "fight";
+      challenge = { t: 20, wave: 0, next: 0.35, done: false };
+      banner = { t: 1.15, text: "SURVIVE" };
+      startDrone();
+      if (chEl) { chEl.classList.add("on"); chEl.textContent = "SURVIVE  20s"; }
     } else if (roomKind === "warden") {
       phase = "fight";
       spawnEnemy("warden", COLS * 0.5, ROWS * 0.42, false, false);
@@ -1708,9 +1952,21 @@
         spawnGem(COLS * 0.72, ROWS * 0.36, makeItem("common"));
         addGold(6 + ((n / 2) | 0), COLS * 0.5, ROWS * 0.52);
       }
+      if (THEME && THEME._name === "ice" && n > 1) {
+        const w = spawnEnemy("wisp", COLS * 0.28, ROWS * 0.4, false, false);
+        if (w) w.frost = true;
+      }
+      if (THEME && THEME._name === "void" && n > 1) {
+        spawnEnemy("wisp", COLS * 0.72, ROWS * 0.36, true, false);
+        spawnEnemy("wisp", COLS * 0.3, ROWS * 0.52, false, false);
+      }
     }
     placeSecret();
     placeHazards();
+    placeTablets();
+    placeDeathGhost(n);
+    syncPauseGlyph();
+    syncRelicTray();
     if (n >= 8) unlockAch("depth8");
     if (n >= 16) unlockAch("depth16");
     syncHud();
@@ -1808,6 +2064,52 @@
       const s = spots.splice(idx, 1)[0];
       hazards.push({ type: kind, tx: s.tx, ty: s.ty, x: s.x, y: s.y, tele: 0.85, tick: 0 });
     }
+  }
+
+  function placeTablets() {
+    tablets = [];
+    if (depth === 1 || roomKind === "shop" || roomKind === "challenge") return;
+    if (rng() > 0.3) return;
+    const spots = [];
+    for (let ty = 2; ty < ROWS - 2; ty++) {
+      for (let tx = 2; tx < COLS - 2; tx++) {
+        const ch = MAP[ty][tx];
+        if (isSolidChar(ch) || ch === "D" || ch === "S") continue;
+        const cx = tx + 0.5, cy = ty + 0.5;
+        if (dist(cx, cy, spawnTile.x, spawnTile.y) < 2.2) continue;
+        if (dist(cx, cy, doorTile.x, doorTile.y) < 1.8) continue;
+        spots.push({ x: cx, y: cy });
+      }
+    }
+    if (!spots.length) return;
+    const s = spots[(rng() * spots.length) | 0];
+    tablets.push({ x: s.x, y: s.y, id: (rng() * LORE_LINES.length) | 0, smashed: false });
+  }
+  function trySmashTablet() {
+    for (let i = 0; i < tablets.length; i++) {
+      const t = tablets[i];
+      if (t.smashed) continue;
+      if (dist(player.x, player.y, t.x, t.y) > 1.75) continue;
+      t.smashed = true;
+      loreFound[t.id] = 1;
+      saveLore();
+      burst(t.x, t.y, "#e8d5c0", 12);
+      sfx("clang");
+      showToast("LORE · " + loreCount() + "/" + LORE_LINES.length, "#e8d5c0");
+      floats.push({ x: t.x, y: t.y - 0.55, t: 1.15, text: LORE_LINES[t.id], col: "#e8d5c0" });
+      return true;
+    }
+    return false;
+  }
+  function placeDeathGhost(n) {
+    const g = lastGhost || loadGhost();
+    if (!g || !g.gold || g.depth !== n) return;
+    if (roomKind === "shop" || roomKind === "boss" || roomKind === "warden" || roomKind === "challenge") return;
+    let x = COLS * 0.5, y = ROWS * 0.46;
+    if ((g.seed >>> 0) === (runSeed >>> 0) && g.x) { x = g.x; y = g.y; }
+    const e = spawnEnemy("shade", x, y, false, false);
+    e.stash = Math.max(5, Math.round(g.gold * 0.45));
+    e.hp = e.maxhp = Math.max(22, 28 + depth * 2);
   }
 
   function setPaused(on) {
@@ -1970,6 +2272,7 @@
     if (e.type === "brute" || e.type === "knight") base = 9;
     if (e.type === "bomber") base = 7;
     if (e.type === "wisp") base = 7;
+    if (e.type === "shade") return e.stash || 12;
     if (e.type === "golem") base = 16;
     if (e.type === "mimic") base = 18;
     if (e.type === "warden") base = 24;
@@ -1999,7 +2302,7 @@
     });
     enemies = enemies.filter(function (x) { return x !== e; });
     addGold(goldFor(e), e.x, e.y);
-    if (!enemies.length && phase === "fight") clearRoom();
+    if (!enemies.length && phase === "fight" && !(challenge && !challenge.done)) clearRoom();
   }
 
   function killEnemy(e) {
@@ -2025,6 +2328,11 @@
       showToast("ELITE DROP", "#fde68a");
       unlockAch("elite");
     }
+    if (e.type === "shade") {
+      showToast("GHOST GOLD", "#c4b5fd");
+      try { localStorage.removeItem(GHOST_KEY); } catch (err) {}
+      lastGhost = null;
+    }
     if (e.type === "warden") {
       spawnGem(e.x, e.y - 0.35, makeItem("rare"));
       showToast("WARDEN RELIC", "#7dd3fc");
@@ -2046,7 +2354,7 @@
       enemies = enemies.filter(function (x) { return x !== e; });
     }
     bumpStat("kills", 1);
-    if (!enemies.length && phase === "fight") clearRoom();
+    if (!enemies.length && phase === "fight" && !(challenge && !challenge.done)) clearRoom();
   }
 
   function hurtPlayer(dmg, ox, oy, src) {
@@ -2104,6 +2412,7 @@
     sfx("slash");
     fireSlashWave();
     tryCrackSecret();
+    trySmashTablet();
     const crit = rng() < player.crit;
     const dmg = slashDmg(crit);
     hitEnemy(target, dmg, crit);
@@ -2262,6 +2571,7 @@
     sfx("slash");
     fireSlashWave();
     tryCrackSecret();
+    trySmashTablet();
     const hitR = player.slashR * 0.88;
     for (let i = 0; i < enemies.length; i++) {
       const e = enemies[i];
@@ -2311,6 +2621,7 @@
     screenFlash(0.14, "253,230,138");
     fireSlashWave();
     tryCrackSecret();
+    trySmashTablet();
     const hitR = player.slashR * 1.55;
     for (let i = 0; i < enemies.length; i++) {
       const e = enemies[i];
@@ -2327,6 +2638,41 @@
     burst(player.x + fx * 1.15, player.y + fy * 1.15, "#fb923c", 8);
   }
 
+  function parryWindow() {
+    return pickedClass === "rogue" ? 0.16 : 0.12;
+  }
+  function tryParry() {
+    if (paused || player.dead || phase !== "fight") return false;
+    const win = parryWindow();
+    let best = null, bd = 2.55;
+    for (let i = 0; i < enemies.length; i++) {
+      const e = enemies[i];
+      if (e.hp <= 0 || !e.wind || e.wind <= 0 || e.wind > win) continue;
+      const d = dist(player.x, player.y, e.x, e.y);
+      if (d < bd && d < (e.range || 1) + player.r + 1.2) { bd = d; best = e; }
+    }
+    if (!best) return false;
+    best.wind = 0;
+    best.atk = (best.cd || 1) + 0.4;
+    best.stun = 0.72;
+    best.vuln = 0.9;
+    if (best.slam) best.slam = null;
+    if (best.casting) { best.casting = false; best.teleT = 1.5; }
+    player.slashCd = 0;
+    player.parryWin = 0.48;
+    player.iframes = Math.max(player.iframes, 0.2);
+    player.dodgeCd = Math.max(player.dodgeCd, 0.24);
+    screenFlash(0.16, "103,232,249");
+    parryFlash = 0.2;
+    burst(best.x, best.y, "#67e8f9", 16);
+    burst(player.x, player.y, "#e0f2fe", 8);
+    floats.push({ x: best.x, y: best.y - 0.65, t: 0.7, text: "PARRY", col: "#67e8f9" });
+    sfx("clang");
+    beep(880, 0.05, "square", 0.06);
+    beep(240, 0.08, "triangle", 0.05, 120);
+    shake = Math.max(shake, 5);
+    return true;
+  }
   function padDodge() {
     const st = stickNow();
     let dx, dy;
@@ -2342,7 +2688,7 @@
     hptext.textContent = Math.max(0, Math.ceil(player.hp)) + " / " + Math.ceil(player.maxhp);
     goldtext.textContent = gold + " G";
     combotext.textContent = combo >= 2 ? "x" + combo : "";
-    roomtext.textContent = (ngPlus ? "NG+ " : "") + "DEPTH " + depth;
+    roomtext.textContent = (ngPlus ? "NG+ " : "") + "DEPTH " + depth + (runMutators.length ? " · " + mutNames() : "");
   }
 
   function startRun(seed, opts) {
@@ -2351,7 +2697,10 @@
     runSeed = seed >>> 0;
     rng = makeRng(runSeed);
     ngPlus = !!(opts && opts.deeper);
+    runMutators = (opts && opts.daily) ? dailyMutators() : [];
     lastKind = "combat";
+    titleDaily = false;
+    titleDeeper = false;
     setPaused(false);
     overlay.classList.add("hidden");
     hud.classList.remove("off");
@@ -2359,11 +2708,14 @@
     titleMode = "main";
     bumpStat("runs", 1);
     runEnded = false;
+    lastGhost = loadGhost();
     resetPlayer();
     startRoom(ngPlus ? 9 : 1);
     syncHud();
+    syncPauseGlyph();
     if (ngPlus) unlockAch("ngplus");
-    showToast(ngPlus ? "DEEPER · SEED " + seedLabel(runSeed) : "SEED " + seedLabel(runSeed), ngPlus ? "#d8b4fe" : "#c4b4a4");
+    if (runMutators.length) showToast("DAILY · " + mutNames(), "#7dd3fc");
+    else showToast(ngPlus ? "DEEPER · SEED " + seedLabel(runSeed) : "SEED " + seedLabel(runSeed), ngPlus ? "#d8b4fe" : "#c4b4a4");
     setTimeout(checkSetBonus, 900);
   }
 
@@ -2385,6 +2737,8 @@
       sfx("death");
       saveBest(depth);
       if (depth > runStats.best) { runStats.best = depth; saveStats(); }
+      saveGhost({ seed: runSeed, depth: depth, x: player.x, y: player.y, gold: gold });
+      lastGhost = loadGhost();
     }
     const gained = depth + ((gold / 10) | 0);
     if (first) {
@@ -2394,6 +2748,10 @@
     hud.classList.add("off");
     hint.style.opacity = "0";
     overlay.classList.remove("hidden");
+    syncPauseGlyph();
+    syncRelicTray();
+    const chEl = document.getElementById("chalhud");
+    if (chEl) { chEl.classList.remove("on"); chEl.textContent = ""; }
     const best = Math.max(depth, bestDepth());
     const nextW = START_WEAPONS.filter(function (w) { return w.need > 0 && best < w.need; })[0];
     const unlockProg = "Unlocks " + unlockCount() + "/" + unlockTotal() +
@@ -2409,7 +2767,7 @@
       "<button class='btn btn-alt btn-sm' id='copyseed' type='button'>COPY SEED</button>" +
       "<button class='btn btn-alt btn-sm' id='enterseed' type='button'>ENTER SEED</button></div>";
     document.getElementById("again").addEventListener("click", function (ev) { ev.stopPropagation(); startRun(); });
-    document.getElementById("daily").addEventListener("click", function (ev) { ev.stopPropagation(); startRun(dailySeed()); });
+    document.getElementById("daily").addEventListener("click", function (ev) { ev.stopPropagation(); startRun(dailySeed(), { daily: true }); });
     document.getElementById("copyseed").addEventListener("click", function (ev) { ev.stopPropagation(); copySeed(); });
     document.getElementById("enterseed").addEventListener("click", function (ev) { ev.stopPropagation(); seedFrom = "dead"; renderSeedPad(); });
   }
@@ -2505,12 +2863,22 @@
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); }, { passive: false });
   document.addEventListener("touchmove", function (e) { e.preventDefault(); }, { passive: false });
 
+  function beginFromTitle() {
+    if (titleDaily) startRun(dailySeed(), { daily: true });
+    else if (titleDeeper) startRun(null, { deeper: true });
+    else startRun();
+  }
   function pressActionA() {
+    if (startHeld && (phase === "fight" || phase === "loot" || phase === "shop" || phase === "event")) {
+      startDidSwap = true;
+      swapRelics();
+      return;
+    }
     if (paused) { togglePause(); return; }
     if (phase === "title") {
-      if (titleMode === "unlocks" || titleMode === "stats") return;
+      if (titleMode === "unlocks" || titleMode === "stats" || titleMode === "codex") return;
       if (titleMode === "seed") { confirmSeed(); return; }
-      startRun();
+      beginFromTitle();
       return;
     }
     if (phase === "dead" || phase === "win") { startRun(); return; }
@@ -2520,16 +2888,17 @@
   function pressActionB() {
     if (paused) { togglePause(); return; }
     if (phase === "title") {
-      if (titleMode === "unlocks" || titleMode === "stats" || titleMode === "seed") {
+      if (titleMode === "unlocks" || titleMode === "stats" || titleMode === "seed" || titleMode === "codex") {
         if (titleMode === "seed" && seedFrom === "dead") { dieRun(); return; }
         titleMode = "main";
         renderTitle();
         return;
       }
-      startRun();
+      beginFromTitle();
       return;
     }
     if (phase === "dead" || phase === "win") { startRun(); return; }
+    if (tryParry()) return;
     padDodge();
   }
 
@@ -2609,7 +2978,9 @@
     startEl.addEventListener("pointerdown", function (e) {
       halt(e);
       startEl.classList.add("pressed");
+      startHeld = true;
       startDidMute = false;
+      startDidSwap = false;
       startHoldTimer = setTimeout(function () {
         startDidMute = true;
         toggleMute();
@@ -2618,15 +2989,34 @@
     function startUp(e) {
       halt(e);
       startEl.classList.remove("pressed");
+      startHeld = false;
       clearTimeout(startHoldTimer);
-      if (startDidMute) return;
+      if (startDidMute || startDidSwap) return;
       if (phase === "fight" || phase === "loot" || phase === "shop" || phase === "event") togglePause();
-      else if (phase === "title" && titleMode === "main") startRun();
+      else if (phase === "title" && titleMode === "main") beginFromTitle();
       else if (phase === "title" && titleMode === "seed") confirmSeed();
       else if (phase === "dead" || phase === "win") startRun();
     }
     startEl.addEventListener("pointerup", startUp, { passive: false });
     startEl.addEventListener("pointercancel", startUp, { passive: false });
+    const bagEl = document.getElementById("gbbag");
+    if (bagEl) {
+      bagEl.addEventListener("pointerdown", function (e) {
+        halt(e);
+        bagEl.classList.add("pressed");
+        if (phase === "fight" || phase === "loot" || phase === "shop" || phase === "event") swapRelics();
+      }, { passive: false });
+      function bagUp(e) { halt(e); bagEl.classList.remove("pressed"); }
+      bagEl.addEventListener("pointerup", bagUp, { passive: false });
+      bagEl.addEventListener("pointercancel", bagUp, { passive: false });
+    }
+    const pauseG = document.getElementById("pauseglyph");
+    if (pauseG) {
+      pauseG.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (phase === "fight" || phase === "loot" || phase === "shop" || phase === "event") togglePause();
+      });
+    }
     root.addEventListener("contextmenu", halt, { passive: false });
     root.addEventListener("touchstart", function (e) { e.preventDefault(); }, { passive: false });
   })();
@@ -2668,6 +3058,12 @@
     const isA = e.code === "Space" || e.code === "KeyX" || e.code === "KeyK";
     const isB = e.code === "KeyZ" || e.code === "KeyJ";
     const isStart = e.code === "Enter";
+    const isBag = e.code === "KeyC" || e.code === "KeyQ";
+    if (isBag) {
+      e.preventDefault();
+      if (phase === "fight" || phase === "loot" || phase === "shop" || phase === "event") swapRelics();
+      return;
+    }
     if (isA) {
       e.preventDefault();
       keys.a = true;
@@ -2681,7 +3077,7 @@
     } else if (isStart) {
       e.preventDefault();
       if (phase === "fight" || phase === "loot" || phase === "shop" || phase === "event") togglePause();
-      else if (phase === "title" && titleMode === "main") startRun();
+      else if (phase === "title" && titleMode === "main") beginFromTitle();
       else if (phase === "title" && titleMode === "seed") confirmSeed();
       else if (phase === "dead" || phase === "win") startRun();
     }
@@ -2706,10 +3102,20 @@
     const enter = document.getElementById("enterbtn");
     const daily = document.getElementById("dailybtn");
     const unb = document.getElementById("unlocksbtn");
-    if (enter) enter.addEventListener("click", function (e) { e.stopPropagation(); startRun(); });
-    if (daily) daily.addEventListener("click", function (e) { e.stopPropagation(); startRun(dailySeed()); });
+    if (enter) enter.addEventListener("click", function (e) { e.stopPropagation(); beginFromTitle(); });
+    if (daily) daily.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (titleDaily) startRun(dailySeed(), { daily: true });
+      else { titleDaily = true; titleDeeper = false; renderTitle(); showToast("DAILY · " + dailyMutators().map(function (m) { return m.name; }).join(" · "), "#7dd3fc"); }
+    });
     const deeper = document.getElementById("deeperbtn");
-    if (deeper) deeper.addEventListener("click", function (e) { e.stopPropagation(); startRun(null, { deeper: true }); });
+    if (deeper) deeper.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (titleDeeper) startRun(null, { deeper: true });
+      else { titleDeeper = true; titleDaily = false; renderTitle(); }
+    });
+    const cdx = document.getElementById("codexbtn");
+    if (cdx) cdx.addEventListener("click", function (e) { e.stopPropagation(); titleMode = "codex"; renderTitle(); });
     if (unb) unb.addEventListener("click", function (e) { e.stopPropagation(); titleMode = "unlocks"; renderTitle(); });
     const stb = document.getElementById("statsbtn");
     if (stb) stb.addEventListener("click", function (e) { e.stopPropagation(); titleMode = "stats"; renderTitle(); });
@@ -2779,13 +3185,18 @@
 
   overlay.addEventListener("click", function (e) {
     if (e.target && (e.target.tagName === "BUTTON" || e.target.tagName === "INPUT" || e.target.closest("button"))) return;
-    if (phase === "title" && titleMode === "main") startRun();
+    if (phase === "title" && titleMode === "main") beginFromTitle();
   });
 
   function updateEnemy(e, dt) {
     e.bob += dt;
     e.flash = Math.max(0, e.flash - dt);
     e.vuln = Math.max(0, e.vuln - dt);
+    if (e.stun > 0) {
+      e.stun -= dt;
+      e.flash = Math.max(e.flash, 0.06);
+      return;
+    }
     if (e.burn > 0) {
       e.burn -= dt;
       e.burnTick = (e.burnTick || 0) - dt;
@@ -2976,7 +3387,7 @@
       return;
     }
 
-    if (e.type === "knight") {
+    if (e.type === "knight" || e.type === "shade") {
       if (e.wind > 0) {
         e.wind -= dt;
         if (e.wind <= 0) {
@@ -3038,6 +3449,21 @@
 
     if (embers.length < 22) {
       embers.push({ x: rnd(0, W), y: rnd(0, H * 0.7), vy: -rnd(8, 22), vx: rnd(-6, 6), t: rnd(1.5, 4), r: rnd(1, 2) });
+    }
+    if (THEME && THEME._name === "ice" && iceSpark.length < 20 && Math.random() < 0.45) {
+      iceSpark.push({ x: srnd(1.1, COLS - 1.1), y: srnd(1.1, ROWS - 1.1), t: rnd(0.35, 1.05) });
+    }
+    for (let i = iceSpark.length - 1; i >= 0; i--) {
+      iceSpark[i].t -= dt;
+      if (iceSpark[i].t <= 0) iceSpark.splice(i, 1);
+    }
+    if (THEME && THEME._name === "void" && voidMotes.length < 22) {
+      voidMotes.push({ x: rnd(0, W), y: rnd(H * 0.15, H * 0.85), vy: -rnd(8, 20), t: rnd(1.2, 3.2), r: rnd(1, 2.2) });
+    }
+    for (let i = voidMotes.length - 1; i >= 0; i--) {
+      const m = voidMotes[i];
+      m.y += m.vy * dt; m.t -= dt;
+      if (m.t <= 0) voidMotes.splice(i, 1);
     }
     for (let i = embers.length - 1; i >= 0; i--) {
       const m = embers[i];
@@ -3153,6 +3579,22 @@
         }
       }
     }
+    if (THEME && THEME._name === "ice" && player.dodging <= 0 && !player.dash) {
+      if (moving && player.tx != null) {
+        const ix = player.tx - player.x, iy = player.ty - player.y;
+        const id = Math.hypot(ix, iy) || 1;
+        player.iceVx = (player.iceVx || 0) * 0.8 + (ix / id) * player.speed * 0.42;
+        player.iceVy = (player.iceVy || 0) * 0.8 + (iy / id) * player.speed * 0.42;
+      } else {
+        player.iceVx = (player.iceVx || 0) * 0.965;
+        player.iceVy = (player.iceVy || 0) * 0.965;
+        if (Math.hypot(player.iceVx || 0, player.iceVy || 0) > 0.18) {
+          tryMove(player, player.x + player.iceVx * dt, player.y + player.iceVy * dt);
+        }
+      }
+    }
+    if (player.parryWin > 0) player.parryWin -= dt;
+    if (parryFlash > 0) parryFlash -= dt;
     if (moving) {
       player.walkT += dt;
       const stw = stickNow();
@@ -3248,6 +3690,39 @@
       }
     }
 
+    if (challenge && !challenge.done && phase === "fight") {
+      challenge.t -= dt;
+      challenge.next -= dt;
+      const chEl = document.getElementById("chalhud");
+      if (chEl) {
+        chEl.classList.add("on");
+        chEl.textContent = "SURVIVE  " + Math.max(0, Math.ceil(challenge.t)) + "s";
+      }
+      if (challenge.next <= 0) {
+        challenge.wave++;
+        challenge.next = 4.1;
+        const types = ["slime", "bat"];
+        if (depth >= 5) types.push("spitter", "wisp");
+        if (depth >= 8) types.push("brute");
+        const n = 1 + (challenge.wave > 2 ? 1 : 0);
+        for (let i = 0; i < n; i++) {
+          spawnEnemy(spick(types), COLS * (0.28 + rng() * 0.44), ROWS * (0.26 + rng() * 0.22), rng() < 0.35, false);
+        }
+      }
+      if (challenge.t <= 0) {
+        challenge.done = true;
+        if (chEl) { chEl.classList.remove("on"); chEl.textContent = ""; }
+        for (let i = 0; i < enemies.length; i++) burst(enemies[i].x, enemies[i].y, "#fde68a", 8);
+        enemies = [];
+        clearRoom();
+        spawnGem(COLS * 0.38, ROWS * 0.44, makeItem("rare"));
+        spawnGem(COLS * 0.62, ROWS * 0.44, makeItem(depth >= 10 ? "epic" : "rare"));
+        addGold(30 + depth * 3, COLS * 0.5, ROWS * 0.4);
+        showToast("CHALLENGE CLEAR", "#fde68a");
+        return;
+      }
+    }
+
     if (phase !== "fight") return;
 
     for (let i = 0; i < enemies.length; i++) updateEnemy(enemies[i], dt);
@@ -3335,8 +3810,11 @@
     const h = (tx * 48271 + ty * 11909) >>> 0;
     if (THEME && THEME._name === "ember" && (h & 7) > 1) return;
     if (THEME && THEME._name === "moss" && (h & 7) > 0) return;
+    if (THEME && (THEME._name === "ice" || THEME._name === "void") && (h & 7) > 2) return;
     const x = sx(tx), y = sy(ty);
-    ctx.fillStyle = THEME && THEME._name === "moss" ? "rgba(40,70,20,0.35)" : "rgba(120,16,16,0.4)";
+    ctx.fillStyle = THEME && THEME._name === "moss" ? "rgba(40,70,20,0.35)"
+      : (THEME && THEME._name === "ice" ? "rgba(180,220,240,0.22)"
+      : (THEME && THEME._name === "void" ? "rgba(80,30,110,0.35)" : "rgba(120,16,16,0.4)"));
     const x0 = x + (h % (TILE - 5));
     const y0 = y + ((h >> 5) % (TILE - 5));
     ctx.fillRect(x0, y0, 3, 2);
@@ -3420,6 +3898,16 @@
           drawTileImg(pack.floor[tileVar(tx, ty)], tx, ty);
           drawCracks(tx, ty);
           drawBlood(tx, ty);
+          if (THEME && THEME._name === "moss" && ((tx + ty) % 3 === 0)) {
+            ctx.fillStyle = "rgba(180,220,200,0.09)";
+            ctx.fillRect(sx(tx) + 2, sy(ty) + TILE * 0.58, TILE - 4, 3);
+            ctx.fillStyle = "rgba(220,255,230,0.07)";
+            ctx.fillRect(sx(tx) + 4, sy(ty) + TILE * 0.6, TILE * 0.38, 2);
+          }
+          if (THEME && THEME._name === "ice" && ((tx * 3 + ty) & 3) === 0) {
+            ctx.fillStyle = "rgba(224,252,255,0.16)";
+            ctx.fillRect(sx(tx) + (tx * 5 + ty) % (TILE - 4), sy(ty) + (ty * 7) % (TILE - 4), 2, 2);
+          }
         }
       }
     }
@@ -3511,7 +3999,7 @@
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.imageSmoothingEnabled = true;
     g.clearRect(0, 0, W, H);
-    g.fillStyle = "rgba(5,2,3,0.80)";
+    g.fillStyle = THEME && THEME._name === "void" ? "rgba(2,0,6,0.90)" : "rgba(5,2,3,0.80)";
     g.fillRect(0, 0, W, H);
     g.globalCompositeOperation = "destination-out";
     function punch(x, y, rad, str) {
@@ -3527,10 +4015,12 @@
     for (let i = 0; i < torches.length; i++) {
       const tch = torches[i];
       const flick = 0.9 + Math.sin(tick * 9 + i * 1.7) * 0.08 + Math.sin(tick * 17 + i) * 0.04;
-      punch(sx(tch.x), sy(tch.y + 0.2), TILE * 3.4 * flick, 0.95);
+      const dark = hasMut("darkness") ? 0.58 : 1;
+      punch(sx(tch.x), sy(tch.y + 0.2), TILE * 3.4 * flick * dark, 0.95);
     }
-    if (phase !== "title" && player.x != null) punch(sx(player.x), sy(player.y - 0.4), TILE * 2.4, 0.7);
-    if (exitGate) punch(sx(exitGate.x), sy(exitGate.y), TILE * 2.1, 0.75);
+    const darkP = hasMut("darkness") ? 0.58 : 1;
+    if (phase !== "title" && player.x != null) punch(sx(player.x), sy(player.y - 0.4), TILE * 2.4 * darkP, 0.7);
+    if (exitGate) punch(sx(exitGate.x), sy(exitGate.y), TILE * 2.1 * darkP, 0.75);
     g.globalCompositeOperation = "source-over";
     ctx.drawImage(lightCvs, 0, 0, W, H);
     ctx.save();
@@ -3568,6 +4058,12 @@
     const ghost = player.iframes > 0 && ((tick * 20) | 0) % 2 === 0 && alpha == null;
     if (ghost) ctx.globalAlpha = 0.4;
     footShadow(wx, wy, 0.7);
+    if (THEME && THEME._name === "moss" && alpha == null) {
+      ctx.fillStyle = "rgba(170,220,190,0.16)";
+      ctx.fillRect(sx(wx) - 9, sy(wy) + 2, 18, 5);
+      ctx.fillStyle = "rgba(220,255,230,0.1)";
+      ctx.fillRect(sx(wx) - 4, sy(wy) + 3, 9, 2);
+    }
     blit(heroSprite(), wx, wy, flip, flashAmt > 0);
     if (slashAmt > 0) {
       const fr = slashAmt > 0.66 ? spr.slash1 : slashAmt > 0.33 ? spr.slash2 : spr.slash3;
@@ -3625,6 +4121,7 @@
       if (e.atk > e.cd * 0.7) return spr.brute;
       return ((e.bob * 4) | 0) % 2 ? spr.bruteW : spr.brute;
     }
+    if (e.type === "shade") return (e.wind > 0) ? spr.knight2 : spr.knight1;
     if (e.type === "wisp") return e.glow ? spr.wisp2 : spr.wisp1;
     if (e.type === "golem") return (e.slam && e.slam.t > 0.2) ? spr.golemSlam : spr.golem;
     if (e.type === "boneking") return (e.slam && e.slam.t > 0.2) ? spr.bonekingSlam : spr.boneking;
@@ -3666,11 +4163,20 @@
     const s = enemySprite(e);
     const hurt = e.flash > 0 || e.wind > 0;
     const escale = e.type === "warden" ? 1.5 : (e.type === "boneking" ? 1.15 : (e.type === "golem" ? 1.2 : 1));
+    if (e.type === "shade") ctx.globalAlpha = 0.42;
     blit(s, e.x, e.y, e.flip, hurt && e.flash > 0, escale);
+    if (e.type === "shade") ctx.globalAlpha = 1;
     if (e.wind > 0 && e.type !== "boss") {
       ctx.globalAlpha = 0.55;
       blit(s, e.x, e.y, e.flip, true, escale);
       ctx.globalAlpha = 1;
+    }
+    if (e.frost) {
+      ctx.strokeStyle = "rgba(125,211,252,0.55)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(sx(e.x), sy(e.y) - TILE * 0.3, TILE * 0.38, 0, Math.PI * 2);
+      ctx.stroke();
     }
     if (e.type === "wisp" && e.glow) {
       ctx.strokeStyle = "rgba(196,181,253,0.7)";
@@ -3730,6 +4236,21 @@
     ctx.fillText(g.item.name, sx(g.x), sy(g.y) + TILE * 0.58);
   }
 
+  function drawTablet(tb) {
+    const x = sx(tb.x), y = sy(tb.y);
+    footShadow(tb.x, tb.y, 0.5);
+    ctx.fillStyle = "#3a322c";
+    ctx.fillRect(x - 8, y - 16, 16, 18);
+    ctx.fillStyle = "#5a4a3c";
+    ctx.fillRect(x - 6, y - 14, 12, 14);
+    ctx.fillStyle = "#c4b4a4";
+    ctx.fillRect(x - 4, y - 11, 8, 1);
+    ctx.fillRect(x - 4, y - 8, 8, 1);
+    ctx.fillRect(x - 3, y - 5, 6, 1);
+    const pulse = 0.35 + Math.sin(tick * 5 + tb.x) * 0.2;
+    ctx.fillStyle = "rgba(253,230,138," + pulse + ")";
+    ctx.fillRect(x - 2, y - 18, 4, 2);
+  }
   function drawShrineOpt(o, i) {
     footShadow(o.x, o.y, 0.7);
     blit(spr.shrine, o.x, o.y, false, false);
@@ -3799,6 +4320,10 @@
       blit(spr.keeper, shop.keeper.x, shop.keeper.y, false, false);
     }});
     if (shrine) shrine.opts.forEach(function (o, i) { list.push({ y: o.y, draw: function () { drawShrineOpt(o, i); } }); });
+    tablets.forEach(function (tb) {
+      if (tb.smashed) return;
+      list.push({ y: tb.y, draw: function () { drawTablet(tb); } });
+    });
     enemies.forEach(function (e) { list.push({ y: e.y, draw: function () { drawEnemy(e); } }); });
     titleMobs.forEach(function (m) {
       list.push({ y: m.y, draw: function () {
@@ -3902,6 +4427,24 @@
       ctx.fillRect(m.x, m.y, m.r, m.r);
       ctx.globalAlpha = 1;
     });
+    iceSpark.forEach(function (sp) {
+      ctx.globalAlpha = clamp(sp.t * 2, 0, 0.85);
+      ctx.fillStyle = "#e0f2fe";
+      ctx.fillRect(sx(sp.x), sy(sp.y), 2, 2);
+      ctx.fillStyle = "#7dd3fc";
+      ctx.fillRect(sx(sp.x) + 1, sy(sp.y) - 1, 1, 1);
+      ctx.globalAlpha = 1;
+    });
+    voidMotes.forEach(function (m) {
+      ctx.globalAlpha = clamp(m.t, 0, 1) * 0.4;
+      ctx.fillStyle = "#6b21a8";
+      ctx.fillRect(m.x, m.y, m.r, m.r);
+      ctx.globalAlpha = 1;
+    });
+    if (parryFlash > 0) {
+      ctx.fillStyle = "rgba(103,232,249," + (parryFlash * 0.35) + ")";
+      ctx.fillRect(0, 0, W, H);
+    }
     if (flash > 0) {
       ctx.fillStyle = "rgba(" + (flashCol || "255,50,36") + "," + (flash * 0.28) + ")";
       ctx.fillRect(0, 0, W, H);
@@ -4000,6 +4543,19 @@
     hud.classList.add("off");
     hint.style.opacity = "0.7";
     const b = bestDepth();
+    if (titleMode === "codex") {
+      let lines = "";
+      for (let i = 0; i < LORE_LINES.length; i++) {
+        lines += "<p class='statline'>" + (loreFound[i] ? esc(LORE_LINES[i]) : "········ · ???") + "</p>";
+      }
+      overlay.innerHTML =
+        "<h2>CODEX</h2>" +
+        "<p>" + loreCount() + "/" + LORE_LINES.length + " tablets</p>" +
+        lines +
+        "<button class='btn btn-sm' id='backbtn' type='button'>BACK</button>";
+      bindTitleButtons();
+      return;
+    }
     if (titleMode === "stats") {
       overlay.innerHTML =
         "<h2>STATS</h2>" +
@@ -4043,12 +4599,14 @@
       "<p>One thumb. Dash-strike. Grab loot. Don't get slammed.</p>" +
       "<p id='bestline'>" + (b ? "Best depth " + b : "No descents yet.") + " · Unlocks " + unlockCount() + "/" + unlockTotal() + " · Achs " + achCount() + "/" + ACH_DEFS.length + "</p>" +
       "<p id='seedline'>TAP TO ENTER rolls a seed · DAILY uses UTC date" + (b >= 16 ? " · DEEPER starts at 9" : "") + "</p>" +
+      (titleDaily ? "<p id='mutline'>DAILY · " + dailyMutators().map(function (m) { return m.name; }).join(" · ") + "</p>" : "<p id='mutline'></p>") +
       classRowHtml() +
-      "<button class='btn' id='enterbtn' type='button'>TAP TO ENTER</button>" +
-      "<div class='btn-row'><button class='btn btn-alt btn-sm' id='dailybtn' type='button'>DAILY</button>" +
-      (b >= 16 ? "<button class='btn btn-alt btn-sm' id='deeperbtn' type='button'>DEEPER</button>" : "") +
+      "<button class='btn' id='enterbtn' type='button'>" + (titleDaily ? "ENTER DAILY" : (titleDeeper ? "ENTER DEEPER" : "TAP TO ENTER")) + "</button>" +
+      "<div class='btn-row'><button class='btn " + (titleDaily ? "" : "btn-alt ") + "btn-sm' id='dailybtn' type='button'>DAILY</button>" +
+      (b >= 16 ? "<button class='btn " + (titleDeeper ? "" : "btn-alt ") + "btn-sm' id='deeperbtn' type='button'>DEEPER</button>" : "") +
       "<button class='btn btn-alt btn-sm' id='unlocksbtn' type='button'>UNLOCKS</button>" +
       "<button class='btn btn-alt btn-sm' id='statsbtn' type='button'>STATS</button>" +
+      "<button class='btn btn-alt btn-sm' id='codexbtn' type='button'>CODEX</button>" +
       "<button class='btn btn-alt btn-sm' id='seedbtn' type='button'>SEED</button></div>";
     bindTitleButtons();
   }
@@ -4139,6 +4697,8 @@
     combotext.textContent = "";
     roomtext.textContent = "DEPTH —";
     renderTitle();
+    syncPauseGlyph();
+    syncRelicTray();
   }
 
   loadMute();
