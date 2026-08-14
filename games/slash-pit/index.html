@@ -539,20 +539,20 @@
     epic:   { w: 7,  label: "EPIC",   color: "#d8b4fe" }
   };
   const WEAPONS = [
-    { r: "junk", name: "Rusty Nail", dmg: 3 },
-    { r: "junk", name: "Bent Spike", dmg: 4 },
-    { r: "junk", name: "Dull Shard", dmg: 3 },
-    { r: "common", name: "Iron Fang", dmg: 6 },
-    { r: "common", name: "Pit Knife", dmg: 7 },
-    { r: "common", name: "Bone Spike", dmg: 6 },
-    { r: "rare", name: "Blood Axe", dmg: 12 },
-    { r: "rare", name: "Ember Cleaver", dmg: 11 },
-    { r: "rare", name: "Widow Blade", dmg: 13 },
-    { r: "epic", name: "Hellfang", dmg: 18 },
+    { r: "junk", name: "Rusty Nail", dmg: 3, special: "fast" },
+    { r: "junk", name: "Bent Spike", dmg: 4, special: "fast" },
+    { r: "junk", name: "Dull Shard", dmg: 3, special: "fast" },
+    { r: "common", name: "Iron Fang", dmg: 6, special: "fast" },
+    { r: "common", name: "Pit Knife", dmg: 7, special: "fast" },
+    { r: "common", name: "Bone Spike", dmg: 6, special: "fast" },
+    { r: "rare", name: "Blood Axe", dmg: 12, special: "heavy" },
+    { r: "rare", name: "Ember Cleaver", dmg: 11, special: "heavy-fire" },
+    { r: "rare", name: "Widow Blade", dmg: 13, special: "fast" },
+    { r: "epic", name: "Hellfang", dmg: 18, special: "fire" },
     { r: "epic", name: "Soul Reaver", dmg: 16 },
-    { r: "epic", name: "Ash Reaper", dmg: 17 },
-    { r: "rare", name: "Tide Cutter", dmg: 10, onSlash: "wave" },
-    { r: "epic", name: "Grave Hook", dmg: 19 }
+    { r: "epic", name: "Ash Reaper", dmg: 17, special: "heavy-fire" },
+    { r: "rare", name: "Tide Cutter", dmg: 10, onSlash: "wave", special: "fast" },
+    { r: "epic", name: "Grave Hook", dmg: 19, special: "heavy" }
   ];
   const ARMORS = [
     { r: "junk", name: "Rag Wrap", hp: 8 },
@@ -594,10 +594,10 @@
     { id: "hp", name: "Pit Heart", need: 6, cost: 22, stat: "hp", v: 25, desc: "+25 max HP", r: "common" }
   ];
   const START_WEAPONS = [
-    { id: "rusty", name: "Rusty Nail", dmg: 3, need: 0 },
-    { id: "fang", name: "Iron Fang", dmg: 6, need: 8 },
-    { id: "axe", name: "Blood Axe", dmg: 12, need: 16 },
-    { id: "hell", name: "Hellfang", dmg: 18, need: 24 }
+    { id: "rusty", name: "Rusty Nail", dmg: 3, need: 0, special: "fast" },
+    { id: "fang", name: "Iron Fang", dmg: 6, need: 8, special: "fast" },
+    { id: "axe", name: "Blood Axe", dmg: 12, need: 16, special: "heavy" },
+    { id: "hell", name: "Hellfang", dmg: 18, need: 24, special: "fire" }
   ];
   const TREE_NODES = [
     { id: "skin", name: "Thick Skin", cost: 8, desc: "+8 start HP" },
@@ -630,6 +630,7 @@
   let rng = Math.random;
   let last = 0;
   let shake = 0;
+  let camPunch = 0, camPx = 0, camPy = 0;
   let flash = 0;
   let banner = { t: 0, text: "" };
   let toastT = 0;
@@ -1857,7 +1858,14 @@
     const wdef = START_WEAPONS.filter(function (w) { return w.id === unlocks.weapon; })[0] || START_WEAPONS[0];
     if (wdef && wdef.dmg) {
       player.dmg += wdef.dmg;
-      slots.weapon = { kind: "weapon", rarity: wdef.need >= 24 ? "epic" : wdef.need >= 16 ? "rare" : wdef.need >= 8 ? "common" : "junk", name: wdef.name, dmg: wdef.dmg };
+      const extra = WEAPONS.filter(function (w) { return w.name === wdef.name; })[0] || {};
+      slots.weapon = {
+        kind: "weapon",
+        rarity: wdef.need >= 24 ? "epic" : wdef.need >= 16 ? "rare" : wdef.need >= 8 ? "common" : "junk",
+        name: wdef.name, dmg: wdef.dmg,
+        special: wdef.special || extra.special,
+        onSlash: extra.onSlash
+      };
       recap.push("START · " + wdef.name);
       markRarePlus(slots.weapon);
     }
@@ -1906,15 +1914,68 @@
 
   function itemBonus(it) {
     if (it.kind === "flask") return "heal " + it.heal + " hp";
-    if (it.onSlash === "wave") return "+" + it.dmg + " dmg · WAVE";
+    if (it.onSlash === "wave") return "+" + it.dmg + " dmg · WAVE" + (it.special === "fast" || (it.special && it.special.indexOf("fast") >= 0) ? " · FAST" : "");
     if (it.onDodge === "bomb") return "dodge bomb";
-    if (it.kind === "weapon") return "+" + it.dmg + " dmg";
+    if (it.kind === "weapon") {
+      let s = "+" + it.dmg + " dmg";
+      const spec = it.special || "";
+      if (spec === "fast" || spec.indexOf("fast") >= 0) s += " · FAST";
+      if (spec === "heavy" || spec.indexOf("heavy") >= 0) s += " · HEAVY";
+      if (spec === "fire" || spec.indexOf("fire") >= 0) s += " · BURN";
+      if (spec === "ice" || spec.indexOf("ice") >= 0) s += " · SLOW";
+      if (it.rarity === "epic") s += " · REACH";
+      return s;
+    }
     if (it.kind === "armor") return "+" + it.hp + " hp";
     if (it.stat === "speed") return "+" + it.v + " spd";
     if (it.stat === "crit") return "+" + Math.round(it.v * 100) + "% crit";
     if (it.stat === "leech") return "+" + Math.round(it.v * 100) + "% leech";
     if (it.stat === "dodge") return "-" + Math.round(it.v * 100) + "% dodge cd";
     return "";
+  }
+
+  function weaponFeel() {
+    const w = slots.weapon;
+    const spec = (w && w.special) || "";
+    const fast = spec === "fast" || spec.indexOf("fast") >= 0;
+    const heavy = spec === "heavy" || spec.indexOf("heavy") >= 0;
+    const fire = spec === "fire" || spec.indexOf("fire") >= 0;
+    const ice = spec === "ice" || spec.indexOf("ice") >= 0;
+    const epic = !!(w && w.rarity === "epic");
+    return {
+      spec: spec, fast: fast, heavy: heavy, fire: fire, ice: ice, epic: epic,
+      cdMul: fast && !heavy ? 0.72 : heavy ? 1.22 : 1,
+      reachMul: epic ? 1.12 : 1,
+      slashScale: fast && !heavy ? 0.76 : heavy ? 1.22 : 1,
+      knock: heavy ? 0.52 : 0.28,
+      cone: heavy ? -0.02 : fast ? 0.34 : 0.18,
+      splash: heavy ? 1.55 : fast ? 0.95 : 1.25
+    };
+  }
+  function slashReach() {
+    return player.slashR * weaponFeel().reachMul;
+  }
+  function beginSlash(baseCd, anim) {
+    const f = weaponFeel();
+    player.slashCd = baseCd * f.cdMul;
+    player.slashAnim = anim == null ? 1 : anim;
+    return f;
+  }
+  function punchCam(amt, dx, dy) {
+    if (!(amt > camPunch)) return;
+    camPunch = amt > 4 ? 4 : amt;
+    const len = Math.hypot(dx, dy) || 1;
+    camPx = dx / len;
+    camPy = dy / len;
+  }
+  function applyWeaponOnHit(e) {
+    const f = weaponFeel();
+    if (f.fire && depth > 1) e.burn = Math.max(e.burn || 0, 2.2);
+    if (f.ice && depth > 1) {
+      e.slow = Math.max(e.slow || 0, 1.6);
+      e.frost = true;
+    }
+    return f;
   }
 
   function applyItem(it) {
@@ -2302,7 +2363,7 @@
       atk: 0, wind: 0, flash: 0, slamT: d.slam || 0, slam: null,
       bob: rnd(0, 6.2), flip: false, face: 0, vuln: 0, boom: 0,
       elite: !!elite, swoopT: 0, sx: c.x, sy: c.y,
-      burn: 0, burnTick: 0, summonT: 2.8, teleT: 2.4, casting: false,
+      burn: 0, burnTick: 0, slow: 0, summonT: 2.8, teleT: 2.4, casting: false,
       glow: 0, glowT: type === "wisp" ? 1.0 : 0,
       stun: 0, frost: false, stash: 0, twin: false, splitGuard: 0, pulse: 0, clangs: 0
     });
@@ -3225,7 +3286,7 @@
       e._boomed = true;
       e.boom = 0.7;
       e.hp = 1;
-      e.speed = 0;
+      e.speed = 0; e._spdSave = null;
       e.wind = 0;
       floats.push({ x: e.x, y: e.y - 0.5, t: 0.6, text: "!", col: "#fb923c" });
       return;
@@ -3235,6 +3296,7 @@
     bloodBurst(e.x, e.y, isBossType(e.type) ? 18 : 10);
     floats.push({ x: e.x, y: e.y - 0.4, t: 0.7, text: "POP", col: "#ffe8a3" });
     shake = Math.max(shake, isBossType(e.type) ? 10 : 5);
+    punchCam(isBossType(e.type) ? 4 : e.elite ? 3.6 : 2.6, e.x - player.x, e.y - player.y);
     addGold(goldFor(e), e.x, e.y);
     unlockAch("firstkill");
     if (e.elite) {
@@ -3376,15 +3438,14 @@
 
   function doFinisher() {
     if (player.slashCd > 0) return;
-    const hitR = player.slashR * 1.75;
+    const hitR = slashReach() * 1.75;
     const targets = [];
     for (let i = 0; i < enemies.length; i++) {
       const e = enemies[i];
       if (e.hp <= 0) continue;
       if (dist(player.x, player.y, e.x, e.y) <= hitR + e.r) targets.push(e);
     }
-    player.slashCd = 0.46;
-    player.slashAnim = 1.2;
+    beginSlash(0.46, 1.2);
     finishSpin = 1;
     player.heavy = 0.22;
     sfx("slash");
@@ -3417,8 +3478,7 @@
   function doSlash(target) {
     if (player.slashCd > 0) return;
     if (combo >= 8) { doFinisher(); return; }
-    player.slashCd = 0.28;
-    player.slashAnim = 1;
+    const feel = beginSlash(0.28, 1);
     player.face = Math.atan2(target.y - player.y, target.x - player.x);
     player.flip = target.x < player.x;
     sfx("slash");
@@ -3431,7 +3491,7 @@
     hitEnemy(target, dmg, crit);
     enemies.forEach(function (e) {
       if (e === target) return;
-      if (dist(e.x, e.y, target.x, target.y) < 1.25) hitEnemy(e, Math.max(1, (dmg * 0.5) | 0), false);
+      if (dist(e.x, e.y, target.x, target.y) < feel.splash) hitEnemy(e, Math.max(1, (dmg * 0.5) | 0), false);
     });
   }
 
@@ -3479,16 +3539,22 @@
       syncHud();
       return;
     }
+    const feel = applyWeaponOnHit(e);
     const ang = Math.atan2(e.y - player.y, e.x - player.x);
-    tryMove(e, e.x + Math.cos(ang) * 0.28, e.y + Math.sin(ang) * 0.28);
+    const knock = Math.max(player.heavy > 0 ? 0.4 : 0.28, feel.knock);
+    tryMove(e, e.x + Math.cos(ang) * knock, e.y + Math.sin(ang) * knock);
     if (player.leech > 0) {
       player.hp = Math.min(player.maxhp, player.hp + dmg * player.leech);
     }
     dmgFloat(e.x + rnd(-0.2, 0.2), e.y - e.r - 0.25, crit ? dmg + "!" : "" + dmg, crit ? "#fde68a" : "#fff7ed", 0.75);
     burst(e.x, e.y, crit ? "#fde68a" : "#fb923c", crit ? 8 : 5);
+    if (feel.fire) burst(e.x, e.y, "#f97316", 3);
     shake = Math.max(shake, crit ? 6 : 3);
     screenFlash(player.heavy > 0 ? 0.1 : 0.05, crit || player.heavy > 0 ? "253,230,138" : "251,146,60");
     if (player.heavy > 0) hitstop = Math.max(hitstop, 0.04);
+    if (player.heavy > 0 || crit) {
+      punchCam(isBossType(e.type) ? 4 : e.elite ? 3.4 : player.heavy > 0 ? 3 : 2.4, e.x - player.x, e.y - player.y);
+    }
     syncHud();
     if (e.hp <= 0) killEnemy(e);
   }
@@ -3496,7 +3562,7 @@
   function dashStrike(e) {
     player.dash = e;
     player.tx = e.x; player.ty = e.y;
-    if (dist(player.x, player.y, e.x, e.y) <= player.slashR) doSlash(e);
+    if (dist(player.x, player.y, e.x, e.y) <= slashReach()) doSlash(e);
   }
 
   function dodge(dx, dy) {
@@ -3545,7 +3611,7 @@
   }
   function slashBolts() {
     const fx = Math.cos(player.face || 0), fy = Math.sin(player.face || 0);
-    const reach = 1.95;
+    const reach = slashReach() * 0.95;
     let n = 0;
     for (let i = shots.length - 1; i >= 0; i--) {
       const sh = shots[i];
@@ -3593,7 +3659,7 @@
 
   function bestSlashTarget() {
     const fx = Math.cos(player.face), fy = Math.sin(player.face);
-    const reach = player.slashR + 1.05;
+    const reach = slashReach() + 1.05;
     let best = null, score = 1e9;
     for (let i = 0; i < enemies.length; i++) {
       const e = enemies[i];
@@ -3655,35 +3721,36 @@
     if (player.slashCd > 0 || player.dead) return;
     if (phase !== "fight" && phase !== "loot") return;
     if (combo >= 8) { doFinisher(); return; }
+    const feel = weaponFeel();
     const fx = Math.cos(player.face), fy = Math.sin(player.face);
     player.flip = fx < 0;
     if (phase === "fight") {
       const t = bestSlashTarget();
-      if (t && dist(player.x, player.y, t.x, t.y) <= player.slashR + 1.15) {
+      if (t && dist(player.x, player.y, t.x, t.y) <= slashReach() + 1.15) {
         dashStrike(t);
-        if (dist(player.x, player.y, t.x, t.y) <= player.slashR) player.dash = null;
+        if (dist(player.x, player.y, t.x, t.y) <= slashReach()) player.dash = null;
         return;
       }
     }
-    player.slashCd = 0.28;
-    player.slashAnim = 1;
+    beginSlash(0.28, 1);
     sfx("slash");
     fireSlashWave();
     slashBolts();
     tryCrackSecret();
     trySmashTablet();
-    const hitR = player.slashR * 0.88;
+    const hitR = slashReach() * (feel.heavy ? 1.05 : feel.fast ? 0.78 : 0.88);
     for (let i = 0; i < enemies.length; i++) {
       const e = enemies[i];
       const dx = e.x - player.x, dy = e.y - player.y;
       const d = Math.hypot(dx, dy) || 0.001;
       if (d > hitR + e.r) continue;
-      if ((dx * fx + dy * fy) / d > 0.18) {
+      if ((dx * fx + dy * fy) / d > feel.cone) {
         const crit = rng() < player.crit;
         hitEnemy(e, slashDmg(crit), crit);
       }
     }
-    burst(player.x + fx * 0.55, player.y + fy * 0.55, "#fb923c", 4);
+    burst(player.x + fx * 0.55, player.y + fy * 0.55, "#fb923c", feel.fire ? 7 : 4);
+    if (feel.fire) burst(player.x + fx * 0.8, player.y + fy * 0.8, "#f97316", 4);
   }
 
   function startCharge() {
@@ -3710,26 +3777,26 @@
     if (phase !== "fight" && phase !== "loot") return;
     const fx = Math.cos(player.face || 0), fy = Math.sin(player.face || 0);
     player.flip = fx < 0;
-    player.slashCd = 0.5;
-    player.slashAnim = 1.2;
+    const feel = beginSlash(0.5, 1.2);
     player.heavy = 0.38;
     tryMove(player, player.x + fx * 0.95, player.y + fy * 0.95);
     sfx("slash");
     beep(150, 0.14, "sawtooth", 0.07, 55);
     shake = Math.max(shake, 8);
     hitstop = 0.04;
+    punchCam(2.6, fx, fy);
     screenFlash(0.14, "253,230,138");
     fireSlashWave();
     slashBolts();
     tryCrackSecret();
     trySmashTablet();
-    const hitR = player.slashR * 1.55;
+    const hitR = slashReach() * (feel.heavy ? 1.7 : feel.fast ? 1.4 : 1.55);
     for (let i = 0; i < enemies.length; i++) {
       const e = enemies[i];
       const dx = e.x - player.x, dy = e.y - player.y;
       const d = Math.hypot(dx, dy) || 0.001;
       if (d > hitR + e.r) continue;
-      if ((dx * fx + dy * fy) / d > -0.28) {
+      if ((dx * fx + dy * fy) / d > (feel.heavy ? -0.42 : feel.fast ? -0.14 : -0.28)) {
         const crit = rng() < player.crit + 0.08;
         hitEnemy(e, Math.round(slashDmg(crit) * 1.8), crit);
         if (depth > 1) e.burn = Math.max(e.burn || 0, 2.5);
@@ -4671,6 +4738,15 @@
       e.flash = Math.max(e.flash, 0.06);
       return;
     }
+    if (e.slow > 0) {
+      e.slow -= dt;
+      if (e.slow <= 0) e.frost = false;
+    }
+    if (e._spdSave != null) {
+      if (e.speed !== 0) e.speed = e._spdSave;
+      e._spdSave = null;
+    }
+    if (e.slow > 0 && e.speed !== 0) { e._spdSave = e.speed; e.speed *= 0.52; }
     if (e.burn > 0) {
       e.burn -= dt;
       e.burnTick = (e.burnTick || 0) - dt;
@@ -4911,7 +4987,7 @@
       if (d < 1.2 && !e._boomed) {
         e._boomed = true;
         e.boom = 0.7;
-        e.speed = 0;
+        e.speed = 0; e._spdSave = null;
         e.wind = 0;
         floats.push({ x: e.x, y: e.y - 0.5, t: 0.65, text: "!", col: "#fb923c" });
       }
@@ -5017,6 +5093,7 @@
     if (doorAnim > 0) doorAnim = Math.max(0, doorAnim - dt);
     if (banner.t > 0) banner.t -= dt;
     shake = Math.max(0, shake - dt * 22);
+    camPunch = Math.max(0, camPunch - dt * 36);
     flash = Math.max(0, flash - dt * 3);
     if (comboT > 0) {
       comboT -= dt;
@@ -5153,7 +5230,7 @@
       if (player.dash && player.dash.hp > 0) {
         player.tx = player.dash.x; player.ty = player.dash.y;
         const d = dist(player.x, player.y, player.dash.x, player.dash.y);
-        if (d <= player.slashR) {
+        if (d <= slashReach()) {
           doSlash(player.dash);
           player.dash = null;
           player.tx = null;
@@ -5696,10 +5773,20 @@
       blit(fr, wx, wy - 0.12, false, false, 1.4);
       blit(fr, wx, wy - 0.12, true, false, 1.15);
     } else if (slashAmt > 0) {
+      const feel = weaponFeel();
       const fr = slashAmt > 0.66 ? spr.slash1 : slashAmt > 0.33 ? spr.slash2 : spr.slash3;
-      const ox = flip ? -0.85 : 0.85;
-      blit(fr, wx + ox, wy - 0.15, flip, false, player.heavy > 0 ? 1.45 : 1);
-      if (player.heavy > 0) blit(fr, wx + ox * 1.25, wy - 0.35, flip, false, 1.2);
+      const ox = (flip ? -0.85 : 0.85) * (feel.heavy ? 1.12 : feel.fast ? 0.78 : 1);
+      const sc = (player.heavy > 0 ? 1.45 : 1) * feel.slashScale * (feel.epic ? 1.08 : 1);
+      blit(fr, wx + ox, wy - 0.15, flip, false, sc);
+      if (player.heavy > 0 || feel.heavy) blit(fr, wx + ox * 1.25, wy - 0.35, flip, false, 1.2 * feel.slashScale);
+      if (feel.fire) {
+        ctx.globalAlpha = 0.4 * slashAmt;
+        ctx.fillStyle = "#fb923c";
+        ctx.beginPath();
+        ctx.arc(sx(wx + ox * 0.65), sy(wy - 0.18), TILE * 0.32 * feel.slashScale, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
     }
     if (player.charging) {
       const ready = player.chargeReady;
@@ -5836,6 +5923,12 @@
       ctx.beginPath();
       ctx.arc(sx(e.x), sy(e.y) - TILE * 0.3, TILE * 0.38, 0, Math.PI * 2);
       ctx.stroke();
+    }
+    if (e.burn > 0) {
+      ctx.fillStyle = "rgba(251,146,60," + (0.26 + 0.16 * Math.sin(tick * 14)) + ")";
+      ctx.beginPath();
+      ctx.arc(sx(e.x), sy(e.y) - TILE * 0.32, TILE * 0.2, 0, Math.PI * 2);
+      ctx.fill();
     }
     if (e.type === "wisp" && e.glow) {
       ctx.save();
@@ -6059,9 +6152,10 @@
   function draw() {
     const ox = (Math.random() - 0.5) * shake;
     const oy = (Math.random() - 0.5) * shake;
+    const punch = camPunch > 4 ? 4 : camPunch;
     ctx.save();
     ctx.imageSmoothingEnabled = false;
-    ctx.translate(ox, oy);
+    ctx.translate(ox + camPx * punch, oy + camPy * punch);
     ctx.fillStyle = THEME ? THEME.fog : "#0a0706";
     ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = "#080506";
