@@ -2248,6 +2248,62 @@
   function bossTitle(t) {
     return t === "boneking" ? "BONE KING" : t === "ashwitch" ? "ASH WITCH" : t === "hollowtwin" ? "HOLLOW TWIN" : t === "heart" ? "HEART OF THE PIT" : "PIT LORD";
   }
+  function bossTint(t) {
+    return t === "boneking" ? "#e2e8f0" : t === "ashwitch" ? "#fb923c" : t === "hollowtwin" ? "#c4b5fd" : t === "heart" ? "#fb7185" : "#fde68a";
+  }
+  function bossRgb(t) {
+    return t === "boneking" ? "226,232,240" : t === "ashwitch" ? "251,146,60" : t === "hollowtwin" ? "196,181,253" : t === "heart" ? "251,113,133" : "253,230,138";
+  }
+  function bossPhaseLine(t) {
+    return t === "boneking" ? "THE CROWN CRACKS" : t === "ashwitch" ? "ASHES RISE" : t === "hollowtwin" ? "THE TWIN SPLITS" : t === "heart" ? "IT BEATS" : "THE PIT STIRS";
+  }
+  function stingBoss(t, prefix) {
+    const name = bossTitle(t);
+    banner = { t: 1.4, text: prefix ? (prefix + name) : name };
+    showToast(name, bossTint(t), 1.5);
+    screenFlash(0.12, bossRgb(t));
+    hitstop = Math.max(hitstop, 0.055);
+    shake = Math.max(shake, 5);
+    sfx("clear");
+  }
+  function enrageBoss(e) {
+    if (!e) return;
+    e.bossPhase = 2;
+    if (e.type === "boss") { e.speed *= 1.12; e.cd = Math.max(0.58, e.cd * 0.78); }
+    else if (e.type === "boneking") { e.speed *= 1.08; e.cd = Math.max(0.58, e.cd * 0.82); }
+    else if (e.type === "ashwitch") { e.speed *= 1.06; e.cd = Math.max(0.55, e.cd * 0.72); }
+    else if (e.type === "hollowtwin") { e.speed *= 1.1; e.cd = Math.max(0.55, e.cd * 0.8); }
+    else if (e.type === "heart") { e.speed *= 1.18; e.cd = Math.max(0.58, e.cd * 0.72); }
+  }
+  function enterBossPhase2(e) {
+    if (!e || (e.bossPhase || 1) >= 2) return false;
+    enrageBoss(e);
+    e.splitGuard = 0.42;
+    const line = bossPhaseLine(e.type);
+    banner = { t: 1.05, text: e.type === "hollowtwin" ? "SPLIT" : "PHASE 2" };
+    showToast(line, bossTint(e.type), 1.35);
+    floats.push({ x: e.x, y: e.y - 0.9, t: 0.72, text: "PHASE 2", col: "#fde68a" });
+    hitstop = Math.max(hitstop, 0.09);
+    punchCam(4, e.x - player.x, e.y - player.y);
+    shake = Math.max(shake, 10);
+    screenFlash(0.16, "253,230,138");
+    burst(e.x, e.y, "#fde68a", 16);
+    sfx("boom");
+    return true;
+  }
+  function maybeBossPhase(e) {
+    if (!e || !isBossType(e.type)) return false;
+    if (e.type === "hollowtwin" && !e.twin && e.hp <= e.maxhp * 0.5) {
+      if (e.hp <= 0) e.hp = 1;
+      splitHollowTwin(e);
+      return true;
+    }
+    if ((e.bossPhase || 1) < 2 && e.hp > 0 && e.hp <= e.maxhp * 0.5) {
+      enterBossPhase2(e);
+      return true;
+    }
+    return false;
+  }
   function applyStatus(kind, dur) {
     if (depth === 1 || player.dead) return;
     const af = armorFeel();
@@ -2401,7 +2457,8 @@
       elite: !!elite, swoopT: 0, sx: c.x, sy: c.y,
       burn: 0, burnTick: 0, slow: 0, summonT: 2.8, teleT: 2.4, casting: false,
       glow: 0, glowT: type === "wisp" ? 1.0 : 0,
-      stun: 0, frost: false, stash: 0, twin: false, splitGuard: 0, pulse: 0, clangs: 0
+      stun: 0, frost: false, stash: 0, twin: false, splitGuard: 0, pulse: 0, clangs: 0,
+      bossPhase: 1
     });
     e.maxhp = e.hp;
     if (depth === 1 && type === "slime") { e.hp = e.maxhp = 18; e.dmg = 6; e.speed = 1.35; }
@@ -2530,7 +2587,7 @@
       phase = "fight";
       lastBoss = practiceBoss;
       spawnEnemy(practiceBoss, COLS * 0.5, ROWS * 0.42, false, false);
-      banner = { t: 1.25, text: "PRACTICE · " + bossTitle(practiceBoss) };
+      stingBoss(practiceBoss, "PRACTICE · ");
       startDrone();
     } else if (runHorde) {
       phase = "fight";
@@ -2634,14 +2691,14 @@
       phase = "fight";
       lastBoss = "heart";
       spawnEnemy("heart", COLS * 0.5, ROWS * 0.42, false, false);
-      banner = { t: 1.35, text: "HEART OF THE PIT" };
+      stingBoss("heart");
       startDrone();
     } else if (roomKind === "boss") {
       phase = "fight";
       const bt = bossTypeFor(n);
       lastBoss = bt;
       spawnEnemy(bt, COLS * 0.5, ROWS * 0.42, false, false);
-      banner = { t: 1.25, text: bossTitle(bt) };
+      stingBoss(bt);
       startDrone();
     } else {
       phase = "fight";
@@ -3506,6 +3563,7 @@
 
   function splitHollowTwin(e) {
     if (!e || e.twin) return;
+    enterBossPhase2(e);
     e.twin = true;
     e.splitGuard = 0.5;
     const half = Math.max(1, Math.round(e.maxhp * 0.5));
@@ -3519,12 +3577,7 @@
     c.hp = c.maxhp = half;
     c.r = e.r;
     c.slam = null;
-    banner = { t: 0.85, text: "SPLIT" };
-    showToast("THE TWIN SPLITS", "#c4b5fd");
-    burst(e.x, e.y, "#c4b5fd", 18);
-    screenFlash(0.14, "167,139,250");
-    sfx("clear");
-    shake = Math.max(shake, 8);
+    enrageBoss(c);
   }
 
   function doFinisher() {
@@ -3625,11 +3678,9 @@
     bumpCombo();
     sfx("hit");
     vibe(12);
-    if (e.type === "hollowtwin" && !e.twin && e.hp <= e.maxhp * 0.5) {
-      if (e.hp <= 0) e.hp = 1;
-      splitHollowTwin(e);
+    if (maybeBossPhase(e)) {
       syncHud();
-      return;
+      if (e.type === "hollowtwin") return;
     }
     const feel = applyWeaponOnHit(e);
     const ang = Math.atan2(e.y - player.y, e.x - player.x);
@@ -4030,8 +4081,7 @@
     syncHud();
     syncClock();
     syncPauseGlyph();
-    if (runPractice) showToast("PRACTICE · " + bossTitle(practiceBoss), "#fde68a");
-    else if (runHorde) showToast("HORDE", "#fb923c");
+    if (runHorde) showToast("HORDE", "#fb923c");
     else if (ngPlus) unlockAch("ngplus");
     if (!runPractice && !runHorde) {
       if (runWeekly) showToast("WEEKLY · " + mutNames(), "#fde68a");
@@ -4835,11 +4885,7 @@
     dmgFloat(best.x, best.y - 0.45, "" + dmg, "#c4b5fd", 0.5);
     burst(best.x, best.y, "#a78bfa", 4);
     beep(640, 0.04, "square", 0.03, 380);
-    if (best.type === "hollowtwin" && !best.twin && best.hp <= best.maxhp * 0.5) {
-      if (best.hp <= 0) best.hp = 1;
-      splitHollowTwin(best);
-      return;
-    }
+    if (maybeBossPhase(best)) return;
     if (best.hp <= 0) killEnemy(best);
   }
   function updateEnemy(e, dt) {
@@ -4869,10 +4915,11 @@
         e.hp -= 3;
         e.flash = 0.08;
         floats.push({ x: e.x, y: e.y - e.r - 0.2, t: 0.45, text: "3", col: "#fb923c" });
+        if (maybeBossPhase(e)) return;
         if (e.hp <= 0) { killEnemy(e); return; }
       }
     }
-    if (e.affix === "regen" && e.hp > 0 && e.hp < e.maxhp) {
+    if (e.affix === "regen" && e.hp > 0 && e.hp < e.maxhp && (e.bossPhase || 1) < 2) {
       e.regenT = (e.regenT || 0) - dt;
       if (e.regenT <= 0) {
         e.regenT = 1;
@@ -4974,11 +5021,12 @@
     if (e.type === "heart") {
       e.pulse = (e.pulse || 0) + dt;
       e.face = Math.atan2(dy, dx);
+      const p2 = (e.bossPhase || 1) >= 2;
       if (!e.slam) {
         e.slamT -= dt;
         if (e.slamT <= 0) {
-          e.slam = { x: e.x, y: e.y, t: 0.72, dur: 0.72, r: 2.35 };
-          e.slamT = 2.05;
+          e.slam = { x: e.x, y: e.y, t: p2 ? 0.55 : 0.72, dur: p2 ? 0.55 : 0.72, r: p2 ? 2.48 : 2.35 };
+          e.slamT = p2 ? 1.5 : 2.05;
         }
       } else {
         e.slam.x = e.x;
@@ -4996,7 +5044,15 @@
       }
       e.atk = Math.max(0, e.atk - dt);
       if (e.atk <= 0 && d < 5.5 && d > 0.05) {
-        shots.push({ x: e.x, y: e.y - 0.2, vx: (dx / d) * 2.6, vy: (dy / d) * 2.6, dmg: Math.max(8, e.dmg - 6), life: 2.0 });
+        if (p2) {
+          const base = Math.atan2(dy, dx);
+          for (let i = -2; i <= 2; i++) {
+            const a = base + i * 0.36;
+            shots.push({ x: e.x, y: e.y - 0.2, vx: Math.cos(a) * 2.6, vy: Math.sin(a) * 2.6, dmg: Math.max(8, e.dmg - 6), life: 2.0 });
+          }
+        } else {
+          shots.push({ x: e.x, y: e.y - 0.2, vx: (dx / d) * 2.6, vy: (dy / d) * 2.6, dmg: Math.max(8, e.dmg - 6), life: 2.0 });
+        }
         e.atk = e.cd;
       }
       if (d > 0.85) tryMove(e, e.x + (dx / d) * e.speed * dt, e.y + (dy / d) * e.speed * dt);
@@ -5006,10 +5062,11 @@
 
     if (e.type === "ashwitch") {
       e.face = Math.atan2(dy, dx);
+      const p2 = (e.bossPhase || 1) >= 2;
       e.teleT = (e.teleT == null ? 2.4 : e.teleT) - dt;
-      if (e.teleT <= 0.5 && !e.casting) {
+      if (e.teleT <= (p2 ? 0.38 : 0.5) && !e.casting) {
         e.casting = true;
-        e.wind = 0.5;
+        e.wind = p2 ? 0.38 : 0.5;
         e.puddleX = player.x;
         e.puddleY = player.y;
       }
@@ -5022,8 +5079,9 @@
           e.x = dest.x; e.y = dest.y;
           burst(e.x, e.y, "#a78bfa", 10);
           puddles.push({ x: e.puddleX || player.x, y: e.puddleY || player.y, t: 2.5, r: 0.8, tick: 0.15 });
+          if (p2) puddles.push({ x: (e.puddleX || player.x) + 0.75, y: (e.puddleY || player.y) - 0.35, t: 2.0, r: 0.62, tick: 0.15 });
           e.casting = false;
-          e.teleT = 2.7;
+          e.teleT = p2 ? 1.85 : 2.7;
           e.wind = 0;
           screenFlash(0.1, "251,146,60");
         }
@@ -5035,7 +5093,15 @@
       else if (d > pref + 0.8) tryMove(e, e.x + (dx / d) * e.speed * dt, e.y + (dy / d) * e.speed * dt);
       e.atk = Math.max(0, e.atk - dt);
       if (e.atk <= 0 && d < 6.4) {
-        shots.push({ x: e.x, y: e.y - 0.25, vx: (dx / d) * 3.1, vy: (dy / d) * 3.1, dmg: e.dmg, life: 2.2, burn: true });
+        if (p2) {
+          const base = Math.atan2(dy, dx);
+          for (let i = -1; i <= 1; i++) {
+            const a = base + i * 0.38;
+            shots.push({ x: e.x, y: e.y - 0.25, vx: Math.cos(a) * 3.1, vy: Math.sin(a) * 3.1, dmg: e.dmg, life: 2.2, burn: true });
+          }
+        } else {
+          shots.push({ x: e.x, y: e.y - 0.25, vx: (dx / d) * 3.1, vy: (dy / d) * 3.1, dmg: e.dmg, life: 2.2, burn: true });
+        }
         e.atk = e.cd;
       }
       resolve(e);
@@ -5043,14 +5109,19 @@
     }
 
     if (e.type === "boss" || e.type === "warden" || e.type === "boneking" || e.type === "hollowtwin") {
+      const p2 = (e.bossPhase || 1) >= 2;
       if (e.type === "boneking") {
         e.summonT = (e.summonT == null ? 2.6 : e.summonT) - dt;
         if (e.summonT <= 0) {
-          e.summonT = 3.3;
+          e.summonT = p2 ? 2.15 : 3.3;
           let bats = 0;
           for (let i = 0; i < enemies.length; i++) if (enemies[i].type === "bat") bats++;
-          if (bats < 3) {
-            spawnEnemy("bat", e.x + srnd(-1.1, 1.1), e.y + srnd(-0.5, 0.7), true, false);
+          const cap = p2 ? 4 : 3;
+          const nSpawn = p2 && bats < cap - 1 ? 2 : 1;
+          if (bats < cap) {
+            for (let k = 0; k < nSpawn && bats + k < cap; k++) {
+              spawnEnemy("bat", e.x + srnd(-1.1, 1.1), e.y + srnd(-0.5, 0.7), true, false);
+            }
             floats.push({ x: e.x, y: e.y - 0.8, t: 0.6, text: "RISE", col: "#e2e8f0" });
           }
         }
@@ -5060,9 +5131,9 @@
       } else if (!e.slam) {
         e.slamT -= dt;
         if (e.slamT <= 0) {
-          const st = e.type === "warden" ? 0.62 : (e.type === "hollowtwin" ? 0.58 : 0.75);
+          const st = e.type === "warden" ? 0.62 : (e.type === "hollowtwin" ? 0.58 : (p2 ? 0.55 : 0.75));
           e.slam = { x: player.x, y: player.y, t: st, dur: st, r: e.type === "warden" ? 1.65 : (e.type === "hollowtwin" ? 1.7 : 2.15) };
-          e.slamT = e.type === "warden" ? 2.6 : (e.type === "hollowtwin" ? 2.4 : 3);
+          e.slamT = e.type === "warden" ? 2.6 : (e.type === "hollowtwin" ? 2.4 : (p2 ? 2.05 : 3));
         }
       } else {
         e.slam.t -= dt;
@@ -5170,7 +5241,7 @@
       if (d > e.range + player.r * 0.4) {
         tryMove(e, e.x + (dx / d) * e.speed * dt, e.y + (dy / d) * e.speed * dt);
       } else if (e.atk <= 0 && !e.slam) {
-        e.wind = e.type === "boss" || e.type === "boneking" ? 0.38 : e.type === "warden" ? 0.4 : e.type === "hollowtwin" ? 0.32 : 0.28;
+        e.wind = e.type === "boss" || e.type === "boneking" ? ((e.bossPhase || 1) >= 2 ? 0.26 : 0.38) : e.type === "warden" ? 0.4 : e.type === "hollowtwin" ? ((e.twin || (e.bossPhase || 1) >= 2) ? 0.24 : 0.32) : 0.28;
       }
     }
     resolve(e);
