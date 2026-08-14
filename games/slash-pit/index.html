@@ -182,6 +182,47 @@
       margin-top: 0.7rem !important; margin-bottom: 0;
       font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: #8a7060;
     }
+    #deathline {
+      margin-top: 0.38rem !important; font-size: 0.78rem; letter-spacing: 0.03em;
+      color: #8a7060; font-style: italic; max-width: 20rem;
+    }
+    .soul-tree {
+      width: min(20.4rem, 94vw); margin: 0.65rem auto 0; position: relative;
+      image-rendering: pixelated; image-rendering: crisp-edges;
+    }
+    .tree-crown {
+      width: 28px; height: 18px; margin: 0.15rem auto 0;
+      background:
+        linear-gradient(#166534 0 4px, transparent 4px) 6px 0 / 16px 4px no-repeat,
+        linear-gradient(#15803d 0 6px, transparent 6px) 2px 4px / 24px 6px no-repeat,
+        linear-gradient(#14532d 0 8px, transparent 8px) 0 10px / 28px 8px no-repeat;
+    }
+    .tree-trunk {
+      width: 8px; height: 16px; margin: 0 auto;
+      background: #5a3a20;
+      box-shadow: 2px 0 0 #2a1810, -2px 0 0 #3a2418;
+    }
+    .tree-row { display: flex; justify-content: space-between; gap: 0.32rem; }
+    .tree-fork {
+      height: 14px; margin: 0 2.15rem 0.08rem;
+      border: 3px solid #5a3a20; border-bottom: 0;
+      position: relative;
+    }
+    .tree-fork:before {
+      content: ""; position: absolute; left: 50%; top: -3px;
+      width: 3px; height: 17px; background: #5a3a20; transform: translateX(-50%);
+    }
+    .tree-node {
+      flex: 1; min-height: 4.05rem; padding: 0.32rem 0.22rem;
+      border: 2px solid #5a3a20; background: #1a100c; color: #c4b4a4;
+      font-size: 0.6rem; letter-spacing: 0.04em; text-transform: uppercase;
+      font-weight: 800; touch-action: manipulation; line-height: 1.2;
+    }
+    .tree-node.owned { border-color: #e85d04; color: #fde68a; background: #2a1408; }
+    .tree-node .tree-name { display: block; }
+    .tree-node .tree-desc { display: block; margin-top: 0.12rem; color: #8a7060; font-size: 0.5rem; letter-spacing: 0.03em; font-weight: 700; text-transform: none; }
+    .tree-node .tree-cost { display: block; margin-top: 0.16rem; color: #8a7060; font-size: 0.55rem; letter-spacing: 0.06em; }
+    .tree-node.owned .tree-cost { color: #86efac; }
 
     #gbsp {
       --dp: 108px; --bt: 60px; --arm: calc(var(--dp) / 3);
@@ -438,6 +479,7 @@
   const PITY_KEY = "slashpit-pity";
   const CAPE_KEY = "slashpit-cape";
   const STREAK_KEY = "slashpit-streak";
+  const TREE_KEY = "slashpit-tree";
   const CAPES = [
     { id: "cyan", name: "CYAN", col: "#22d3ee", dark: [14, 100, 122], lite: [34, 211, 238] },
     { id: "blood", name: "BLOOD", col: "#ef4444", dark: [88, 10, 14], lite: [220, 38, 38], need: 16 },
@@ -557,6 +599,20 @@
     { id: "axe", name: "Blood Axe", dmg: 12, need: 16 },
     { id: "hell", name: "Hellfang", dmg: 18, need: 24 }
   ];
+  const TREE_NODES = [
+    { id: "skin", name: "Thick Skin", cost: 8, desc: "+8 start HP" },
+    { id: "step", name: "Quick Step", cost: 10, desc: "+8% move" },
+    { id: "pockets", name: "Deep Pockets", cost: 12, desc: "+15% gold" },
+    { id: "crack", name: "Lucky Crack", cost: 14, desc: "secrets ~1-in-2" },
+    { id: "wind", name: "Second Wind", cost: 18, desc: "survive one killing blow" },
+    { id: "greedy", name: "Greedy Eyes", cost: 16, desc: "shops list a 4th item" }
+  ];
+  const DEATH_LINES = {
+    knight: ["Steel met steel. Steel won.", "The shield never dropped.", "A knight's last courtesy."],
+    boss: ["The pit's king took a bow.", "You were an offering.", "That name stays on the floor."],
+    hazard: ["The pit bites back.", "You stepped where the dead step.", "The floor collected its due."],
+    default: ["The pit keeps what it is given.", "Another soul for the drain.", "You fell. The dark did not."]
+  };
   const BIOMES = ["ember", "moss", "blood", "ash", "hell"];
   const DEEP_BIOMES = ["ember", "moss", "blood", "ash", "hell", "ice", "void"];
   const LAYOUT_IDS = ["hall", "chamber", "pillars", "arena", "lbend", "split", "treasury"];
@@ -682,6 +738,9 @@
   let playStreak = 0;
   let lastPlayDepth = 0;
   let runIsPlay = false;
+  let soulTree = { bought: [] };
+  let secondWindUsed = false;
+  let deathCause = "default";
 
   const ptr = { down: false, x: 0, y: 0, sx: 0, sy: 0, t: 0, id: null };
   const pad = { x: 0, y: 0, id: null, a: false, b: false };
@@ -919,6 +978,43 @@
     try { localStorage.setItem(UNLOCK_KEY, JSON.stringify(u)); } catch (e) {}
   }
   let unlocks = loadUnlocks();
+  function defaultTree() { return { bought: [] }; }
+  function loadTree() {
+    try {
+      const raw = localStorage.getItem(TREE_KEY);
+      if (!raw) return defaultTree();
+      const o = JSON.parse(raw);
+      const ids = {};
+      TREE_NODES.forEach(function (n) { ids[n.id] = 1; });
+      const bought = Array.isArray(o.bought) ? o.bought.filter(function (id) { return ids[id]; }) : [];
+      return { bought: bought };
+    } catch (e) { return defaultTree(); }
+  }
+  function saveTree(t) {
+    try { localStorage.setItem(TREE_KEY, JSON.stringify(t)); } catch (e) {}
+  }
+  soulTree = loadTree();
+  function treeHas(id) { return soulTree.bought.indexOf(id) >= 0; }
+  function treeDef(id) {
+    return TREE_NODES.filter(function (n) { return n.id === id; })[0];
+  }
+  function buyTreeNode(id) {
+    const def = treeDef(id);
+    if (!def) return;
+    if (treeHas(id)) { showToast("OWNED", "#86efac"); return; }
+    if (unlocks.souls < def.cost) {
+      showToast("NEED " + def.cost + " SOULS", "#fda4af");
+      sfx("clang");
+      return;
+    }
+    unlocks.souls -= def.cost;
+    saveUnlocks(unlocks);
+    soulTree.bought.push(id);
+    saveTree(soulTree);
+    showToast("SOUL · " + def.name.toUpperCase(), "#fde68a");
+    sfx("buy");
+    renderTitle();
+  }
   function loadAchs() {
     try {
       const raw = localStorage.getItem(ACH_KEY);
@@ -1750,6 +1846,8 @@
       epicPulse: false, epicPulseT: 0,
       poison: 0, burn: 0, slow: 0, poisonTick: 0, burnTick: 0, cursed: false
     });
+    if (treeHas("skin")) { player.maxhp += 8; player.hp += 8; }
+    if (treeHas("step")) player.speed *= 1.08;
     slots = { weapon: null, armor: null, relic: null, bag: null };
     setFlags = { junk: false, common: false, rare: false, epic: false };
     recap = [];
@@ -2064,12 +2162,15 @@
     else if (kind === "slow") player.slow = Math.max(player.slow || 0, dur);
   }
   function tickDot(kind) {
-    if (player.dead) return;
+    if (player.dead || player.iframes > 0) return;
     const dmg = kind === "poison" ? 3 : 4;
     player.hp -= dmg;
     screenFlash(0.08, kind === "poison" ? "74,222,128" : "251,146,60");
     dmgFloat(player.x, player.y - 0.7, "" + dmg, kind === "poison" ? "#4ade80" : "#fb923c", 0.55);
-    if (player.hp <= 0) { player.hp = 0; player.dead = true; dieRun(); }
+    if (player.hp <= 0) {
+      if (trySecondWind()) { syncHud(); return; }
+      player.hp = 0; player.dead = true; deathCause = "hazard"; dieRun();
+    }
     syncHud();
   }
   function fireSlashWave() {
@@ -2119,6 +2220,7 @@
     n = Math.max(1, n | 0);
     if (ngPlus) n = Math.max(1, Math.round(n * 1.3));
     if (hasMut("rich")) n = Math.max(1, n * 2);
+    if (treeHas("pockets")) n = Math.max(1, Math.round(n * 1.15));
     gold += n;
     if (!runPractice) bumpStat("gold", n);
     if (x != null) {
@@ -2576,7 +2678,7 @@
   function placeSecret() {
     secret = null;
     if (depth === 1 || roomKind === "shop" || roomKind === "rest" || roomKind === "heart") return;
-    if (rng() > 0.34) return;
+    if (rng() > (treeHas("crack") ? 0.5 : 0.34)) return;
     const cands = [];
     for (let ty = 0; ty < ROWS; ty++) {
       for (let tx = 0; tx < COLS; tx++) {
@@ -2772,20 +2874,24 @@
     return n >>> 0;
   }
 
-  function openShop() {
-    const items = [];
-    items.push(makeItem());
-    items.push(makeItem(depth >= 8 ? "common" : null));
-    if (rng() < 0.55) {
-      items.push({ kind: "flask", rarity: "common", name: "Heart Flask", heal: 36 + ((depth / 4) | 0) * 6 });
-    } else {
-      items.push(makeItem(depth >= 12 ? "rare" : "common"));
+  function shopSpots() {
+    if (treeHas("greedy")) {
+      return [
+        clampToWalkable(COLS * 0.20, ROWS * 0.46),
+        clampToWalkable(COLS * 0.40, ROWS * 0.40),
+        clampToWalkable(COLS * 0.60, ROWS * 0.40),
+        clampToWalkable(COLS * 0.80, ROWS * 0.46)
+      ];
     }
-    const spots = [
+    return [
       clampToWalkable(COLS * 0.28, ROWS * 0.48),
       clampToWalkable(COLS * 0.50, ROWS * 0.42),
       clampToWalkable(COLS * 0.72, ROWS * 0.48)
     ];
+  }
+  function openShop() {
+    const items = shopStock();
+    const spots = shopSpots();
     const rp = clampToWalkable(COLS * 0.5, ROWS * 0.64);
     shop = {
       sel: 0,
@@ -2805,6 +2911,7 @@
     items.push(makeItem(depth >= 8 ? "common" : null));
     if (rng() < 0.55) items.push({ kind: "flask", rarity: "common", name: "Heart Flask", heal: 36 + ((depth / 4) | 0) * 6 });
     else items.push(makeItem(depth >= 12 ? "rare" : "common"));
+    if (treeHas("greedy")) items.push(makeItem(depth >= 8 ? "common" : null));
     return items;
   }
   function tryRefresh() {
@@ -3097,7 +3204,7 @@
     sfx("boom");
     floats.push({ x: e.x, y: e.y - 0.4, t: 0.7, text: "BOOM", col: "#fb923c" });
     if (dist(player.x, player.y, e.x, e.y) < rad) {
-      hurtPlayer(Math.round(12 + depth * 0.6), player.x - e.x, player.y - e.y, "poison");
+      hurtPlayer(Math.round(12 + depth * 0.6), player.x - e.x, player.y - e.y, "hazard");
     }
     enemies.forEach(function (o) {
       if (o === e || o.hp <= 0) return;
@@ -3164,6 +3271,31 @@
     maybeClearRoom();
   }
 
+  function causeFrom(src) {
+    if (src === "knight" || src === "warden") return "knight";
+    if (src === "boss" || src === "boneking" || src === "ashwitch" || src === "hollowtwin" || src === "heart") return "boss";
+    if (src === "hazard" || src === "spike" || src === "poison" || src === "burn") return "hazard";
+    return "default";
+  }
+  function foeCause(e) {
+    if (!e) return "default";
+    return causeFrom(e.type);
+  }
+  function trySecondWind() {
+    if (secondWindUsed || !treeHas("wind") || player.dead) return false;
+    secondWindUsed = true;
+    player.hp = 1;
+    player.dead = false;
+    player.iframes = 1.0;
+    player.flash = 0.35;
+    screenFlash(0.22, "253,230,138");
+    burst(player.x, player.y, "#fde68a", 14);
+    floats.push({ x: player.x, y: player.y - 0.75, t: 0.95, text: "SECOND WIND", col: "#fde68a" });
+    showToast("SECOND WIND", "#fde68a");
+    sfx("pickup");
+    recap.push("SOUL · SECOND WIND");
+    return true;
+  }
   function hurtPlayer(dmg, ox, oy, src) {
     if (player.iframes > 0 || player.dead) return;
     if (player.cursed) dmg = Math.round(dmg * 1.35);
@@ -3183,8 +3315,10 @@
     player.dash = null;
     dmgFloat(player.x, player.y - 0.7, "" + dmg, "#fda4af", 0.7);
     if (player.hp <= 0) {
+      if (trySecondWind()) { syncHud(); return; }
       player.hp = 0;
       player.dead = true;
+      deathCause = causeFrom(src);
       dieRun();
     }
     syncHud();
@@ -3695,6 +3829,8 @@
     bumpStat("runs", 1);
     runEnded = false;
     boardSaved = false;
+    secondWindUsed = false;
+    deathCause = "default";
     knightHints = 0;
     runRarePlus = false;
     coached = {};
@@ -3773,6 +3909,8 @@
     if (runPractice) headline = "PRACTICE OVER";
     else if (runHorde) headline = "HORDE OVER";
     const recapLine = "Depth " + depth + " · " + clock + " · " + gold + " G";
+    const pool = DEATH_LINES[deathCause] || DEATH_LINES.default;
+    const epitaph = pool[(runSeed + depth) % pool.length];
     const canPity = first && !runPractice && !runHorde && depth < 3 && !runRarePlus && !pityState();
     let extra = "";
     if (runPractice) extra = " · " + esc(bossTitle(practiceBoss));
@@ -3782,6 +3920,7 @@
     if (!runPractice && !runHorde) extra += " · Best " + best;
     overlay.innerHTML =
       "<h2>" + headline + "</h2>" +
+      "<p id='deathline'>" + esc(epitaph) + "</p>" +
       "<p>" + recapLine + "</p>" +
       "<p id='seedline'>SEED " + seedLabel(runSeed) + extra + "</p>" +
       "<button class='btn btn-play' id='again' type='button'>PLAY AGAIN</button>" +
@@ -4046,7 +4185,7 @@
     if (paused) hidePauseOverlay();
     if (phase === "title") {
       if (titleMode === "help") { dismissHelpAndPlay(); return; }
-      if (titleMode === "unlocks" || titleMode === "stats" || titleMode === "codex" || titleMode === "board" || titleMode === "practice" || titleMode === "settings") return;
+      if (titleMode === "unlocks" || titleMode === "stats" || titleMode === "codex" || titleMode === "board" || titleMode === "practice" || titleMode === "settings" || titleMode === "tree") return;
       if (titleMode === "modes") { if (titleHasMode()) beginFromTitle(); return; }
       if (titleMode === "seed") { confirmSeed(); return; }
       playFairRun();
@@ -4359,6 +4498,14 @@
     const cdx = document.getElementById("codexbtn");
     if (cdx) cdx.addEventListener("click", function (e) { e.stopPropagation(); titleMode = "codex"; titleBackTo = "main"; renderTitle(); });
     if (unb) unb.addEventListener("click", function (e) { e.stopPropagation(); titleMode = "unlocks"; titleBackTo = "main"; renderTitle(); });
+    const trb = document.getElementById("treebtn");
+    if (trb) trb.addEventListener("click", function (e) { e.stopPropagation(); titleMode = "tree"; titleBackTo = "unlocks"; renderTitle(); });
+    overlay.querySelectorAll("[data-tree]").forEach(function (el) {
+      el.addEventListener("click", function (e) {
+        e.stopPropagation();
+        buyTreeNode(el.getAttribute("data-tree"));
+      });
+    });
     const stb = document.getElementById("statsbtn");
     if (stb) stb.addEventListener("click", function (e) { e.stopPropagation(); titleMode = "stats"; titleBackTo = "modes"; renderTitle(); });
     const brd = document.getElementById("boardbtn");
@@ -4546,7 +4693,7 @@
       e.thornT = (e.thornT || 0) - dt;
       if (e.thornT <= 0 && dist(player.x, player.y, e.x, e.y) < player.r + e.r + 0.05) {
         e.thornT = 0.55;
-        hurtPlayer(Math.max(2, Math.round(e.dmg * 0.22)), player.x - e.x, player.y - e.y);
+        hurtPlayer(Math.max(2, Math.round(e.dmg * 0.22)), player.x - e.x, player.y - e.y, foeCause(e));
         if (player.dead) return;
       }
     }
@@ -4596,7 +4743,7 @@
       if (e.wind > 0) {
         e.wind -= dt;
         if (e.wind <= 0 && dist(player.x, player.y, e.x, e.y) < e.range + player.r + 0.22) {
-          hurtPlayer(e.dmg, player.x - e.x, player.y - e.y);
+          hurtPlayer(e.dmg, player.x - e.x, player.y - e.y, foeCause(e));
         }
       }
       return;
@@ -4617,7 +4764,7 @@
           screenFlash(0.14, "168,162,158");
           burst(e.x, e.y, "#a8a29e", 16);
           if (dist(player.x, player.y, e.x, e.y) < e.slam.r + 0.2) {
-            hurtPlayer(e.dmg, player.x - e.x, player.y - e.y);
+            hurtPlayer(e.dmg, player.x - e.x, player.y - e.y, foeCause(e));
           }
           e.slam = null;
           e.wind = 0;
@@ -4652,7 +4799,7 @@
           screenFlash(0.18, "220,20,60");
           burst(e.x, e.y, "#9b1d20", 20);
           if (dist(player.x, player.y, e.x, e.y) < e.slam.r + 0.2) {
-            hurtPlayer(e.dmg, player.x - e.x, player.y - e.y);
+            hurtPlayer(e.dmg, player.x - e.x, player.y - e.y, foeCause(e));
           }
           e.slam = null;
         }
@@ -4734,7 +4881,7 @@
           screenFlash(0.16, "239,68,68");
           burst(e.slam.x, e.slam.y, "#ef4444", e.type === "warden" ? 12 : 16);
           if (dist(player.x, player.y, e.slam.x, e.slam.y) < e.slam.r + 0.22) {
-            hurtPlayer(e.dmg, player.x - e.slam.x, player.y - e.slam.y);
+            hurtPlayer(e.dmg, player.x - e.slam.x, player.y - e.slam.y, foeCause(e));
           }
           e.slam = null;
         }
@@ -4790,7 +4937,7 @@
       if (e.wind > 0) {
         e.wind -= dt;
         if (e.wind <= 0 && dist(player.x, player.y, e.x, e.y) < e.range + player.r + 0.2) {
-          hurtPlayer(e.dmg, player.x - e.x, player.y - e.y);
+          hurtPlayer(e.dmg, player.x - e.x, player.y - e.y, foeCause(e));
         }
       } else e.atk = Math.max(0, e.atk - dt);
       resolve(e);
@@ -4802,7 +4949,7 @@
         e.wind -= dt;
         if (e.wind <= 0) {
           if (dist(player.x, player.y, e.x, e.y) < e.range + player.r + 0.38) {
-            hurtPlayer(e.dmg, player.x - e.x, player.y - e.y);
+            hurtPlayer(e.dmg, player.x - e.x, player.y - e.y, foeCause(e));
           }
           e.vuln = 0.35;
           e.atk = e.cd;
@@ -4823,7 +4970,7 @@
       e.wind -= dt;
       if (e.wind <= 0) {
         if (dist(player.x, player.y, e.x, e.y) < e.range + player.r + 0.18) {
-          hurtPlayer(e.dmg, player.x - e.x, player.y - e.y);
+          hurtPlayer(e.dmg, player.x - e.x, player.y - e.y, foeCause(e));
         }
         e.atk = e.cd;
         if (e.type === "warden") e.vuln = 0.35;
@@ -5093,7 +5240,7 @@
         continue;
       }
       if (dist(s.x, s.y, player.x, player.y) < player.r + 0.18) {
-        hurtPlayer(s.dmg, player.x - s.x, player.y - s.y, s.poison ? "poison" : (s.burn ? "burn" : null));
+        hurtPlayer(s.dmg, player.x - s.x, player.y - s.y, s.poison ? "poison" : (s.burn ? "burn" : "hazard"));
         if (s.burn) applyStatus("burn", 2.4);
         shots.splice(i, 1);
       }
@@ -5138,7 +5285,7 @@
         hz.tick = (hz.tick || 0) - dt;
         if (hz.tick <= 0) {
           hz.tick = 0.55;
-          hurtPlayer(Math.max(4, 4 + ((depth / 6) | 0)), 0, -0.15);
+          hurtPlayer(Math.max(4, 4 + ((depth / 6) | 0)), 0, -0.15, "hazard");
         }
       }
     }
@@ -6367,6 +6514,30 @@
       bindTitleButtons();
       return;
     }
+    if (titleMode === "tree") {
+      function nodeHtml(id) {
+        const def = treeDef(id);
+        const owned = treeHas(id);
+        return "<button type='button' class='tree-node" + (owned ? " owned" : "") + "' data-tree='" + id + "'>" +
+          "<span class='tree-name'>" + esc(def.name) + "</span>" +
+          "<span class='tree-desc'>" + esc(def.desc) + "</span>" +
+          "<span class='tree-cost'>" + (owned ? "OWNED" : def.cost + " SOULS") + "</span></button>";
+      }
+      overlay.innerHTML =
+        "<h2>SOUL TREE</h2>" +
+        "<p>Souls " + unlocks.souls + " · " + soulTree.bought.length + "/6 owned</p>" +
+        "<div class='soul-tree'>" +
+        "<div class='tree-crown' aria-hidden='true'></div>" +
+        "<div class='tree-trunk' aria-hidden='true'></div>" +
+        "<div class='tree-row'>" + nodeHtml("skin") + nodeHtml("step") + nodeHtml("pockets") + "</div>" +
+        "<div class='tree-fork' aria-hidden='true'></div>" +
+        "<div class='tree-row'>" + nodeHtml("crack") + nodeHtml("wind") + nodeHtml("greedy") + "</div>" +
+        "</div>" +
+        "<p class='menu-sub'>Spend souls. Nodes stay bought.</p>" +
+        "<button class='btn btn-sm' id='backbtn' type='button'>BACK</button>";
+      bindTitleButtons();
+      return;
+    }
     if (titleMode === "unlocks") {
       let rel = "";
       START_RELICS.forEach(function (r) {
@@ -6384,7 +6555,8 @@
       });
       overlay.innerHTML =
         "<h2>UNLOCKS</h2>" +
-        "<p>Best depth " + b + " · Souls " + unlocks.souls + " · " + unlockCount() + "/" + unlockTotal() + "</p>" +
+        "<p>Best depth " + b + " · Souls " + unlocks.souls + " · " + unlockCount() + "/" + unlockTotal() + " · Tree " + soulTree.bought.length + "/6</p>" +
+        "<div class='btn-row'><button class='btn btn-alt btn-sm' id='treebtn' type='button'>TREE</button></div>" +
         "<p class='menu-sub'>Class</p>" +
         classRowHtml() +
         "<p class='menu-sub'>Cape</p>" +
