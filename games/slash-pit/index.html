@@ -602,6 +602,8 @@
   let bombs = [];
   let bloodStains = [];
   let hitstop = 0;
+  let killCam = 0;
+  let pendingClear = false;
   let flashCol = "255,50,36";
   let paused = false;
   let hazards = [];
@@ -1208,24 +1210,13 @@
   }
 
   function initSprites() {
-    spr.hero = bake([
-      "................","......kkk.......",".....kSSSk......","....kShhhSk.....","....kSwwwSk.k...","....kSwCwSk.Sk..",".....kSSSk.kSk..","....kksssk.khk..","...kCssssCk.k...","...kssssssk.....","..kbksssskbk....","..kBBssssBBk....","...k..oo..k.....",".....ko.ok......",".....kS.Sk......",".....kk.kk......"
-    ]);
-    spr.heroW1 = bake([
-      "................","......kkk.......",".....kSSSk......","....kShhhSk.....","....kSwwwSk.k...","....kSwCwSk.Sk..",".....kSSSk.kSk..","....kksssk.khk..","...kCssssCk.k...","...kssssssk.....","..kbksssskbk....","..kBBssssBBk....","...k..oo..k.....","....ko...ok.....","....kS...Sk.....","....kk...kk....."
-    ]);
-    spr.heroW2 = bake([
-      "................","......kkk.......",".....kSSSk......","....kShhhSk.....","....kSwwwSk.k...","....kSwCwSk.Sk..",".....kSSSk.kSk..","....kksssk.khk..","...kCssssCk.k...","...kssssssk.....","..kbksssskbk....","..kBBssssBBk....","...k..oo..k.....","......kook......","......kSSk......","......kkkk......"
-    ]);
-    spr.heroSlash = bake([
-      "................","......kkk.......",".....kSSSk......","....kShhhSk.....","....kSwwwSk.....","....kSwCwSk.....",".....kSSSk......","....kkssskkkk...","...kCssssSShhk..","...ksssss.kSk...","..kbksss..kk....","..kBBsss.k......","...k..oo.k......",".....ko.ok......",".....kS.Sk......",".....kk.kk......"
-    ]);
-    spr.slime1 = bake([
-      "................","................","................","......kkkk......","....kkllllkk....","...kllggggllk...","..klgggggggglk..","..kggGggggGggk..","..kggkkggkkggk..","..kggggggggggk..","..kgggGggGgggk..","...kggggggggk...","....kkggggkk....","......kkkk......","................","................"
-    ]);
-    spr.slime2 = bake([
-      "................","................",".....kkkkkk.....","....kllllllk....","...klgggggglk...","..klgggggggglk..","..kggggggggggk..","..kggkkggkkggk..","..kggggggggggk..","...kggGggGggk...","....kggggggk....",".....kkggkk.....","......kkkk......","................","................","................"
-    ]);
+    spr.hero = bake(["................",".....kkkkk......","....kSSSSSk.....","....kShhhSk.....","....kSwwwSk.kk..","....kSSSSSk.SSk.",".....ksssk.kSSk.","....kksssk.khk..","...kCssssk.kk...","...kCsssssCk....","..kc.sssss.ck...","..kccssssscck...","...k..ooo..k....",".....koo.ok.....",".....kS..Sk.....",".....kk..kk....."]);
+    spr.heroW1 = bake(["................",".....kkkkk......","....kSSSSSk.....","....kShhhSk.....","....kSwwwSk.kk..","....kSSSSSk.SSk.",".....ksssk.kSSk.","....kksssk.khk..","...kCssssk.kk...","...kCsssssCk....","..kc.sssss.ck...","..kccssssscck...","...k..ooo..k....","....ko...ok.....","....kS...Sk.....","....kk...kk....."]);
+    spr.heroW2 = bake(["................",".....kkkkk......","....kSSSSSk.....","....kShhhSk.....","....kSwwwSk.kk..","....kSSSSSk.SSk.",".....ksssk.kSSk.","....kksssk.khk..","...kCssssk.kk...","...kCsssssCk....","..kc.sssss.ck...","..kccssssscck...","...k..ooo..k....","......kook......","......kSSk......","......kkkk......"]);
+    spr.heroSlash = bake(["................",".....kkkkk......","....kSSSSSk.....","....kShhhSk.....","....kSwwwSk.....","....kSSSSSk.....",".....ksssk......","....kkssskkkk...","...kCssssSShhk..","...kCssss.kSk...","..kc.sss..kk....","..kccsss.k......","...k..oo.k......",".....koo.ok.....",".....kS..Sk.....",".....kk..kk....."]);
+    spr.slime1 = bake(["................","................","................","......kkkk......","....kkllllkk....","...kllggggllk...","..klgggggggglk..","..klgwwggwwglk..","..kggkkggkkggk..","..kggggggggggk..","..kgggGggGgggk..","...kggggggggk...","....kkggggkk....","......kkkk......","................","................"]);
+    spr.slime3 = bake(["................","................",".......kk.......",".....kkllkk.....","....klgggglk....","...klgggggglk...","...kgwwggwwgk...","...kgkkggkkgk...","...kggggggggk...","...kggGggGggk...","....kggggggk....",".....kkggkk.....","......kook......","......kkkk......","................","................"]);
+    spr.slime2 = bake(["................","................",".....kkkkkk.....","....kllllllk....","...klgggggglk...","..klgggggggglk..","..klgwwggwwglk..","..kggkkggkkggk..","..kggggggggggk..","...kggGggGggk...","....kggggggk....",".....kkggkk.....","......kkkk......","................","................","................"]);
     spr.brute = bake([
       "........................","........kkkkkk..........",".......kEEEEEEEk........","......kEErrrrrrEk.......","......kEryyyyrrEk.......","......kEEryyyrEEk.......",".......kEE....EEk.......","......kkEEEEEEEEkk......",".....kEEeeeeeeeeEEk.....","....kEeeeeEEeeeeeeEk....","...kEeeeeEEeeeeeeeEk....","...kkeeeEEeeEEeeeekk....","...kEeeeEEeeEEeeeeEk....","...kEeeeeeeeeeeeeeEk....","....kEeeEEeeEEeeeEk.....","....kkkkEEeeEEkkkkk.....","......kOO.kk.OOk........","......kOO.kk.OOk........","......kEE....EEk........","......kEE....EEk........","......kEE....EEk........","......kkk....kkk........","........................","........................"
     ]);
@@ -1264,12 +1255,9 @@
     spr.spit2 = bake([
       "................","......kkk.......",".....kgggk......","....kgnnngk.....","....kgnkngk.....",".....kgggk.u....","....kkgggkk.....","...kgggggggk....","...kggNNgggk....","....kgggggk.....","....ko...ok.....","....k.....k.....","....kk...kk.....","................","................","................"
     ]);
-    spr.knight1 = bake([
-      "................",".....kkkk.......","....kiiiik......","....kihhh k.....","....kiwwwk......","...kkiiiiykk....","..kyyyyyyyy k...","..kySyyyySyk....","...kkssssk......","....kssssk......","....kI..Ik......","....kI..Ik......",".....o..o.......",".....kk.kk......","................","................"
-    ]);
-    spr.knight2 = bake([
-      "................",".....kkkk.......","....kiiiik......","....kihhhk......","....kiwwwk......","...kkiiii.......","..ksssssskyy....","..ksssssky yk...","...kkssskyyy....","....ksss.k......","....kI..Ik......","....kI..Ik......",".....o..o.......",".....kk.kk......","................","................"
-    ]);
+    spr.knight1 = bake(["................",".....kkkk.......","....kiiiik......","....kihhhik.kk..","....kiwwwik.IIk.","...kkiiiiikIIIk.","..kyyyyyyykIIIk.","..kySyyyySyIIIk.","...kkssssk.kkk..","....kssssk......","....kI..Ik......","....kI..Ik......",".....o..o.......",".....kk.kk......","................","................"]);
+    spr.knight3 = bake(["................",".....kkkk.......","....kiiiik......","....kihhhik.kk..","....kiwwwik.IIk.","...kkiiiiikIIIk.","..kyyyyyyykIIIk.","..kySyyyySyIIIk.","...kkssssk.kkk..","....kssssk......","....kI...Ik.....","....kI...Ik.....","....o....o......","....kk...kk.....","................","................"]);
+    spr.knight2 = bake(["................",".....kkkk.......","....kiiiik......","....kihhhik.....","....kiwwwik.....","...kkiiii.......","..ksssssskyykk..","..kssssskyIIIk..","...kkssskIIIIk..","....ksss.kkk....","....kI..Ik......","....kI..Ik......",".....o..o.......",".....kk.kk......","................","................"]);
     spr.bomber1 = bake([
       "................","................","......kkkk......","....kkrRRRkk....","...krRRRRRRrk...","..krRRqRRRqRrk..","..kRRRkkRRkkRRk.","..kRRRRRRRRRRk..","...kRRRfRRRRk...","....kkRRRRkk....","......kkkk......","................","................","................","................","................"
     ]);
@@ -1308,15 +1296,12 @@
   }
 
   function initExtraSprites() {
-    spr.heroW3 = bake([
-      "................","......kkk.......",".....kSSSk......","....kShhhSk.....","....kSwwwSk.k...","....kSwCwSk.Sk..",".....kSSSk.kSk..","....kksssk.khk..","...kCssssCk.k...","...kssssssk.....","..kbksssskbk....","..kBBssssBBk....","...k..oo..k.....",".....kook.......",".....kSSk.......",".....kkk........"
-    ]);
-    spr.heroW4 = bake([
-      "................","......kkk.......",".....kSSSk......","....kShhhSk.....","....kSwwwSk.k...","....kSwCwSk.Sk..",".....kSSSk.kSk..","....kksssk.khk..","...kCssssCk.k...","...kssssssk.....","..kbksssskbk....","..kBBssssBBk....","...k..oo..k.....","....k.o.ok......","....k.S.Sk......","....k.k.kk......"
-    ]);
+    spr.heroW3 = bake(["................",".....kkkkk......","....kSSSSSk.....","....kShhhSk.....","....kSwwwSk.kk..","....kSSSSSk.SSk.",".....ksssk.kSSk.","....kksssk.khk..","...kCssssk.kk...","...kCsssssCk....","..kc.sssss.ck...","..kccssssscck...","...k..ooo..k....",".....kook.......",".....kSSk.......",".....kkk........"]);
+    spr.heroW4 = bake(["................",".....kkkkk......","....kSSSSSk.....","....kShhhSk.....","....kSwwwSk.kk..","....kSSSSSk.SSk.",".....ksssk.kSSk.","....kksssk.khk..","...kCssssk.kk...","...kCsssssCk....","..kc.sssss.ck...","..kccssssscck...","...k..ooo..k....","....k.o.ok......","....k.S.Sk......","....k.k.kk......"]);
     spr.bruteW = bake([
       "........................","........kkkkkk..........",".......kEEEEEEEk........","......kEErrrrrrEk.......","......kEryyyyrrEk.......","......kEEryyyrEEk.......",".......kEE....EEk.......","......kkEEEEEEEEkk......",".....kEEeeeeeeeeEEk.....","....kEeeeeEEeeeeeeEk....","...kEeeeeEEeeeeeeeEk....","...kkeeeEEeeEEeeeekk....","...kEeeeEEeeEEeeeeEk....","...kEeeeeeeeeeeeeeEk....","....kEeeEEeeEEeeeEk.....","....kkkkEEeeEEkkkkk.....",".....kOO..kk..OOk.......",".....kOO..kk..OOk.......",".....kEE......EEk.......",".....kEE......EEk.......",".....kkk......EEk.......","................kkk.....","........................","........................"
     ]);
+    spr.bruteW2 = bake(["........................","........kkkkkk..........",".......kEEEEEEEk........","......kEErrrrrrEk.......","......kEryyyyrrEk.......","......kEEryyyrEEk.......",".......kEE....EEk.......","......kkEEEEEEEEkk......",".....kEEeeeeeeeeEEk.....","....kEeeeeEEeeeeeeEk....","...kEeeeeEEeeeeeeeEk....","...kkeeeEEeeEEeeeekk....","...kEeeeEEeeEEeeeeEk....","...kEeeeeeeeeeeeeeEk....","....kEeeEEeeEEeeeEk.....","....kkkkEEeeEEkkkkk.....","...kOO..kk..OOk.........","...kOO..kk..OOk.........","...kEE......EEk.........","...kEE......EEk.........","...kEE......kkk.........","...kkk..................","........................","........................"]);
     spr.bruteAtk = bake([
       "........................","........kkkkkk..........",".......kEEEEEEEk........","......kEErrrrrrEk.......","......kEryyyyrrEk.......","......kEEryyyrEEk.kk....",".......kEE....EEkkEk....","......kkEEEEEEEEkrEk....",".....kEEeeeeeeeeEyEk....","....kEeeeeEEeeeeEkk.....","...kEeeeeEEeeeeeEk......","...kkeeeEEeeEEeeEk......","...kEeeeEEeeEEeeEk......","...kEeeeeeeeeeeeEk......","....kEeeEEeeEEeeEk......","....kkkkEEeeEEkkkk......","......kOO.kk.OOk........","......kOO.kk.OOk........","......kEE....EEk........","......kEE....EEk........","......kkk....kkk........","........................","........................","........................"
     ]);
@@ -1376,9 +1361,7 @@
     spr.spin2 = bake([
       "........................","........kwww............","......wCCCwww...........",".....wCCk..kCCw.........","....wCk......kCw........","....wk........kw........","....w..........w........",".....ww......ww.........","......wCCwwwwCk.........","........kkkk............","........................","........................"
     ]);
-    spr.heroBack = bake([
-      "................","......kkk.......",".....kSSSk......","....kSSSSSk.....","....kSSSSSk.k...","....kSSSSSk.Sk..",".....kSSSk.kSk..","....kksssk.khk..","...kssssssk.k...","...kssssssk.....","..kbksssskbk....","..kBBssssBBk....","....k.oo.k......",".....ko.ok......",".....kS.Sk......",".....kk.kk......"
-    ]);
+    spr.heroBack = bake(["................",".....kkkkk......","....kSSSSSk.....","....kSSSSSk.....","....kSSSSSk.kk..","....kSSSSSk.SSk.",".....ksssk.kSSk.","....kksssk.khk..","...kssssssk.k...","...kCsssssCk....","..kcCsssssCck...","..kccssssscck...","....k.ooo.k.....",".....koo.ok.....",".....kS..Sk.....",".....kk..kk....."]);
     spr.heart = bake(padBottom([
       "........kkkkkkkk........","......kkRRRRRRRRkk......",".....kRRRRqqRRRRRk......","....kRRRRyyyyRRRRRk.....","....kRRyywwwwyyRRRk.....","...kRRRyyyyyyyyRRRRk....","...kRRRRyyyyyyRRRRRk....","....kRRRRRqqRRRRRRk.....","....kRRRRRRRRRRRRk......",".....kRRRRRRRRRRk.......","......kRRRRRRRRk........",".......kRRRRRRk.........","........kRRRRk..........",".........kRRk...........","..........kk............"
     ], 20));
@@ -2110,6 +2093,34 @@
     return { type: "boss", hp: 220 + (cycle - 1) * 85, dmg: 22 + (cycle - 1) * 4, speed: 1.48 + (cycle - 1) * 0.07, r: 0.82, cr: 0.48, range: 1.18, cd: 1.05, slam: 3 };
   }
 
+  const AFFIX = {
+    haste: { tag: "HST", name: "Haste" },
+    regen: { tag: "REG", name: "Regenerator" },
+    thorny: { tag: "THN", name: "Thorny" },
+    giant: { tag: "GNT", name: "Giant" }
+  };
+  const AFFIX_IDS = ["haste", "regen", "thorny", "giant"];
+  function rollAffix(e) {
+    if (!e || !e.elite || depth <= 1 || e.affix) return;
+    const id = AFFIX_IDS[(rng() * AFFIX_IDS.length) | 0];
+    e.affix = id;
+    e.affixTag = AFFIX[id].tag;
+    if (id === "haste") e.speed *= 1.4;
+    if (id === "giant") {
+      e.r *= 1.3;
+      if (e.cr) e.cr *= 1.3;
+      e.range = (e.range || 0.9) * 1.15;
+      e.hp = e.maxhp = Math.round(e.maxhp * 1.3);
+    }
+  }
+  function maybeClearRoom() {
+    if (enemies.length || phase !== "fight" || (challenge && !challenge.done) || pendingClear) return;
+    if (roomKind === "boss" || roomKind === "heart" || runPractice) {
+      killCam = 0.35;
+      pendingClear = true;
+    } else clearRoom();
+  }
+
   function spawnEnemy(type, x, y, fast, elite) {
     if (type === "knight" && depth <= 2 && !runPractice) type = "slime";
     const d = enemyDef(type);
@@ -2135,6 +2146,7 @@
       e.maxhp = e.hp;
     }
     if (hasMut("fury") && type !== "shade") e.speed *= 1.35;
+    if (e.elite) rollAffix(e);
     enemies.push(e);
     coachFoe(type);
     return e;
@@ -2204,6 +2216,8 @@
     branchDoors = null;
     doorAnim = 0;
     finishSpin = 0;
+    killCam = 0;
+    pendingClear = false;
     wipeT = 0.2;
     paused = false;
     setPaused(false);
@@ -2380,6 +2394,7 @@
           el.elite = true;
           el.hp = el.maxhp = Math.round(el.maxhp * 2.15);
           el.dmg = Math.round(el.dmg * 1.25);
+          rollAffix(el);
         } else {
           spawnEnemy(n >= 4 ? "brute" : "bat", COLS * 0.5, ROWS * 0.4, false, true);
         }
@@ -2958,7 +2973,7 @@
     });
     enemies = enemies.filter(function (x) { return x !== e; });
     addGold(goldFor(e), e.x, e.y);
-    if (!enemies.length && phase === "fight" && !(challenge && !challenge.done)) clearRoom();
+    maybeClearRoom();
   }
 
   function killEnemy(e) {
@@ -3010,7 +3025,7 @@
       enemies = enemies.filter(function (x) { return x !== e; });
     }
     bumpStat("kills", 1);
-    if (!enemies.length && phase === "fight" && !(challenge && !challenge.done)) clearRoom();
+    maybeClearRoom();
   }
 
   function hurtPlayer(dmg, ox, oy, src) {
@@ -4346,6 +4361,21 @@
         if (e.hp <= 0) { killEnemy(e); return; }
       }
     }
+    if (e.affix === "regen" && e.hp > 0 && e.hp < e.maxhp) {
+      e.regenT = (e.regenT || 0) - dt;
+      if (e.regenT <= 0) {
+        e.regenT = 1;
+        e.hp = Math.min(e.maxhp, e.hp + Math.max(1, (e.maxhp * 0.04) | 0));
+      }
+    }
+    if (e.affix === "thorny" && !player.dead && player.iframes <= 0) {
+      e.thornT = (e.thornT || 0) - dt;
+      if (e.thornT <= 0 && dist(player.x, player.y, e.x, e.y) < player.r + e.r + 0.05) {
+        e.thornT = 0.55;
+        hurtPlayer(Math.max(2, Math.round(e.dmg * 0.22)), player.x - e.x, player.y - e.y);
+        if (player.dead) return;
+      }
+    }
     if (e.boom > 0) {
       e.boom -= dt;
       if (e.boom <= 0) explodeBomber(e);
@@ -5020,7 +5050,7 @@
     ctx.fillRect(sx(wx) - w * 0.38, sy(wy) - 1, w * 0.76, 2);
   }
 
-  function drawHpPip(wx, wy, hp, max, above) {
+  function drawHpPip(wx, wy, hp, max, above, tag) {
     const w = Math.max(18, TILE * 0.95), h = 4;
     const x = sx(wx) - w / 2, y = sy(wy) - above;
     ctx.fillStyle = "#0a0606";
@@ -5029,6 +5059,16 @@
     ctx.fillRect(x, y, w, h);
     ctx.fillStyle = "#e85d04";
     ctx.fillRect(x, y, w * clamp(hp / max, 0, 1), h);
+    if (tag) {
+      ctx.font = "800 8px ui-sans-serif, system-ui";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.fillStyle = "#3a2010";
+      ctx.fillText(tag, sx(wx) + 1, y - 1);
+      ctx.fillStyle = "#fde68a";
+      ctx.fillText(tag, sx(wx), y - 2);
+      ctx.textBaseline = "alphabetic";
+    }
   }
 
   function isBorder(tx, ty) {
@@ -5374,16 +5414,20 @@
   }
 
   function enemySprite(e) {
-    if (e.type === "slime") return Math.sin(e.bob * 6) > 0 ? spr.slime1 : spr.slime2;
+    if (e.type === "slime") { const f = ((e.bob * 5.2) | 0) % 3; return f === 0 ? spr.slime1 : f === 1 ? spr.slime2 : (spr.slime3 || spr.slime1); }
     if (e.type === "bat") return Math.sin(e.bob * 10) > 0 ? spr.bat1 : spr.bat2;
     if (e.type === "spitter") return (e.wind > 0 || e.atk > e.cd * 0.75) ? spr.spit2 : spr.spit1;
-    if (e.type === "knight" || e.type === "warden") return (e.wind > 0 || (e.slam && e.slam.t > 0.25)) ? spr.knight2 : spr.knight1;
+    if (e.type === "knight" || e.type === "warden") {
+      if (e.wind > 0 || (e.slam && e.slam.t > 0.25)) return spr.knight2;
+      return (((e.bob * 4) | 0) % 2 && spr.knight3) ? spr.knight3 : spr.knight1;
+    }
     if (e.type === "bomber") return (e.boom > 0 || Math.sin(e.bob * 7) > 0) ? spr.bomber2 : spr.bomber1;
     if (e.type === "mimic") return Math.sin(e.bob * 5) > 0 ? spr.mimic : spr.chestC;
     if (e.type === "brute") {
       if (e.wind > 0) return spr.bruteAtk;
       if (e.atk > e.cd * 0.7) return spr.brute;
-      return ((e.bob * 4) | 0) % 2 ? spr.bruteW : spr.brute;
+      const f = ((e.bob * 4) | 0) % 3;
+      return f === 1 ? spr.bruteW : (f === 2 && spr.bruteW2 ? spr.bruteW2 : spr.brute);
     }
     if (e.type === "shade") return (e.wind > 0) ? spr.knight2 : spr.knight1;
     if (e.type === "wisp") return e.glow ? spr.wisp2 : spr.wisp1;
@@ -5432,7 +5476,7 @@
       ctx.restore();
     }
     const span = e.type === "boss" || e.type === "boneking" || e.type === "heart" ? 1.35 : (e.type === "warden" || e.type === "golem" || e.type === "hollowtwin") ? 1.25 : (e.type === "brute" || e.type === "knight" || e.type === "mimic") ? 1.05 : 0.7;
-    footShadow(e.x, e.y, span);
+    footShadow(e.x, e.y, span * (e.affix === "giant" ? 1.3 : 1));
     if (e.wind > 0) {
       ctx.save();
       ctx.strokeStyle = "rgba(255,244,200," + (0.5 + 0.45 * Math.sin(tick * 22)) + ")";
@@ -5445,7 +5489,8 @@
     const s = enemySprite(e);
     const hurt = e.flash > 0 || e.wind > 0;
     const guardOpen = (e.type === "knight" || e.type === "warden") && shieldOpen(e);
-    const escale = e.type === "warden" ? 1.5 : (e.type === "boneking" ? 1.15 : (e.type === "golem" ? 1.2 : (e.type === "hollowtwin" ? (e.twin ? 0.82 : 1.08) : (e.type === "heart" ? 1.62 + Math.sin((e.pulse || 0) * 6.2) * 0.1 : 1))));
+    let escale = e.type === "warden" ? 1.5 : (e.type === "boneking" ? 1.15 : (e.type === "golem" ? 1.2 : (e.type === "hollowtwin" ? (e.twin ? 0.82 : 1.08) : (e.type === "heart" ? 1.62 + Math.sin((e.pulse || 0) * 6.2) * 0.1 : 1))));
+    if (e.affix === "giant") escale *= 1.3;
     if (e.type === "shade") ctx.globalAlpha = 0.42;
     blit(s, e.x, e.y, e.flip, (hurt && e.flash > 0) || guardOpen, escale);
     if (e.type === "shade") ctx.globalAlpha = 1;
@@ -5480,9 +5525,9 @@
       ctx.restore();
     }
     if (e.type === "knight" || e.type === "warden") drawShieldGleam(e, escale);
-    if (e.elite) blit(spr.star, e.x, e.y - 1.15, false, false);
-    const above = (s.h * (TILE / 16) * (e.type === "warden" ? 1.5 : 1)) + 6;
-    drawHpPip(e.x, e.y, e.hp, e.maxhp, above);
+    if (e.elite) blit(spr.star, e.x - (e.affixTag ? 0.36 : 0), e.y - 1.15, false, false);
+    const above = (s.h * (TILE / 16) * escale) + 6;
+    drawHpPip(e.x, e.y, e.hp, e.maxhp, above, e.affixTag);
   }
 
   function drawChest() {
@@ -5712,8 +5757,8 @@
     titleMobs.forEach(function (m) {
       list.push({ y: m.y, draw: function () {
         footShadow(m.x, m.y, m.type === "brute" ? 1.05 : 0.7);
-        const s = m.type === "brute" ? (((m.bob * 3) | 0) % 2 ? spr.bruteW : spr.brute)
-          : (Math.sin(m.bob * 6) > 0 ? spr.slime1 : spr.slime2);
+        const s = m.type === "brute" ? (((m.bob * 3) | 0) % 3 === 1 ? spr.bruteW : (((m.bob * 3) | 0) % 3 === 2 && spr.bruteW2 ? spr.bruteW2 : spr.brute))
+          : (((m.bob * 5.2) | 0) % 3 === 0 ? spr.slime1 : (((m.bob * 5.2) | 0) % 3 === 1 ? spr.slime2 : (spr.slime3 || spr.slime1)));
         blit(s, m.x, m.y, m.flip, false);
       }});
     });
@@ -5928,18 +5973,28 @@
     let dt = (ts - last) / 1000;
     last = ts;
     if (dt > 0.05) dt = 0.05;
+    const rawDt = dt;
     if (hitstop > 0) {
-      hitstop -= dt;
+      hitstop -= rawDt;
       if (hitstop < 0) hitstop = 0;
       draw();
       pid = requestAnimationFrame(loop);
       return;
+    }
+    if (killCam > 0 && !paused) {
+      killCam -= rawDt;
+      dt = rawDt * 0.22;
+      if (killCam < 0) killCam = 0;
     }
     for (let i = ghosts.length - 1; i >= 0; i--) {
       ghosts[i].t -= dt;
       if (ghosts[i].t <= 0) ghosts.splice(i, 1);
     }
     update(dt);
+    if (pendingClear && killCam <= 0 && !paused) {
+      pendingClear = false;
+      clearRoom();
+    }
     draw();
     pid = requestAnimationFrame(loop);
   }
@@ -6259,7 +6314,7 @@
     g.drawImage(src.c, 0, 0);
     const img = g.getImageData(0, 0, src.w, src.h);
     const lite = PAL.C, dark = PAL.c;
-    for (let y = 7; y < src.h; y++) {
+    for (let y = 0; y < src.h; y++) {
       for (let x = 0; x < src.w; x++) {
         const i = (y * src.w + x) * 4;
         if (img.data[i + 3] < 10) continue;
