@@ -1206,6 +1206,8 @@
     else if (name === "leapsquat") beep(140, 0.11, "triangle", 0.045, 70);
     else if (name === "leaphop") beep(180, 0.09, "square", 0.05, 340);
     else if (name === "leapland") { beep(85, 0.12, "triangle", 0.06, 45); beep(130, 0.07, "sine", 0.04); }
+    else if (name === "bowdraw") beep(210, 0.14, "triangle", 0.04, 360);
+    else if (name === "arrow") { beep(520, 0.05, "square", 0.045, 200); beep(170, 0.06, "triangle", 0.035); }
     else if (name === "vault") { beep(180, 0.08, "triangle", 0.06, 90); setTimeout(function () { beep(420, 0.07, "square", 0.05); }, 55); setTimeout(function () { beep(620, 0.1, "triangle", 0.05); }, 110); }
     else if (name === "phase2") { beep(70, 0.28, "sawtooth", 0.08, 40); setTimeout(function () { beep(110, 0.16, "square", 0.06); }, 90); setTimeout(function () { beep(165, 0.22, "triangle", 0.055); }, 180); }
     else if (name === "tick") beep(640, 0.028, "square", 0.035);
@@ -1554,6 +1556,15 @@
     ]);
     spr.leaper3 = bake([
       "................","................","................","....kkkkkkkk....","...kllllllllk...","..klgggggggglk..","..klgwwggwwglk..","..kggkkggkkggk..","..kggggGGggggk..","...kkggggggkk...","..kGkkkkkkkkGk..","..kG........Gk..","...kk......kk...","................","................","................"
+    ]);
+    spr.archer1 = bake([
+      "................",".....kkkk.......","....kAAAAAk.....","....kAhhhAk.k...","....kAwwwAkkAk..","...kkAAAAAkAAk..","..ksssssssAAkk..","..ksssssssAAk...","...kksssskAAk...","....ksssskAAk...","....kA..Ak.k....","....kA..Ak......",".....o..o.......",".....kk.kk......","................","................"
+    ]);
+    spr.archer2 = bake([
+      "................",".....kkkk.......","....kAAAAAk.....","....kAhhhAkCk...","....kAwwwAkCAk..","...kkAAAAACAk...","..ksssssssCAkk..","..ksssssssCAk...","...kksssskCAk...","....ksssskAAk...","....kA..Ak.k....","....kA..Ak......",".....o..o.......",".....kk.kk......","................","................"
+    ]);
+    spr.archer3 = bake([
+      "................",".....kkkk.......","....kAAAAAk.....","....kAhhhAk.....","....kAwwwAk.k...","...kkAAAA..kAk..",".kyyssssssAAkk..","..ksssssssAAk...","...kksssskAAk...","....ksss.AAk....","....kA..Ak......","....kA..Ak......",".....o..o.......",".....kk.kk......","................","................"
     ]);
   }
 
@@ -2277,7 +2288,8 @@
       bomber: ["BOMBER · walk out", "#fb923c"],
       wisp: ["WISP · wait for the glow", "#c4b5fd"],
       golem: ["GOLEM · dodge the wave", "#a8a29e"],
-      leaper: ["LEAPER · watch the shadow", "#86efac"]
+      leaper: ["LEAPER · watch the shadow", "#86efac"],
+      archer: ["ARCHER · slash the arrow", "#f59e0b"]
     };
     const tip = tips[type];
     if (!tip) return;
@@ -2479,6 +2491,7 @@
     if (type === "shade") return { type: "shade", hp: 40, dmg: 10, speed: 1.42, r: 0.42, cr: 0.28, range: 0.9, cd: 1.1 };
     if (type === "golem") return { type: "golem", hp: 118, dmg: 18, speed: 0.74, r: 0.72, cr: 0.46, range: 1.18, cd: 1.5, slam: 2.9 };
     if (type === "leaper") return { type: "leaper", hp: 26, dmg: 10, speed: 1.15, r: 0.4, cr: 0.26, range: 3.2, cd: 1.35 };
+    if (type === "archer") return { type: "archer", hp: 24, dmg: 9, speed: 1.22, r: 0.38, cr: 0.26, range: 3.7, cd: 1.55 };
     const cycle = Math.max(1, (depth / 8) | 0);
     if (type === "boneking") return { type: "boneking", hp: 200 + (cycle - 1) * 70, dmg: 20 + (cycle - 1) * 3, speed: 1.38 + (cycle - 1) * 0.06, r: 0.76, cr: 0.46, range: 1.1, cd: 1.08, slam: 3.1 };
     if (type === "ashwitch") return { type: "ashwitch", hp: 165 + (cycle - 1) * 60, dmg: 17 + (cycle - 1) * 3, speed: 1.62, r: 0.48, cr: 0.3, range: 2.55, cd: 1.15 };
@@ -2522,7 +2535,7 @@
   function spawnEnemy(type, x, y, fast, elite) {
     if (!runPractice) {
       if (depth === 1) {
-        if (type === "knight" || type === "leaper" || type === "bomber") type = "slime";
+        if (type === "knight" || type === "leaper" || type === "bomber" || type === "archer") type = "slime";
         elite = false;
       } else if (depth <= 3) {
         if (type === "knight" || type === "bomber") type = "slime";
@@ -2532,6 +2545,7 @@
           if (leaps >= 1) type = "slime";
         }
       }
+      if (depth <= 4 && type === "archer") type = "slime";
     }
     const d = enemyDef(type);
     const c = clampToWalkable(x, y);
@@ -2549,7 +2563,8 @@
       glow: 0, glowT: type === "wisp" ? 1.0 : 0,
       stun: 0, frost: false, stash: 0, twin: false, splitGuard: 0, pulse: 0, clangs: 0,
       bossPhase: 1,
-      hopT: 0, hopDur: 0, hopH: 0, hopWind: 0, hopMark: null
+      hopT: 0, hopDur: 0, hopH: 0, hopWind: 0, hopMark: null,
+      drawT: 0, drawDur: 0, hopUsed: false, stabT: 0
     });
     e.maxhp = e.hp;
     if (depth === 1 && type === "slime") { e.hp = e.maxhp = 18; e.dmg = 6; e.speed = 1.35; }
@@ -2591,10 +2606,10 @@
     if (n >= 2) pool.push("bat");
     if (n >= 3) pool.push("slime", "leaper");
     if (n >= 4) pool.push("spitter", "brute", "wisp");
-    if (n >= 5) pool.push("bomber");
+    if (n >= 5) pool.push("bomber", "archer");
     if (n >= 6) pool.push("knight");
     if (n >= 7) pool.push("golem");
-    if (n >= 10) pool.push("bat", "spitter", "knight", "wisp", "leaper");
+    if (n >= 10) pool.push("bat", "spitter", "knight", "wisp", "leaper", "archer");
     if (n >= 18) pool.push("bomber", "brute", "knight", "golem");
     const list = [];
     for (let i = 0; i < count; i++) list.push(spick(pool));
@@ -2608,6 +2623,9 @@
           if (n === 1 || leaps > 1) list[i] = "slime";
         }
       }
+    }
+    if (n <= 4) {
+      for (let i = 0; i < list.length; i++) if (list[i] === "archer") list[i] = "slime";
     }
     return { list: list, fast: n >= 5 && rng() < 0.45, chest: n >= 3 && rng() < 0.34, elite: false };
   }
@@ -2914,7 +2932,7 @@
     if (w >= 3) types.push("spitter", "wisp", "leaper");
     if (w >= 4) types.push("brute");
     if (w >= 6) types.push("bomber");
-    if (w >= 8) types.push("knight");
+    if (w >= 8) types.push("knight", "archer");
     if (w >= 10) types.push("golem");
     const n = Math.min(8, 2 + ((w - 1) / 2 | 0));
     for (let i = 0; i < n; i++) {
@@ -3528,6 +3546,7 @@
     if (e.type === "bomber") base = 7;
     if (e.type === "wisp") base = 7;
     if (e.type === "leaper") base = 8;
+    if (e.type === "archer") base = 7;
     if (e.type === "shade") return e.stash || 12;
     if (e.type === "golem") base = 16;
     if (e.type === "mimic") base = 18;
@@ -3573,7 +3592,7 @@
       floats.push({ x: e.x, y: e.y - 0.5, t: 0.6, text: "!", col: "#fb923c" });
       return;
     }
-    const col = e.type === "slime" || e.type === "leaper" ? "#4ade80" : e.type === "bat" ? "#a78bfa" : e.type === "wisp" ? "#c4b5fd" : e.type === "golem" ? "#a8a29e" : e.type === "spitter" ? "#2dd4bf" : e.type === "knight" || e.type === "warden" ? "#cbd5e1" : e.type === "bomber" ? "#fb923c" : e.type === "mimic" ? "#fbbf24" : e.type === "brute" ? "#c2410c" : e.type === "ashwitch" ? "#fb923c" : e.type === "boneking" ? "#e2e8f0" : e.type === "hollowtwin" ? "#c4b5fd" : e.type === "heart" ? "#fb7185" : "#9b1d20";
+    const col = e.type === "slime" || e.type === "leaper" ? "#4ade80" : e.type === "bat" ? "#a78bfa" : e.type === "wisp" ? "#c4b5fd" : e.type === "golem" ? "#a8a29e" : e.type === "spitter" ? "#2dd4bf" : e.type === "archer" ? "#f59e0b" : e.type === "knight" || e.type === "warden" ? "#cbd5e1" : e.type === "bomber" ? "#fb923c" : e.type === "mimic" ? "#fbbf24" : e.type === "brute" ? "#c2410c" : e.type === "ashwitch" ? "#fb923c" : e.type === "boneking" ? "#e2e8f0" : e.type === "hollowtwin" ? "#c4b5fd" : e.type === "heart" ? "#fb7185" : "#9b1d20";
     burst(e.x, e.y, col, isBossType(e.type) ? 22 : 16);
     bloodBurst(e.x, e.y, isBossType(e.type) ? 18 : 10);
     killPop(e.x, e.y, col, isBossType(e.type));
@@ -3953,8 +3972,8 @@
       const d = Math.hypot(dx, dy) || 0.001;
       if (d > reach) continue;
       if ((dx * fx + dy * fy) / d < 0.12) continue;
-      burst(sh.x, sh.y, "#5eead4", 7);
-      floats.push({ x: sh.x, y: sh.y - 0.28, t: 0.45, text: "CLANG", col: "#5eead4" });
+      burst(sh.x, sh.y, sh.arrow ? "#f59e0b" : "#5eead4", 7);
+      floats.push({ x: sh.x, y: sh.y - 0.28, t: 0.45, text: "CLANG", col: sh.arrow ? "#fbbf24" : "#5eead4" });
       shots.splice(i, 1);
       n++;
     }
@@ -5488,6 +5507,93 @@
       return;
     }
 
+    if (e.type === "archer") {
+      e.face = Math.atan2(dy, dx);
+      if (e.hopT > 0) {
+        e.hopT -= dt;
+        const dur = e.hopDur || 0.2;
+        const k = 1 - Math.max(0, e.hopT) / dur;
+        e.x = e.hopFromX + (e.hopToX - e.hopFromX) * k;
+        e.y = e.hopFromY + (e.hopToY - e.hopFromY) * k;
+        e.hopH = Math.sin(k * Math.PI) * 0.28;
+        if (e.hopT <= 0) {
+          const dest = clampToWalkable(e.hopToX, e.hopToY);
+          e.x = dest.x; e.y = dest.y;
+          e.hopH = 0; e.hopT = 0;
+        }
+        return;
+      }
+      if (e.stabT > 0) {
+        e.stabT -= dt;
+        e.wind = e.stabT;
+        if (e.stabT <= 0) {
+          e.wind = 0;
+          if (dist(player.x, player.y, e.x, e.y) < 1.15 + player.r) {
+            hurtPlayer(Math.max(5, Math.round(e.dmg * 0.7)), player.x - e.x, player.y - e.y, foeCause(e));
+          }
+          e.atk = e.cd * 0.55;
+        }
+        resolve(e);
+        return;
+      }
+      if (d < 1.28) {
+        e.drawT = 0;
+        e.wind = 0;
+        if (!e.hopUsed) {
+          const back = clampToWalkable(e.x - (dx / d) * 1.65, e.y - (dy / d) * 1.65);
+          e.hopUsed = true;
+          if (dist(back.x, back.y, e.x, e.y) < 0.45) {
+            e.stabT = 0.22;
+            e.wind = 0.22;
+          } else {
+            e.hopFromX = e.x; e.hopFromY = e.y;
+            e.hopToX = back.x; e.hopToY = back.y;
+            e.hopDur = 0.2; e.hopT = 0.2; e.hopH = 0;
+            e.wind = 0;
+            e.atk = 0.28;
+            burst(e.x, e.y, "#d97706", 5);
+            sfx("leaphop");
+          }
+          resolve(e);
+          return;
+        }
+        e.atk = Math.max(0, e.atk - dt);
+        if (e.atk <= 0) {
+          e.stabT = 0.22;
+          e.wind = 0.22;
+        }
+        resolve(e);
+        return;
+      }
+      if (e.drawT > 0) {
+        e.drawT -= dt;
+        e.wind = e.drawT;
+        if (e.drawT <= 0) {
+          e.wind = 0;
+          const nd = Math.hypot(dx, dy) || 1;
+          const arrowSpd = depth < 8 ? 2.55 : 2.95;
+          shots.push({ x: e.x, y: e.y - 0.18, vx: (dx / nd) * arrowSpd, vy: (dy / nd) * arrowSpd, dmg: e.dmg, life: 2.6, bolt: true, arrow: true });
+          burst(e.x + (dx / nd) * 0.35, e.y - 0.18 + (dy / nd) * 0.2, "#fbbf24", 4);
+          sfx("arrow");
+          e.atk = e.cd;
+        }
+        resolve(e);
+        return;
+      }
+      const pref = 3.45;
+      if (d < pref - 0.5) tryMove(e, e.x - (dx / d) * e.speed * dt, e.y - (dy / d) * e.speed * dt);
+      else if (d > pref + 0.75) tryMove(e, e.x + (dx / d) * e.speed * dt, e.y + (dy / d) * e.speed * dt);
+      e.atk = Math.max(0, e.atk - dt);
+      if (e.atk <= 0 && d < 6.4 && d > 1.35) {
+        e.drawT = 0.58;
+        e.drawDur = 0.58;
+        e.wind = 0.58;
+        sfx("bowdraw");
+      }
+      resolve(e);
+      return;
+    }
+
     if (e.type === "bat") {
       e.swoopT -= dt;
       if (e.swoopT <= 0) {
@@ -5901,7 +6007,7 @@
         const types = ["slime", "bat"];
         if (depth >= 5) types.push("spitter", "wisp");
         if (depth >= 6) types.push("leaper");
-        if (depth >= 8) types.push("brute");
+        if (depth >= 8) types.push("brute", "archer");
         const n = 1 + (challenge.wave > 2 ? 1 : 0);
         for (let i = 0; i < n; i++) {
           spawnEnemy(spick(types), COLS * (0.28 + rng() * 0.44), ROWS * (0.26 + rng() * 0.22), rng() < 0.35, false);
@@ -6380,6 +6486,7 @@
     if (e.type === "shade") return (e.wind > 0) ? spr.knight2 : spr.knight1;
     if (e.type === "wisp") return e.glow ? spr.wisp2 : spr.wisp1;
     if (e.type === "leaper") return e.hopT > 0 ? spr.leaper2 : (e.hopWind > 0 ? spr.leaper3 : spr.leaper1);
+    if (e.type === "archer") return e.stabT > 0 ? spr.archer3 : (e.drawT > 0 ? spr.archer2 : spr.archer1);
     if (e.type === "golem") return (e.slam && e.slam.t > 0.2) ? spr.golemSlam : spr.golem;
     if (e.type === "boneking") return (e.slam && e.slam.t > 0.2) ? spr.bonekingSlam : spr.boneking;
     if (e.type === "ashwitch") return (e.wind > 0 || e.casting) ? spr.ashwitchCast : spr.ashwitch;
@@ -6446,6 +6553,32 @@
       ctx.beginPath();
       ctx.arc(sx(e.x), sy(e.y) + 3, TILE * (0.34 + e.r * 0.14), 0, Math.PI * 2);
       ctx.stroke();
+      ctx.restore();
+    }
+
+    if (e.type === "archer" && e.drawT > 0) {
+      const k = 1 - e.drawT / (e.drawDur || 0.58);
+      const ang = e.face || 0;
+      const bx = e.x + Math.cos(ang) * 0.4;
+      const by = e.y - 0.22 + Math.sin(ang) * 0.18;
+      const pulse = 0.4 + 0.5 * k + 0.12 * Math.sin(tick * 22);
+      ctx.save();
+      ctx.strokeStyle = "rgba(251,191,36," + pulse + ")";
+      ctx.lineWidth = 1.6 + k * 1.4;
+      ctx.beginPath();
+      ctx.moveTo(sx(bx - Math.sin(ang) * 0.3), sy(by + Math.cos(ang) * 0.3));
+      ctx.lineTo(sx(bx + Math.sin(ang) * 0.3), sy(by - Math.cos(ang) * 0.3));
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(253,230,138," + (0.22 + k * 0.5) + ")";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(sx(bx), sy(by));
+      ctx.lineTo(sx(bx + Math.cos(ang) * (0.55 + k * 0.95)), sy(by + Math.sin(ang) * (0.55 + k * 0.95)));
+      ctx.stroke();
+      ctx.fillStyle = "rgba(251,191,36," + (0.16 + k * 0.32) + ")";
+      ctx.beginPath();
+      ctx.arc(sx(e.x), sy(e.y) - 8, TILE * (0.26 + k * 0.12), 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
     }
     const s = enemySprite(e);
@@ -6840,6 +6973,20 @@
         ctx.fillRect(sx(s.x) - 3, sy(s.y) - 3, 6, 6);
         ctx.fillStyle = "#fde68a";
         ctx.fillRect(sx(s.x) - 1, sy(s.y) - 1, 3, 3);
+      } else if (s.arrow) {
+        const ang = Math.atan2(s.vy, s.vx);
+        ctx.save();
+        ctx.translate(sx(s.x), sy(s.y));
+        ctx.rotate(ang);
+        ctx.fillStyle = "rgba(251,191,36,0.28)";
+        ctx.fillRect(-11, -4, 22, 8);
+        ctx.fillStyle = "#7c4a1e";
+        ctx.fillRect(-9, -1.5, 16, 3);
+        ctx.fillStyle = "#fbbf24";
+        ctx.fillRect(5, -2.5, 6, 5);
+        ctx.fillStyle = "#e8d5c0";
+        ctx.fillRect(-10, -2.5, 3, 5);
+        ctx.restore();
       } else if (s.bolt) {
         ctx.fillStyle = "rgba(45,212,191,0.38)";
         ctx.beginPath();
