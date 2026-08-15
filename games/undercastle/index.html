@@ -7,8 +7,355 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#0a080c" />
   <title>Undercastle</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%; height: 100dvh;
+      overflow: hidden; overscroll-behavior: none; touch-action: none;
+      background: #0a080c; color: #e8dcc8;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      user-select: none; -webkit-user-select: none;
+    }
+    #app {
+      display: flex; flex-direction: column;
+      width: 100%; height: 100%; height: 100dvh;
+    }
+    #stage { position: relative; flex: 1; min-height: 0; background: #0a080c; }
+    canvas {
+      display: block; width: 100%; height: 100%;
+      touch-action: none;
+      image-rendering: pixelated; image-rendering: crisp-edges;
+    }
+    #home {
+      position: absolute;
+      left: max(0.55rem, env(safe-area-inset-left, 0px));
+      top: max(0.4rem, env(safe-area-inset-top, 0px));
+      z-index: 8;
+      color: #cbb89a;
+      text-decoration: none;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.32rem 0.58rem;
+      border-radius: 999px;
+      background: rgba(12, 8, 8, 0.62);
+      border: 1px solid #4a3824;
+      box-shadow: 0 1px 0 #0008, inset 0 1px 0 #6a543888;
+      touch-action: manipulation;
+    }
+    #title {
+      position: absolute;
+      left: 50%; top: max(0.48rem, env(safe-area-inset-top, 0px));
+      transform: translateX(-50%);
+      z-index: 3; pointer-events: none;
+      font-size: 0.62rem; font-weight: 800;
+      letter-spacing: 0.28em; text-transform: uppercase;
+      color: #a89070;
+      text-shadow: 0 1px 0 #000a;
+    }
+    #hud {
+      position: absolute;
+      right: max(0.5rem, env(safe-area-inset-right, 0px));
+      top: max(0.38rem, env(safe-area-inset-top, 0px));
+      z-index: 4;
+      display: flex; align-items: center; gap: 0.45rem;
+    }
+    #stats {
+      pointer-events: none;
+      text-align: right;
+      font-size: 0.62rem; font-weight: 700;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: #9a8670;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.4;
+      text-shadow: 0 1px 2px #000c;
+    }
+    #mute {
+      width: 2.05rem; height: 2.05rem; padding: 0;
+      border-radius: 999px;
+      border: 1px solid #4a3824;
+      background: radial-gradient(circle at 40% 30%, #2c2218, #16110e);
+      color: #d4c0a0;
+      box-shadow: 0 1px 0 #0008, inset 0 1px 0 #6a543866;
+      touch-action: manipulation;
+    }
+    #mute svg { display: block; margin: 0 auto; }
+    #mute.off { color: #7a6a58; }
+    #mute.off .wave { display: none; }
+    #mute:not(.off) .slash { display: none; }
+    #tools {
+      display: flex; gap: 0.32rem; align-items: stretch;
+      padding: 0.42rem 0.42rem calc(0.48rem + env(safe-area-inset-bottom, 0px));
+      padding-left: max(0.42rem, env(safe-area-inset-left, 0px));
+      padding-right: max(0.42rem, env(safe-area-inset-right, 0px));
+      background:
+        linear-gradient(180deg, #3a2c1e 0%, #221810 6%, #140f0c 100%);
+      border-top: 1px solid #5a4430;
+      box-shadow: inset 0 1px 0 #7a604088, 0 -10px 28px #0006;
+    }
+    #tools button {
+      flex: 1; min-width: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 0.12rem;
+      min-height: 3.35rem;
+      padding: 0.28rem 0.1rem 0.3rem;
+      border-radius: 0.8rem;
+      border: 1px solid #2a2018;
+      border-bottom-color: #0e0a08;
+      background: linear-gradient(180deg, #2a221a 0%, #181410 100%);
+      color: #b8a488;
+      font-weight: 800;
+      font-size: 0.62rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      box-shadow: inset 0 1px 0 #3e342c, 0 1px 0 #0a0806;
+      touch-action: manipulation;
+    }
+    #tools button svg { width: 1.15rem; height: 1.15rem; display: block; }
+    #tools button.on {
+      background: linear-gradient(180deg, #6a4218 0%, #3d2410 100%);
+      color: #f6e4c0;
+      border-color: #e0a848;
+      box-shadow:
+        inset 0 0 0 1px #e8b860,
+        inset 0 1px 0 #f0d090,
+        0 0 14px #e0a84844;
+    }
+    #tools button#clear {
+      flex: 0.72;
+      color: #c4a090;
+      max-width: 4.2rem;
+    }
+    #tools button#clear.on { color: #f6e4c0; }
+    #tools button:active { transform: scale(0.97); }
+
+    #app:not(.play) #tools { display: none; }
+    #app:not(.play) #title, #app:not(.play) #hud, #app:not(.play) #menu, #app:not(.play) #goal {
+      visibility: hidden; pointer-events: none;
+    }
+    #menu {
+      position: absolute;
+      left: max(5.4rem, calc(env(safe-area-inset-left, 0px) + 4.85rem));
+      top: max(0.4rem, env(safe-area-inset-top, 0px));
+      z-index: 4;
+      color: #cbb89a;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.32rem 0.58rem;
+      border-radius: 999px;
+      background: rgba(12, 8, 8, 0.62);
+      border: 1px solid #4a3824;
+      box-shadow: 0 1px 0 #0008, inset 0 1px 0 #6a543888;
+      touch-action: manipulation;
+    }
+    #goal {
+      position: absolute;
+      left: 50%;
+      top: max(1.7rem, calc(env(safe-area-inset-top, 0px) + 1.25rem));
+      transform: translateX(-50%);
+      z-index: 4;
+      pointer-events: none;
+      font-size: 0.62rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #c4a878;
+      text-shadow: 0 1px 3px #000c;
+      white-space: nowrap;
+      max-width: 72%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #goal.gold, #stats.gold {
+      color: #f3d78a;
+      text-shadow: 0 0 14px #e8b860cc, 0 1px 2px #000c;
+    }
+    #toast {
+      position: absolute;
+      left: 50%; top: 42%;
+      transform: translate(-50%, -50%);
+      z-index: 5;
+      pointer-events: none;
+      opacity: 0;
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #f6e4c0;
+      text-shadow: 0 0 18px #e8b860aa, 0 2px 8px #000c;
+      transition: opacity 0.25s ease;
+      text-align: center;
+    }
+    #toast.show { opacity: 1; }
+    #veil {
+      position: absolute; inset: 0; z-index: 6;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 1.2rem 1.1rem 1.4rem;
+      background:
+        linear-gradient(180deg, rgba(10,8,12,0.28) 0%, rgba(10,8,12,0.55) 38%, rgba(10,8,12,0.82) 100%);
+    }
+    #app.play #veil { display: none; }
+    .wordmark {
+      font-size: 1.55rem;
+      font-weight: 800;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: #f0e0c4;
+      text-shadow: 0 2px 0 #0008, 0 0 28px #e8a04044;
+      margin: 0 0 0.35rem;
+    }
+    .tag {
+      margin: 0 0 1.15rem;
+      color: #b8a488;
+      font-size: 0.86rem;
+      letter-spacing: 0.02em;
+      text-align: center;
+    }
+    #stamp {
+      display: none;
+      margin: -0.35rem 0 0.95rem;
+      padding: 0.22rem 0.7rem;
+      border: 1px solid #c4a060;
+      border-radius: 999px;
+      color: #e8c878;
+      font-size: 0.58rem;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      box-shadow: 0 0 16px #e8b86033, inset 0 0 8px #e8b86022;
+    }
+    #stamp.on { display: inline-block; }
+    #menu-stack, #how-card {
+      display: flex; flex-direction: column; align-items: center;
+      width: min(20.5rem, 100%);
+    }
+    #app.how #menu-stack { display: none; }
+    #app:not(.how) #how-card { display: none; }
+    #veil .cta {
+      width: 100%;
+      min-height: 3.05rem;
+      margin: 0 0 0.45rem;
+      border-radius: 0.9rem;
+      border: 1px solid #5a4030;
+      background: linear-gradient(180deg, #3a2a1c 0%, #1c1410 100%);
+      color: #f0e0c4;
+      font-weight: 800;
+      font-size: 0.92rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      box-shadow: inset 0 1px 0 #6a5438, 0 2px 0 #0a0806;
+      touch-action: manipulation;
+    }
+    #veil .cta.primary {
+      border-color: #e0a848;
+      background: linear-gradient(180deg, #6a4218 0%, #3d2410 100%);
+      box-shadow: inset 0 1px 0 #f0d090, 0 0 18px #e0a84833;
+    }
+    #veil .cta:active { transform: scale(0.98); }
+    #veil .row { display: flex; gap: 0.45rem; width: 100%; margin-top: 0.15rem; }
+    #veil .row .cta { flex: 1; min-height: 2.7rem; font-size: 0.78rem; }
+    #how-card {
+      background: rgba(14, 10, 10, 0.78);
+      border: 1px solid #5a4430;
+      border-radius: 1.15rem;
+      padding: 1.2rem 1.05rem 1.05rem;
+      box-shadow: inset 0 1px 0 #6a543866, 0 16px 40px #000a;
+    }
+    #how-card h2 {
+      margin: 0 0 0.7rem;
+      font-size: 0.72rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: #c4a878;
+    }
+    #how-card p {
+      margin: 0 0 0.45rem;
+      color: #e0d0b4;
+      font-size: 0.92rem;
+      line-height: 1.35;
+      text-align: center;
+    }
+    #how-card p:last-of-type { margin-bottom: 1rem; }
+  </style>
 </head>
 <body>
-PLACEHOLDER_WILL_BE_REPLACED
-</body>
-</html>
+  <div id="app" class="title">
+    <div id="stage">
+      <a id="home" href="../../">Arcade</a>
+      <button type="button" id="menu">Menu</button>
+      <div id="title">Undercastle</div>
+      <div id="goal"></div>
+      <div id="toast"></div>
+      <div id="hud">
+        <div id="stats">rooms 0<br>alive 0</div>
+        <button type="button" id="mute" aria-label="Mute">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M2.5 6.2h2.1L8 3.6v8.8L4.6 9.8H2.5V6.2z" fill="currentColor"/>
+            <path class="wave" d="M10.1 5.2a3.2 3.2 0 010 5.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            <path class="slash" d="M3 13 L13 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <canvas id="c"></canvas>
+    </div>
+    <nav id="tools">
+      <button type="button" data-tool="dig">
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M9.8 2.2l4 4-1.2 1.2-4-4L9.8 2.2z" fill="currentColor"/>
+          <path d="M8.2 5.2l2.6 2.6-6.4 6.2H2.2v-2.1L8.2 5.2z" fill="currentColor" opacity="0.85"/>
+        </svg>
+        Dig
+      </button>
+      <button type="button" data-tool="soil" class="on">
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M2 11.2c1.4-3.2 3-5.4 6-5.4s4.6 2.2 6 5.4H2z" fill="currentColor"/>
+          <path d="M3.2 11.2h9.6v2.2H3.2z" fill="currentColor" opacity="0.7"/>
+        </svg>
+        Soil
+      </button>
+      <button type="button" data-tool="stone">
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M3.2 5.2h6.2v6.2H3.2z" fill="currentColor"/>
+          <path d="M6.6 3.4h6.2v6.2H6.6z" fill="currentColor" opacity="0.55"/>
+        </svg>
+        Stone
+      </button>
+      <button type="button" data-tool="water">
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M8 2.4c2.8 3.2 4.6 5.4 4.6 7.4A4.6 4.6 0 118 2.4z" fill="currentColor"/>
+        </svg>
+        Water
+      </button>
+      <button type="button" id="clear" data-tool="clear">
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M4 4l8 8M12 4L4 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+        Clear
+      </button>
+    </nav>
+    <div id="veil">
+      <div id="menu-stack">
+        <div class="wordmark">Undercastle</div>
+        <p class="tag">Carve a palace from the earth.</p>
+        <div id="stamp">Master Builder</div>
+        <button type="button" class="cta primary" id="btn-sandbox">Sandbox</button>
+        <button type="button" class="cta" id="btn-charter">Charter</button>
+        <div class="row">
+          <button type="button" class="cta" id="btn-how">How</button>
+          <button type="button" class="cta" id="btn-mute2">Mute</button>
+        </div>
+      </div>
+      <div id="how-card">
+        <h2>How</h2>
+        <p>Drag to raise earth. Stone holds the roof.</p>
+        <p>Wide halls slump. Pillars do not.</p>
+        <p>Dry rooms grow crystals. Wet rooms, mushrooms.</p>
+        <button type="button" class="cta primary" id="btn-gotit">Got it</button>
+      </div>
+    </div>
+  </div>
+  <script>
