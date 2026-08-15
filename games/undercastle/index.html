@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#0b0908" />
+  <title>Undercastle</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%; height: 100dvh;
+      overflow: hidden; overscroll-behavior: none; touch-action: none;
+      background: #0b0908; color: #e8dcc8;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+      user-select: none; -webkit-user-select: none;
+    }
+    #app {
+      display: flex; flex-direction: column;
+      width: 100%; height: 100%; height: 100dvh;
+    }
+    #stage {
+      position: relative; flex: 1; min-height: 0;
+    }
+    canvas {
+      display: block; width: 100%; height: 100%;
+      touch-action: none;
+      image-rendering: pixelated; image-rendering: crisp-edges;
+    }
+    #home {
+      position: absolute;
+      left: max(0.65rem, env(safe-area-inset-left, 0px));
+      top: max(0.45rem, env(safe-area-inset-top, 0px));
+      z-index: 3;
+      color: #c4b49a;
+      text-decoration: none;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 0.35rem 0.55rem;
+      border-radius: 999px;
+      background: rgba(12, 9, 8, 0.55);
+      border: 1px solid #3a2e22;
+      touch-action: manipulation;
+    }
+    #title {
+      position: absolute;
+      left: 50%; top: max(0.5rem, env(safe-area-inset-top, 0px));
+      transform: translateX(-50%);
+      z-index: 2; pointer-events: none;
+      font-size: 0.68rem; font-weight: 800;
+      letter-spacing: 0.22em; text-transform: uppercase;
+      color: #8a7a66;
+    }
+    #hud {
+      position: absolute;
+      right: max(0.65rem, env(safe-area-inset-right, 0px));
+      top: max(0.5rem, env(safe-area-inset-top, 0px));
+      z-index: 2; pointer-events: none;
+      text-align: right;
+      font-size: 0.72rem; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: #9a8a74;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.45;
+      text-shadow: 0 1px 2px #000a;
+    }
+    #tools {
+      display: flex; gap: 0.4rem;
+      padding: 0.5rem 0.5rem calc(0.55rem + env(safe-area-inset-bottom, 0px));
+      padding-left: max(0.5rem, env(safe-area-inset-left, 0px));
+      padding-right: max(0.5rem, env(safe-area-inset-right, 0px));
+      background: #140f0c;
+      border-top: 1px solid #2a2118;
+    }
+    #tools button {
+      flex: 1; min-height: 3.15rem;
+      border: 1px solid #3a2e22;
+      border-radius: 0.85rem;
+      background: #1c1612;
+      color: #d4c4a8;
+      font-weight: 800;
+      font-size: 0.82rem;
+      letter-spacing: 0.04em;
+      touch-action: manipulation;
+    }
+    #tools button.on {
+      background: #3d2a16;
+      color: #f3e0c0;
+      border-color: #d4a056;
+      box-shadow: inset 0 0 0 1px #d4a056;
+    }
+    #tools button#clear {
+      color: #c4a090;
+      max-width: 4.6rem;
+    }
+    #tools button:active { transform: scale(0.98); }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="stage">
+      <a id="home" href="../../">Arcade</a>
+      <div id="title">Undercastle</div>
+      <div id="hud">rooms: 0<br>alive: 0</div>
+      <canvas id="c"></canvas>
+    </div>
+    <nav id="tools">
+      <button type="button" data-tool="dig" class="on">Dig</button>
+      <button type="button" data-tool="soil">Soil</button>
+      <button type="button" data-tool="stone">Stone</button>
+      <button type="button" data-tool="water">Water</button>
+      <button type="button" id="clear" data-tool="clear">Clear</button>
+    </nav>
+  </div>
+  <script>
+(function () {
+  "use strict";
+
+  var EMPTY = 0, SOIL = 1, SAND = 2, STONE = 3, WATER = 4, CRYSTAL = 5, MUSHROOM = 6;
+  var CELL = 4;
+  var GROW = 0.00011;
+
+  var canvas = document.getElementById("c");
+  var ctx = canvas.getContext("2d", { alpha: false });
+  var hud = document.getElementById("hud");
+  var buttons = document.querySelectorAll("#tools button");
+
+  var W = 0, H = 0, N = 0, cellW = CELL, cellH = CELL;
+  var grid, spans, visited, moved, queue;
+  var tool = "dig";
+  var tick = 0;
+  var rooms = 0, alive = 0, lastHud = "";
+  var painting = false, lastX = -1, lastY = -1;
+
+  function alloc() {
+    grid = new Uint8Array(N);
+    spans = new Uint16Array(N);
+    visited = new Uint8Array(N);
+    moved = new Uint8Array(N);
+    queue = new Int32Array(N);
+  }
+
+  function generate() {
+    grid.fill(EMPTY);
+    var sky = Math.max(4, (H * 0.18) | 0);
+    var peak = sky + 1;
+    var x, y, i, t, mound, wobble, frac, soilTop;
+
+    for (x = 0; x < W; x++) {
+      t = W <= 1 ? 0.5 : x / (W - 1);
+      mound = Math.pow(Math.sin(t * Math.PI), 0.62);
+      wobble = 0.055 * Math.sin(t * 13.7 + 0.6) + 0.035 * Math.sin(t * 29.3 + 1.9);
+      frac = Math.max(0.1, mound * 0.96 + wobble);
+      soilTop = H - 3 - ((frac * (H - 3 - peak)) | 0);
+      for (y = 0; y < H; y++) {
+        i = y * W + x;
+        if (y >= H - 3) grid[i] = STONE;
+        else if (y >= soilTop) grid[i] = SOIL;
+      }
+    }
+
+    var ribs = 3 + ((Math.random() * 2) | 0);
+    var r, k, thick, dx, dy, len, xx, yy, tt;
+    for (r = 0; r < ribs; r++) {
+      x = (W * (0.12 + Math.random() * 0.76)) | 0;
+      y = (H * (0.38 + Math.random() * 0.38)) | 0;
+      dx = Math.random() < 0.5 ? 1 : -1;
+      dy = Math.random() < 0.4 ? 0 : (Math.random() < 0.5 ? 1 : -1);
+      len = (W * (0.22 + Math.random() * 0.38)) | 0;
+      thick = Math.random() < 0.45 ? 2 : 1;
+      for (k = 0; k < len; k++) {
+        for (tt = 0; tt < thick; tt++) {
+          xx = x + k * dx;
+          yy = y + ((k * dy) / 3 | 0) + tt;
+          if (xx >= 0 && yy >= 0 && xx < W && yy < H - 3 && grid[yy * W + xx] === SOIL) {
+            grid[yy * W + xx] = STONE;
+          }
+        }
+      }
+    }
+  }
+
+  function fit() {
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var cssW = canvas.clientWidth;
+    var cssH = canvas.clientHeight;
+    if (cssW < 8 || cssH < 8) return;
+    canvas.width = (cssW * dpr) | 0;
+    canvas.height = (cssH * dpr) | 0;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var nw = Math.max(24, (cssW / CELL) | 0);
+    var nh = Math.max(24, (cssH / CELL) | 0);
+    cellW = cssW / nw;
+    cellH = cssH / nh;
+    if (nw !== W || nh !== H) {
+      W = nw;
+      H = nh;
+      N = W * H;
+      alloc();
+      generate();
+    }
+  }
+
+  function nearStone(x, y) {
+    var dx, dy, xx, yy;
+    for (dy = -1; dy <= 1; dy++) {
+      yy = y + dy;
+      if (yy < 0 || yy >= H) continue;
+      for (dx = -1; dx <= 1; dx++) {
+        xx = x + dx;
+        if (xx < 0 || xx >= W) continue;
+        if (grid[yy * W + xx] === STONE) return true;
+      }
+    }
+    return false;
+  }
+
+  function computeSpans() {
+    var x, y, x1, row, below, span;
+    for (y = 0; y < H - 1; y++) {
+      row = y * W;
+      below = row + W;
+      x = 0;
+      while (x < W) {
+        if (grid[row + x] === SOIL && grid[below + x] === EMPTY) {
+          x1 = x + 1;
+          while (x1 < W && grid[row + x1] === SOIL && grid[below + x1] === EMPTY) x1++;
+          span = x1 - x;
+          while (x < x1) spans[row + x++] = span;
+        } else {
+          spans[row + x++] = 0;
+        }
+      }
+    }
+  }
+
+  function caveIn() {
+    computeSpans();
+    var x, y, i;
+    for (y = 0; y < H - 1; y++) {
+      for (x = 0; x < W; x++) {
+        i = y * W + x;
+        if (grid[i] === SOIL && grid[i + W] === EMPTY && spans[i] >= 6 && !nearStone(x, y)) {
+          grid[i] = SAND;
+        }
+      }
+    }
+  }
+
+  function swapInto(i, dest) {
+    var t = grid[dest];
+    grid[dest] = grid[i];
+    grid[i] = t;
+    moved[dest] = 1;
+  }
+
+  function stepSand() {
+    moved.fill(0);
+    var x, y, n, i, d, ltr, dest, left, right;
+    for (y = H - 2; y >= 0; y--) {
+      ltr = ((y + tick) & 1) === 0;
+      for (n = 0; n < W; n++) {
+        x = ltr ? n : W - 1 - n;
+        i = y * W + x;
+        if (grid[i] !== SAND || moved[i]) continue;
+        d = i + W;
+        if (grid[d] === EMPTY || grid[d] === WATER) {
+          swapInto(i, d);
+          continue;
+        }
+        left = x > 0 && (grid[d - 1] === EMPTY || grid[d - 1] === WATER);
+        right = x < W - 1 && (grid[d + 1] === EMPTY || grid[d + 1] === WATER);
+        if (left && right) dest = ((x + tick) & 1) ? d + 1 : d - 1;
+        else if (left) dest = d - 1;
+        else if (right) dest = d + 1;
+        else continue;
+        swapInto(i, dest);
+      }
+    }
+  }
+
+  function tryEmpty(i, dest) {
+    if (grid[dest] !== EMPTY) return false;
+    grid[dest] = WATER;
+    grid[i] = EMPTY;
+    moved[dest] = 1;
+    return true;
+  }
+
+  function stepWater() {
+    moved.fill(0);
+    var x, y, n, i, ltr, dl, dr;
+    for (y = H - 2; y >= 0; y--) {
+      ltr = ((y + tick) & 1) === 0;
+      for (n = 0; n < W; n++) {
+        x = ltr ? n : W - 1 - n;
+        i = y * W + x;
+        if (grid[i] !== WATER || moved[i]) continue;
+        if (tryEmpty(i, i + W)) continue;
+        dl = x > 0 && grid[i + W - 1] === EMPTY;
+        dr = x < W - 1 && grid[i + W + 1] === EMPTY;
+        if (dl && dr) {
+          tryEmpty(i, ((x + tick) & 1) ? i + W + 1 : i + W - 1);
+          continue;
+        }
+        if (dl && tryEmpty(i, i + W - 1)) continue;
+        if (dr && tryEmpty(i, i + W + 1)) continue;
+        dl = x > 0 && grid[i - 1] === EMPTY;
+        dr = x < W - 1 && grid[i + 1] === EMPTY;
+        if (dl && dr) {
+          tryEmpty(i, ((x + y + tick) & 1) ? i + 1 : i - 1);
+          continue;
+        }
+        if (dl) tryEmpty(i, i - 1);
+        else if (dr) tryEmpty(i, i + 1);
+      }
+    }
+  }
+
+  function life() {
+    visited.fill(0);
+    rooms = 0;
+    alive = 0;
+    var i, p, x, y, qh, qt, sky, wet, grow, k, below;
+    for (i = 0; i < N; i++) {
+      if (grid[i] === CRYSTAL || grid[i] === MUSHROOM) alive++;
+    }
+    for (i = 0; i < N; i++) {
+      if (grid[i] !== EMPTY || visited[i]) continue;
+      qh = 0;
+      qt = 0;
+      queue[qt++] = i;
+      visited[i] = 1;
+      sky = false;
+      wet = false;
+      while (qh < qt) {
+        p = queue[qh++];
+        x = p % W;
+        y = (p / W) | 0;
+        if (y === 0) sky = true;
+        if (!wet) {
+          if (x > 0 && grid[p - 1] === WATER) wet = true;
+          else if (x < W - 1 && grid[p + 1] === WATER) wet = true;
+          else if (y > 0 && grid[p - W] === WATER) wet = true;
+          else if (y < H - 1 && grid[p + W] === WATER) wet = true;
+        }
+        if (x > 0 && grid[p - 1] === EMPTY && !visited[p - 1]) { visited[p - 1] = 1; queue[qt++] = p - 1; }
+        if (x < W - 1 && grid[p + 1] === EMPTY && !visited[p + 1]) { visited[p + 1] = 1; queue[qt++] = p + 1; }
+        if (y > 0 && grid[p - W] === EMPTY && !visited[p - W]) { visited[p - W] = 1; queue[qt++] = p - W; }
+        if (y < H - 1 && grid[p + W] === EMPTY && !visited[p + W]) { visited[p + W] = 1; queue[qt++] = p + W; }
+      }
+      if (sky) continue;
+      rooms++;
+      grow = wet ? MUSHROOM : CRYSTAL;
+      for (k = 0; k < qt; k++) {
+        p = queue[k];
+        y = (p / W) | 0;
+        if (y >= H - 1) continue;
+        below = grid[p + W];
+        if (below !== SOIL && below !== SAND && below !== STONE) continue;
+        if (Math.random() < GROW) {
+          grid[p] = grow;
+          alive++;
+        }
+      }
+    }
+  }
+
+  function step() {
+    caveIn();
+    stepSand();
+    stepWater();
+    life();
+    tick++;
+  }
+
+  function shade(x, y, n) {
+    return ((x * 374761393 + y * 668265263) >>> 0) % n;
+  }
+
+  function render() {
+    var cssW = canvas.clientWidth;
+    var cssH = canvas.clientHeight;
+    ctx.fillStyle = "#121016";
+    ctx.fillRect(0, 0, cssW, cssH);
+
+    var sky = Math.max(4, (H * 0.18) | 0);
+    var x, y, i, t, color, prev = "", surface, h, g;
+    for (x = 0; x < W; x++) {
+      if (shade(x, 1, 97) === 0) {
+        ctx.fillStyle = shade(x, 3, 2) ? "#3a342c" : "#2a2620";
+        ctx.fillRect(x * cellW + cellW * 0.35, (shade(x, 5, sky)) * cellH + cellH * 0.3, Math.max(1, cellW * 0.35), Math.max(1, cellH * 0.35));
+      }
+    }
+
+    for (y = 0; y < H; y++) {
+      for (x = 0; x < W; x++) {
+        i = y * W + x;
+        t = grid[i];
+        if (t === EMPTY) continue;
+        if (t === SOIL) {
+          surface = y === 0 || grid[i - W] === EMPTY;
+          g = shade(x, y, 8);
+          color = surface ? (g < 3 ? "#35461c" : "#2a3a16") : (g === 0 ? "#2c1c0a" : g < 4 ? "#3a2410" : g < 6 ? "#452b14" : "#311e0c");
+        } else if (t === SAND) {
+          color = shade(x, y, 3) === 0 ? "#b89560" : shade(x, y, 3) === 1 ? "#d1b483" : "#c4a574";
+        } else if (t === STONE) {
+          g = shade(x, y, 4);
+          color = y >= H - 3 ? (g < 2 ? "#2e2c2a" : "#3a3836") : (g === 0 ? "#6a6662" : g === 1 ? "#5c5854" : "#4a4744");
+        } else if (t === WATER) {
+          color = ((x + y + (tick >> 3)) & 3) === 0 ? "#3d8fd4" : ((x + (tick >> 2)) & 1) ? "#2563a8" : "#1d4e89";
+        } else if (t === CRYSTAL) {
+          h = shade(x, y, 4);
+          color = h === 0 ? "#7c5cbf" : h === 1 ? "#5eead4" : h === 2 ? "#a78bfa" : "#67e8f9";
+        } else {
+          h = shade(x, y, 3);
+          color = h === 0 ? "#c45c26" : h === 1 ? "#e07a3d" : "#d4692e";
+        }
+        if (color !== prev) { ctx.fillStyle = color; prev = color; }
+        ctx.fillRect(x * cellW, y * cellH, cellW + 0.4, cellH + 0.4);
+      }
+    }
+
+    var line = "rooms: " + rooms + "\nalive: " + alive;
+    if (line !== lastHud) {
+      lastHud = line;
+      hud.textContent = line;
+    }
+  }
+
+  function canDig(x, y) {
+    if (y >= H - 3) return false;
+    var t = grid[y * W + x];
+    return t === SOIL || t === SAND || t === CRYSTAL || t === MUSHROOM;
+  }
+
+  function paintBrush(cx, cy) {
+    var r = tool === "water" ? 1 : 2;
+    var dx, dy, x, y, i, t;
+    for (dy = -r; dy <= r; dy++) {
+      for (dx = -r; dx <= r; dx++) {
+        if (dx * dx + dy * dy > r * r + 1) continue;
+        x = cx + dx;
+        y = cy + dy;
+        if (x < 0 || y < 0 || x >= W || y >= H) continue;
+        i = y * W + x;
+        t = grid[i];
+        if (tool === "dig") {
+          if (canDig(x, y)) grid[i] = EMPTY;
+        } else if (tool === "soil") {
+          if (y < H - 3 && (t === EMPTY || t === SAND || t === WATER)) grid[i] = SOIL;
+        } else if (tool === "stone") {
+          if (y < H - 3 && t !== STONE && t !== CRYSTAL && t !== MUSHROOM) grid[i] = STONE;
+        } else if (tool === "water") {
+          if (t === EMPTY) grid[i] = WATER;
+        }
+      }
+    }
+  }
+
+  function paintLine(x0, y0, x1, y1) {
+    var dist = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);
+    var i, u;
+    for (i = 0; i <= dist; i++) {
+      u = i / dist;
+      paintBrush((x0 + (x1 - x0) * u) | 0, (y0 + (y1 - y0) * u) | 0);
+    }
+  }
+
+  function eventCell(e) {
+    var r = canvas.getBoundingClientRect();
+    var x = ((e.clientX - r.left) / r.width) * W;
+    var y = ((e.clientY - r.top) / r.height) * H;
+    return [x | 0, y | 0];
+  }
+
+  function onDown(e) {
+    if (e.button !== undefined && e.button !== 0) return;
+    e.preventDefault();
+    canvas.setPointerCapture(e.pointerId);
+    painting = true;
+    var c = eventCell(e);
+    lastX = c[0];
+    lastY = c[1];
+    paintBrush(c[0], c[1]);
+  }
+
+  function onMove(e) {
+    if (!painting) return;
+    e.preventDefault();
+    var c = eventCell(e);
+    paintLine(lastX, lastY, c[0], c[1]);
+    lastX = c[0];
+    lastY = c[1];
+  }
+
+  function onUp(e) {
+    painting = false;
+    lastX = lastY = -1;
+  }
+
+  canvas.addEventListener("pointerdown", onDown);
+  canvas.addEventListener("pointermove", onMove);
+  canvas.addEventListener("pointerup", onUp);
+  canvas.addEventListener("pointercancel", onUp);
+  canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+
+  buttons.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var next = btn.getAttribute("data-tool");
+      if (next === "clear") {
+        generate();
+        tool = "dig";
+        buttons.forEach(function (b) {
+          b.classList.toggle("on", b.getAttribute("data-tool") === "dig");
+        });
+        return;
+      }
+      tool = next;
+      buttons.forEach(function (b) {
+        b.classList.toggle("on", b === btn);
+      });
+    });
+  });
+
+  window.addEventListener("resize", fit);
+  if (window.ResizeObserver) {
+    new ResizeObserver(fit).observe(canvas);
+  }
+
+  function frame() {
+    if (N === 0) fit();
+    if (N > 0) {
+      step();
+      step();
+      render();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  fit();
+  requestAnimationFrame(frame);
+})();
+  </script>
+</body>
+</html>
