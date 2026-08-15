@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#0b0d12" />
+  <title>Sand & Water</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #0b0d12;
+      color: #eef2f7;
+      font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+    canvas { display: block; width: 100%; height: 100%; }
+    a.back {
+      position: fixed;
+      top: calc(0.65rem + env(safe-area-inset-top));
+      left: 0.7rem;
+      color: #9aa3b2;
+      text-decoration: none;
+      font-size: 0.9rem;
+      z-index: 2;
+    }
+    .bar {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      display: flex;
+      gap: 0.4rem;
+      padding: 0.55rem 0.55rem calc(0.55rem + env(safe-area-inset-bottom));
+      background: linear-gradient(transparent, #0b0d12 28%);
+      z-index: 2;
+    }
+    button {
+      flex: 1;
+      min-height: 2.6rem;
+      border: 0;
+      border-radius: 0.75rem;
+      background: #232833;
+      color: #eef2f7;
+      font: inherit;
+      font-weight: 650;
+      font-size: 0.82rem;
+    }
+    button.on { outline: 2px solid #fff; }
+    #sand.on { background: #e6b35a; color: #1a1206; }
+    #water.on { background: #4aa3ff; color: #041225; }
+    #stone.on { background: #6b7280; }
+    #wood.on { background: #8b5a2b; }
+    #fire.on { background: #ff6a2a; color: #2a0c00; }
+    #erase.on { background: #111827; }
+  </style>
+</head>
+<body>
+  <a class="back" href="../../">Arcade</a>
+  <canvas id="c"></canvas>
+  <div class="bar">
+    <button id="sand" class="on">Sand</button>
+    <button id="water">Water</button>
+    <button id="stone">Stone</button>
+    <button id="wood">Wood</button>
+    <button id="fire">Fire</button>
+    <button id="erase">Erase</button>
+    <button id="clear">Clear</button>
+  </div>
+  <script>
+    const EMPTY = 0, SAND = 1, WATER = 2, STONE = 3, WOOD = 4, FIRE = 5, STEAM = 6;
+    const canvas = document.getElementById("c");
+    const ctx = canvas.getContext("2d", { alpha: false });
+    const CELL = 4;
+    let W, H, grid, next, fireLife;
+
+    function resize() {
+      const dpr = Math.min(devicePixelRatio || 1, 2);
+      canvas.width = innerWidth * dpr;
+      canvas.height = innerHeight * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      W = Math.ceil(innerWidth / CELL);
+      H = Math.ceil(innerHeight / CELL);
+      grid = new Uint8Array(W * H);
+      next = new Uint8Array(W * H);
+      fireLife = new Uint8Array(W * H);
+    }
+
+    const at = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? STONE : grid[y * W + x];
+    const set = (arr, x, y, v) => { if (x >= 0 && y >= 0 && x < W && y < H) arr[y * W + x] = v; };
+
+    let paint = SAND;
+    const btns = { sand: SAND, water: WATER, stone: STONE, wood: WOOD, fire: FIRE, erase: EMPTY };
+    for (const [id, t] of Object.entries(btns)) {
+      document.getElementById(id).onclick = () => {
+        paint = t;
+        for (const k of Object.keys(btns)) document.getElementById(k).classList.toggle("on", k === id);
+      };
+    }
+    document.getElementById("clear").onclick = () => { grid.fill(0); fireLife.fill(0); };
+
+    let drawing = false;
+    function paintAt(clientX, clientY) {
+      const x = Math.floor(clientX / CELL);
+      const y = Math.floor(clientY / CELL);
+      const r = paint === STONE || paint === WOOD ? 2 : 3;
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (dx * dx + dy * dy > r * r) continue;
+          const xx = x + dx, yy = y + dy;
+          if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+          grid[yy * W + xx] = paint;
+          fireLife[yy * W + xx] = paint === FIRE ? 20 + (Math.random() * 20 | 0) : 0;
+        }
+      }
+    }
+    canvas.addEventListener("pointerdown", e => { drawing = true; canvas.setPointerCapture(e.pointerId); paintAt(e.clientX, e.clientY); });
+    canvas.addEventListener("pointermove", e => { if (drawing) paintAt(e.clientX, e.clientY); });
+    addEventListener("pointerup", () => { drawing = false; });
+    addEventListener("pointercancel", () => { drawing = false; });
+
+    function step() {
+      next.fill(0);
+      const newFire = new Uint8Array(W * H);
+      for (let y = H - 1; y >= 0; y--) {
+        const ltr = (y & 1) === 0;
+        for (let n = 0; n < W; n++) {
+          const x = ltr ? n : W - 1 - n;
+          const i = y * W + x;
+          const t = grid[i];
+          if (!t) continue;
+          if (next[i] && next[i] !== STEAM) continue;
+
+          const down = at(x, y + 1);
+          const dl = at(x - 1, y + 1);
+          const dr = at(x + 1, y + 1);
+          const left = at(x - 1, y);
+          const right = at(x + 1, y);
+          const flip = Math.random() < 0.5 ? -1 : 1;
+
+          if (t === STONE || t === WOOD) {
+            set(next, x, y, t);
+            continue;
+          }
+
+          if (t === SAND) {
+            if (down === EMPTY || down === WATER || down === STEAM) {
+              set(next, x, y + 1, SAND);
+              if (down === WATER) set(next, x, y, WATER);
+              else if (down === STEAM) set(next, x, y, STEAM);
+            } else if (dl === EMPTY || dl === WATER) {
+              set(next, x - 1, y + 1, SAND);
+              if (dl === WATER) set(next, x, y, WATER);
+            } else if (dr === EMPTY || dr === WATER) {
+              set(next, x + 1, y + 1, SAND);
+              if (dr === WATER) set(next, x, y, WATER);
+            } else set(next, x, y, SAND);
+            continue;
+          }
+
+          if (t === WATER) {
+            if (down === EMPTY || down === STEAM) set(next, x, y + 1, WATER);
+            else if ((dl === EMPTY || dl === STEAM) && flip < 0) set(next, x - 1, y + 1, WATER);
+            else if ((dr === EMPTY || dr === STEAM) && flip > 0) set(next, x + 1, y + 1, WATER);
+            else if (left === EMPTY && right === EMPTY) set(next, x + flip, y, WATER);
+            else if (left === EMPTY) set(next, x - 1, y, WATER);
+            else if (right === EMPTY) set(next, x + 1, y, WATER);
+            else set(next, x, y, WATER);
+            continue;
+          }
+
+          if (t === STEAM) {
+            const up = at(x, y - 1);
+            if (Math.random() < 0.02) { set(next, x, y, WATER); continue; }
+            if (up === EMPTY) set(next, x, y - 1, STEAM);
+            else if (at(x + flip, y - 1) === EMPTY) set(next, x + flip, y - 1, STEAM);
+            else if (at(x + flip, y) === EMPTY) set(next, x + flip, y, STEAM);
+            else set(next, x, y, STEAM);
+            continue;
+          }
+
+          if (t === FIRE) {
+            let life = fireLife[i] || 8;
+            life--;
+            const nbs = [[0,1],[0,-1],[1,0],[-1,0],[1,1],[-1,1]];
+            for (const [dx, dy] of nbs) {
+              const nx = x + dx, ny = y + dy;
+              const nt = at(nx, ny);
+              if (nt === WOOD && Math.random() < 0.18) {
+                set(next, nx, ny, FIRE);
+                newFire[ny * W + nx] = 18 + (Math.random() * 16 | 0);
+              }
+              if (nt === WATER && Math.random() < 0.35) {
+                set(next, nx, ny, STEAM);
+                life = 0;
+              }
+            }
+            if (life <= 0) continue;
+            if (at(x, y - 1) === EMPTY && Math.random() < 0.35) {
+              set(next, x, y - 1, FIRE);
+              newFire[(y - 1) * W + x] = life;
+            } else {
+              set(next, x, y, FIRE);
+              newFire[i] = life;
+            }
+          }
+        }
+      }
+      const tmp = grid; grid = next; next = tmp;
+      fireLife = newFire;
+    }
+
+    function color(t, x, y) {
+      const j = (x * 13 + y * 7) & 7;
+      if (t === SAND) return j < 3 ? "#d4a24a" : j < 6 ? "#e6b35a" : "#c4903c";
+      if (t === WATER) return j < 4 ? "#3b8fe8" : "#5eb0ff";
+      if (t === STONE) return j < 4 ? "#6b7280" : "#4b5563";
+      if (t === WOOD) return j < 4 ? "#8b5a2b" : "#6b4220";
+      if (t === FIRE) return j < 3 ? "#ff3b00" : j < 6 ? "#ff7a1a" : "#ffd166";
+      if (t === STEAM) return "#9ca3af";
+      return "#0b0d12";
+    }
+
+    function draw() {
+      ctx.fillStyle = "#0b0d12";
+      ctx.fillRect(0, 0, innerWidth, innerHeight);
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          const t = grid[y * W + x];
+          if (!t) continue;
+          ctx.fillStyle = color(t, x, y);
+          ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
+        }
+      }
+    }
+
+    function tick() {
+      step(); step();
+      draw();
+      requestAnimationFrame(tick);
+    }
+
+    addEventListener("resize", resize);
+    resize();
+    requestAnimationFrame(tick);
+  </script>
+</body>
+</html>

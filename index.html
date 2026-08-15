@@ -13,7 +13,6 @@
       --card: #1a1d24;
       --text: #f3f4f6;
       --muted: #9aa3b2;
-      --accent: #7dd3fc;
     }
     * { box-sizing: border-box; }
     html, body {
@@ -28,20 +27,9 @@
       margin: 0 auto;
       padding: 2.5rem 1.25rem 4rem;
     }
-    h1 {
-      margin: 0 0 0.35rem;
-      font-size: 2rem;
-      letter-spacing: -0.03em;
-    }
-    p {
-      margin: 0 0 1.75rem;
-      color: var(--muted);
-      line-height: 1.45;
-    }
-    .games {
-      display: grid;
-      gap: 0.85rem;
-    }
+    h1 { margin: 0 0 0.35rem; font-size: 2rem; letter-spacing: -0.03em; }
+    p { margin: 0 0 1.75rem; color: var(--muted); line-height: 1.45; }
+    .games { display: grid; gap: 0.85rem; }
     a.game {
       display: block;
       padding: 1.1rem 1.15rem;
@@ -51,23 +39,19 @@
       text-decoration: none;
       min-height: 4.5rem;
     }
-    a.game strong {
-      display: block;
-      font-size: 1.1rem;
-    }
-    a.game span {
-      display: block;
-      margin-top: 0.25rem;
-      color: var(--muted);
-      font-size: 0.95rem;
-    }
+    a.game strong { display: block; font-size: 1.1rem; }
+    a.game span { display: block; margin-top: 0.25rem; color: var(--muted); font-size: 0.95rem; }
   </style>
 </head>
 <body>
   <main>
     <h1>Arcade</h1>
     <p>Tiny browser games for a phone. Tap one.</p>
-    <div class="games" id="games">
+    <div class="games">
+      <a class="game" href="games/sand/">
+        <strong>Sand & Water</strong>
+        <span>Paint sand, water, stone, wood, fire. It piles and flows.</span>
+      </a>
       <a class="game" href="games/physics/">
         <strong>Physics Sandbox</strong>
         <span>Tap to drop, drag to throw. Balls, boxes, a seesaw.</span>
