@@ -109,8 +109,8 @@
       <canvas id="c"></canvas>
     </div>
     <nav id="tools">
-      <button type="button" data-tool="dig" class="on">Dig</button>
-      <button type="button" data-tool="soil">Soil</button>
+      <button type="button" data-tool="dig">Dig</button>
+      <button type="button" data-tool="soil" class="on">Soil</button>
       <button type="button" data-tool="stone">Stone</button>
       <button type="button" data-tool="water">Water</button>
       <button type="button" id="clear" data-tool="clear">Clear</button>
@@ -131,7 +131,7 @@
 
   var W = 0, H = 0, N = 0, cellW = CELL, cellH = CELL;
   var grid, spans, visited, moved, queue;
-  var tool = "dig";
+  var tool = "soil";
   var tick = 0;
   var rooms = 0, alive = 0, lastHud = "";
   var painting = false, lastX = -1, lastY = -1;
@@ -146,40 +146,10 @@
 
   function generate() {
     grid.fill(EMPTY);
-    var sky = Math.max(4, (H * 0.18) | 0);
-    var peak = sky + 1;
-    var x, y, i, t, mound, wobble, frac, soilTop;
-
-    for (x = 0; x < W; x++) {
-      t = W <= 1 ? 0.5 : x / (W - 1);
-      mound = Math.pow(Math.sin(t * Math.PI), 0.62);
-      wobble = 0.055 * Math.sin(t * 13.7 + 0.6) + 0.035 * Math.sin(t * 29.3 + 1.9);
-      frac = Math.max(0.1, mound * 0.96 + wobble);
-      soilTop = H - 3 - ((frac * (H - 3 - peak)) | 0);
-      for (y = 0; y < H; y++) {
-        i = y * W + x;
-        if (y >= H - 3) grid[i] = STONE;
-        else if (y >= soilTop) grid[i] = SOIL;
-      }
-    }
-
-    var ribs = 3 + ((Math.random() * 2) | 0);
-    var r, k, thick, dx, dy, len, xx, yy, tt;
-    for (r = 0; r < ribs; r++) {
-      x = (W * (0.12 + Math.random() * 0.76)) | 0;
-      y = (H * (0.38 + Math.random() * 0.38)) | 0;
-      dx = Math.random() < 0.5 ? 1 : -1;
-      dy = Math.random() < 0.4 ? 0 : (Math.random() < 0.5 ? 1 : -1);
-      len = (W * (0.22 + Math.random() * 0.38)) | 0;
-      thick = Math.random() < 0.45 ? 2 : 1;
-      for (k = 0; k < len; k++) {
-        for (tt = 0; tt < thick; tt++) {
-          xx = x + k * dx;
-          yy = y + ((k * dy) / 3 | 0) + tt;
-          if (xx >= 0 && yy >= 0 && xx < W && yy < H - 3 && grid[yy * W + xx] === SOIL) {
-            grid[yy * W + xx] = STONE;
-          }
-        }
+    var x, y, i;
+    for (y = H - 3; y < H; y++) {
+      for (x = 0; x < W; x++) {
+        grid[y * W + x] = STONE;
       }
     }
   }
@@ -514,9 +484,9 @@
       var next = btn.getAttribute("data-tool");
       if (next === "clear") {
         generate();
-        tool = "dig";
+        tool = "soil";
         buttons.forEach(function (b) {
-          b.classList.toggle("on", b.getAttribute("data-tool") === "dig");
+          b.classList.toggle("on", b.getAttribute("data-tool") === "soil");
         });
         return;
       }
