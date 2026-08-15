@@ -3,8 +3,15 @@
     return x >= 0 && y >= 0 && x < W && y < H;
   }
 
+  function brushRadius() {
+    if (tool === "water") return 3.0;
+    if (tool === "stone") return 3.4;
+    if (tool === "dig") return 4.6;
+    return 5.4;
+  }
+
   function paintBrush(cx, cy) {
-    var r = tool === "water" ? 1.15 : tool === "stone" ? 1.9 : 2.7;
+    var r = brushRadius();
     var r2 = r * r;
     var x0 = Math.floor(cx - r), x1 = Math.ceil(cx + r);
     var y0 = Math.floor(cy - r), y1 = Math.ceil(cy + r);
@@ -41,7 +48,7 @@
         } else if (tool === "soil") {
           if (t === EMPTY || t === SAND || t === WATER) {
             grid[i] = SOIL;
-            packed[i] = 84;
+            packed[i] = 96;
             changed++;
           }
         } else if (tool === "stone") {
@@ -58,7 +65,11 @@
     if (changed) {
       sfxPaint(tool, changed);
       dirty = true;
-      if (tool === "dig") spawnDust(cx, cy, crumbs ? 3 : 2, 168, 136, 86);
+      if (tool === "dig") {
+        spawnDust(cx, cy, Math.min(28, 10 + changed), 255, 236, 190);
+        spawnDust(cx, cy, Math.min(16, 6 + (changed >> 1)), 232, 196, 120);
+        if (crumbs) spawnDust(cx, cy, crumbs ? 3 : 2, 168, 136, 86);
+      }
     }
     return changed;
   }
@@ -66,7 +77,7 @@
   function paintLine(x0, y0, x1, y1) {
     var dx = x1 - x0, dy = y1 - y0;
     var dist = Math.sqrt(dx * dx + dy * dy);
-    var steps = Math.max(1, Math.ceil(dist * 3));
+    var steps = Math.max(1, Math.ceil(dist * 8));
     var i, u;
     for (i = 0; i <= steps; i++) {
       u = i / steps;
@@ -91,13 +102,19 @@
     var c = eventCell(e);
     lastX = c[0];
     lastY = c[1];
+    hoverX = c[0];
+    hoverY = c[1];
+    hoverOn = true;
     paintBrush(c[0], c[1]);
   }
 
   function onMove(e) {
+    var c = eventCell(e);
+    hoverX = c[0];
+    hoverY = c[1];
+    hoverOn = true;
     if (!painting) return;
     e.preventDefault();
-    var c = eventCell(e);
     paintLine(lastX, lastY, c[0], c[1]);
     lastX = c[0];
     lastY = c[1];
@@ -108,10 +125,15 @@
     lastX = lastY = -1;
   }
 
+  function onLeave() {
+    hoverOn = false;
+  }
+
   canvas.addEventListener("pointerdown", onDown);
   canvas.addEventListener("pointermove", onMove);
   canvas.addEventListener("pointerup", onUp);
   canvas.addEventListener("pointercancel", onUp);
+  canvas.addEventListener("pointerleave", onLeave);
   canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
 
   function selectTool(next) {
