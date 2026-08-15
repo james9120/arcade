@@ -358,6 +358,191 @@
       </div>
     </div>
   </div>
-  <script src="game.js"></script>
-</body>
-</html>
+  <script>
+(function () {
+  "use strict";
+
+  var EMPTY = 0, SOIL = 1, SAND = 2, STONE = 3, WATER = 4, CRYSTAL = 5, MUSHROOM = 6;
+  var CELL = 4, PX = 4, GROW = 0.00016;
+  var SOLID = [0, 1, 1, 1, 0, 1, 1];
+
+  var canvas = document.getElementById("c");
+  var ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+  var statsEl = document.getElementById("stats");
+  var muteBtn = document.getElementById("mute");
+  var buttons = document.querySelectorAll("#tools button");
+
+  var W = 0, H = 0, N = 0, cssW = 0, cssH = 0, dpr = 1;
+  var grid, spans, visited, moved, queue, sealed, light, glowR, glowG, glowB, colLight, packed;
+  var off, offCtx, img, pix, imgW = 0, imgH = 0;
+
+  var tool = "soil";
+  var simTick = 0, frameTick = 0;
+  var rooms = 0, alive = 0, lastHud = "";
+  var painting = false, lastX = -1, lastY = -1;
+  var shake = 0;
+  var muted = false;
+
+  var PMAX = 96, pc = 0;
+  var px = new Float32Array(PMAX), py = new Float32Array(PMAX);
+  var pvx = new Float32Array(PMAX), pvy = new Float32Array(PMAX);
+  var plife = new Float32Array(PMAX), pmax = new Float32Array(PMAX);
+  var pr = new Uint8Array(PMAX), pg = new Uint8Array(PMAX), pb = new Uint8Array(PMAX);
+
+  var motes = [];
+  var audio = null;
+
+  var SAVE_KEY = "undercastle.v1";
+  var appEl = document.getElementById("app");
+  var goalEl = document.getElementById("goal");
+  var toastEl = document.getElementById("toast");
+  var stampEl = document.getElementById("stamp");
+  var menuBtn = document.getElementById("menu");
+  var mute2 = document.getElementById("btn-mute2");
+  var screen = "title";
+  var playing = false;
+  var mode = "sandbox";
+  var charterStep = 0;
+  var charterDone = false;
+  var hallTime = 0;
+  var goldFlash = 0;
+  var dirty = false;
+  var lastSaveAt = 0;
+  var lastFrameT = 0;
+  var toastT = 0;
+  var loadedOnce = false;
+  var pendingSave = null;
+
+  function clamp8(v) {
+    return v < 0 ? 0 : v > 255 ? 255 : v | 0;
+  }
+
+  function hash(x, y) {
+    var n = ((x * 374761393) + (y * 668265263)) >>> 0;
+    n = Math.imul(n ^ (n >>> 13), 1274126177);
+    return n >>> 0;
+  }
+
+  function alloc() {
+    grid = new Uint8Array(N);
+    spans = new Uint16Array(N);
+    visited = new Uint8Array(N);
+    moved = new Uint8Array(N);
+    queue = new Int32Array(N);
+    sealed = new Uint8Array(N);
+    light = new Float32Array(N);
+    glowR = new Float32Array(N);
+    glowG = new Float32Array(N);
+    glowB = new Float32Array(N);
+    colLight = new Float32Array(W);
+    packed = new Uint8Array(N);
+    imgW = W * PX;
+    imgH = H * PX;
+    off = document.createElement("canvas");
+    off.width = imgW;
+    off.height = imgH;
+    offCtx = off.getContext("2d", { alpha: false });
+    img = offCtx.createImageData(imgW, imgH);
+    pix = img.data;
+  }
+
+  function generate() {
+    grid.fill(EMPTY);
+    sealed.fill(0);
+    if (packed) packed.fill(0);
+    var x, y;
+    for (y = H - 3; y < H; y++) {
+      for (x = 0; x < W; x++) grid[y * W + x] = STONE;
+    }
+    pc = 0;
+    shake = 0;
+    rooms = 0;
+    alive = 0;
+    hallTime = 0;
+    dirty = true;
+    seedMotes();
+  }
+
+  function seedMotes() {
+    motes.length = 0;
+    var i, n = 14;
+    for (i = 0; i < n; i++) {
+      motes.push({
+        x: Math.random() * Math.max(W, 1),
+        y: Math.random() * Math.max(H * 0.55, 1),
+        vx: (Math.random() - 0.5) * 0.015,
+        vy: (Math.random() - 0.4) * 0.01,
+        ph: Math.random() * 6.28
+      });
+    }
+  }
+
+  function fit() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var cw = canvas.clientWidth;
+    var ch = canvas.clientHeight;
+    if (cw < 8 || ch < 8) return false;
+    cssW = cw;
+    cssH = ch;
+    canvas.width = (cw * dpr) | 0;
+    canvas.height = (ch * dpr) | 0;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    var nw = Math.max(24, (cw / CELL) | 0);
+    var nh = Math.max(24, (ch / CELL) | 0);
+    if (nw !== W || nh !== H) {
+      var oldG = grid, oldW = W, oldH = H;
+      W = nw;
+      H = nh;
+      N = W * H;
+      alloc();
+      generate();
+      if (oldG && oldW) blitGrid(oldG, oldW, oldH);
+      else if (!loadedOnce) {
+        loadedOnce = true;
+        bootSave();
+      }
+    }
+    return true;
+  }
+
+  function blitGrid(src, sw, sh) {
+    var cw = Math.min(W, sw), ch = Math.min(H, sh), x, y;
+    for (y = 0; y < ch; y++) {
+      var sy = sh - ch + y, dy = H - ch + y;
+      for (x = 0; x < cw; x++) grid[dy * W + x] = src[sy * sw + x];
+    }
+  }
+
+  function nearStone(x, y) {
+    var dx, dy, xx, yy;
+    for (dy = -1; dy <= 1; dy++) {
+      yy = y + dy;
+      if (yy < 0 || yy >= H) continue;
+      for (dx = -1; dx <= 1; dx++) {
+        xx = x + dx;
+        if (xx < 0 || xx >= W) continue;
+        if (grid[yy * W + xx] === STONE) return true;
+      }
+    }
+    return false;
+  }
+
+  function spawnDust(x, y, n, r, g, b) {
+    var i, k;
+    for (k = 0; k < n; k++) {
+      if (pc >= PMAX) {
+        for (i = 0; i < PMAX; i++) if (plife[i] <= 0) { pc = i; break; }
+        if (plife[pc] > 0) return;
+      }
+      i = pc;
+      px[i] = x + Math.random();
+      py[i] = y + Math.random() * 0.4;
+      pvx[i] = (Math.random() - 0.5) * 0.22;
+      pvy[i] = -0.04 - Math.random() * 0.12;
+      plife[i] = 18 + (Math.random() * 16) | 0;
+      pmax[i] = plife[i];
+      pr[i] = r; pg[i] = g; pb[i] = b;
+      pc = i + 1;
+    }
+  }
