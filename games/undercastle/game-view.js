@@ -49,9 +49,9 @@
           colLight[x] *= 0.88;
         } else {
           light[i] = colLight[x] * 0.7;
-          colLight[x] *= t === SAND ? 0.2 : 0.1;
+          colLight[x] *= t === STONE ? 0.55 : 0.42;
         }
-        if (colLight[x] < 0.018) colLight[x] = 0.018;
+        if (colLight[x] < 0.16) colLight[x] = 0.16;
       }
     }
 
@@ -83,6 +83,7 @@
     for (y = 0; y < H; y++) {
       for (x = 0; x < W; x++) {
         i = y * W + x;
+        t = grid[i];
         blocked = 0;
         for (dy = -1; dy <= 1; dy++) {
           yy = y + dy;
@@ -105,7 +106,12 @@
           if (cave) L *= 1 - 0.11 * cave;
         }
         L *= 1 - ((x / W - 0.5) * (x / W - 0.5) * 0.35 + (y / H) * (y / H) * 0.08);
-        light[i] = L < 0.03 ? 0.03 : L > 1.2 ? 1.2 : L;
+        if (t === EMPTY || t === WATER || t === CRYSTAL || t === MUSHROOM) {
+          if (sealed[i] && t === EMPTY) light[i] = L < 0.18 ? 0.18 : L > 1.2 ? 1.2 : L;
+          else light[i] = L < 0.12 ? 0.12 : L > 1.2 ? 1.2 : L;
+        } else {
+          light[i] = L < 0.22 ? 0.22 : L > 1.2 ? 1.2 : L;
+        }
       }
     }
   }
@@ -135,31 +141,31 @@
 
         if (t === EMPTY) {
           if (sealed[i]) {
-            hr = 7; hg = 6; hb = 16;
+            hr = 28; hg = 24; hb = 48;
           } else {
             u = y / Math.max(1, H - 4);
             if (u > 1) u = 1;
             if (u < 0.32) {
               t2 = u / 0.32;
-              hr = (198 * (1 - t2) + 96 * t2) | 0;
-              hg = (122 * (1 - t2) + 56 * t2) | 0;
-              hb = (68 * (1 - t2) + 64 * t2) | 0;
+              hr = (198 * (1 - t2) + 110 * t2) | 0;
+              hg = (122 * (1 - t2) + 68 * t2) | 0;
+              hb = (68 * (1 - t2) + 78 * t2) | 0;
             } else {
               t2 = (u - 0.32) / 0.68;
-              hr = (96 * (1 - t2) + 16 * t2) | 0;
-              hg = (56 * (1 - t2) + 14 * t2) | 0;
-              hb = (64 * (1 - t2) + 34 * t2) | 0;
+              hr = (110 * (1 - t2) + 48 * t2) | 0;
+              hg = (68 * (1 - t2) + 36 * t2) | 0;
+              hb = (78 * (1 - t2) + 62 * t2) | 0;
             }
           }
         } else if (t === SOIL) {
           surface = emptyAbove && !waterAbove;
           g = h % 8;
           if (surface) {
-            hr = g < 3 ? 58 : 44; hg = g < 3 ? 78 : 62; hb = g < 3 ? 24 : 18;
+            hr = 138; hg = 92; hb = 48;
           } else {
-            hr = g === 0 ? 44 : g < 4 ? 58 : g < 6 ? 70 : 48;
-            hg = g === 0 ? 26 : g < 4 ? 34 : g < 6 ? 40 : 28;
-            hb = g === 0 ? 12 : g < 4 ? 16 : g < 6 ? 18 : 12;
+            hr = g === 0 ? 120 : g < 4 ? 148 : 110;
+            hg = g === 0 ? 78 : g < 4 ? 98 : 70;
+            hb = g === 0 ? 40 : g < 4 ? 52 : 36;
           }
           if (y < H - 1 && grid[i + W] === EMPTY && spans[i] >= 3) {
             var stress = spans[i] >= 6 ? 0.70 : spans[i] >= 4 ? 0.82 : 0.90;
@@ -175,20 +181,20 @@
         } else if (t === STONE) {
           g = h % 5;
           if (y >= H - 3) {
-            if (y === H - 3) { hr = 118 + (g < 2 ? 14 : 0); hg = 102; hb = 78; }
-            else if (y === H - 2) { hr = 72 + (g === 0 ? 10 : 0); hg = 64; hb = 56; }
-            else { hr = 44 + (g === 0 ? 12 : 0); hg = 40; hb = 38; }
+            if (y === H - 3) { hr = 150 + (g < 2 ? 10 : 0); hg = 132; hb = 104; }
+            else if (y === H - 2) { hr = 128 + (g === 0 ? 10 : 0); hg = 114; hb = 96; }
+            else { hr = 108 + (g === 0 ? 12 : 0); hg = 98; hb = 86; }
           } else {
-            hr = g === 0 ? 118 : g === 1 ? 96 : g === 2 ? 84 : 74;
-            hg = g === 0 ? 112 : g === 1 ? 92 : g === 2 ? 80 : 70;
-            hb = g === 0 ? 104 : g === 1 ? 86 : g === 2 ? 76 : 66;
+            hr = g === 0 ? 168 : g === 1 ? 148 : 132;
+            hg = g === 0 ? 158 : g === 1 ? 140 : 126;
+            hb = g === 0 ? 142 : g === 1 ? 128 : 116;
           }
         } else if (t === WATER) {
           g = (x + y + (frameTick >> 3)) & 3;
           hr = g === 0 ? 54 : 28;
           hg = g === 0 ? 130 : g === 1 ? 92 : 74;
           hb = g === 0 ? 196 : g === 1 ? 154 : 128;
-          if (emptyAbove) { hr = 120; hg = 196; hb = 220; }
+          if (emptyAbove) { hr = 148; hg = 214; hb = 236; }
         } else if (t === CRYSTAL) {
           g = h % 4;
           if (g === 0) { hr = 124; hg = 92; hb = 210; }
@@ -223,12 +229,12 @@
                 pix[o] = clamp8(hr + n); pix[o + 1] = clamp8(hg + n); pix[o + 2] = clamp8(hb + n + (sealed[i] ? 6 : 0)); pix[o + 3] = 255;
               }
             } else if (t === SOIL && emptyAbove && !waterAbove && sy <= 1) {
-              pix[o] = clamp8((sy === 0 ? 62 : 52) + n * 3);
-              pix[o + 1] = clamp8((sy === 0 ? 86 : 70) + n * 2);
-              pix[o + 2] = clamp8(20 + n);
+              pix[o] = clamp8((sy === 0 ? 92 : 78) + n * 3);
+              pix[o + 1] = clamp8((sy === 0 ? 118 : 102) + n * 2);
+              pix[o + 2] = clamp8((sy === 0 ? 38 : 28) + n);
               pix[o + 3] = 255;
             } else if (t === WATER && emptyAbove && sy === 0) {
-              pix[o] = 168; pix[o + 1] = 220; pix[o + 2] = 236; pix[o + 3] = 255;
+              pix[o] = 196; pix[o + 1] = 236; pix[o + 2] = 250; pix[o + 3] = 255;
             } else if (t === WATER) {
               spark = ((h + frameTick * 13 + sx * 7 + sy * 11) >>> 0) % 47;
               if (spark === 0) { pix[o] = 210; pix[o + 1] = 236; pix[o + 2] = 245; pix[o + 3] = 255; }
@@ -291,9 +297,9 @@
             r = pix[o];
             g = pix[o + 1];
             b = pix[o + 2];
-            pix[o]     = clamp8(r * (0.14 + 0.86 * L) + gr + warm);
-            pix[o + 1] = clamp8(g * (0.14 + 0.86 * L) + gg + warm * 0.45);
-            pix[o + 2] = clamp8(b * (0.16 + 0.84 * L) + gb + cool);
+            pix[o]     = clamp8(r * (0.48 + 0.52 * L) + gr + warm);
+            pix[o + 1] = clamp8(g * (0.48 + 0.52 * L) + gg + warm * 0.45);
+            pix[o + 2] = clamp8(b * (0.48 + 0.52 * L) + gb + cool);
           }
         }
       }
@@ -377,7 +383,10 @@
       pvx[i] *= 0.96;
       a = plife[i] / pmax[i];
       plotWorldPixel(px[i], py[i], pr[i], pg[i], pb[i], a);
-      plotWorldPixel(px[i] + 0.15, py[i] + 0.1, pr[i], pg[i], pb[i], a * 0.5);
+      plotWorldPixel(px[i] + 0.35, py[i], pr[i], pg[i], pb[i], a);
+      plotWorldPixel(px[i], py[i] + 0.35, pr[i], pg[i], pb[i], a * 0.85);
+      plotWorldPixel(px[i] + 0.35, py[i] + 0.35, pr[i], pg[i], pb[i], a * 0.7);
+      plotWorldPixel(px[i] + 0.7, py[i] + 0.15, pr[i], pg[i], pb[i], a * 0.4);
     }
     for (i = 0; i < motes.length; i++) {
       a = motes[i];
@@ -421,6 +430,20 @@
     ctx.fillStyle = "#0a080c";
     ctx.fillRect(0, 0, cssW, cssH);
     ctx.drawImage(off, ox, oy, cssW, cssH);
+
+    if (playing && hoverOn && W > 0) {
+      var cellPx = cssW / W;
+      var br = brushRadius();
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(hoverX * cellPx, hoverY * cellPx, br * cellPx, 0, Math.PI * 2);
+      ctx.strokeStyle = tool === "dig" ? "rgba(240,200,140,0.85)" : "rgba(255,236,200,0.7)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,220,160,0.08)";
+      ctx.fill();
+      ctx.restore();
+    }
 
     var line = "rooms " + rooms + "\nalive " + alive;
     if (line !== lastHud) {

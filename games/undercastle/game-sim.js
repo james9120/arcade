@@ -2,7 +2,7 @@
   "use strict";
 
   var EMPTY = 0, SOIL = 1, SAND = 2, STONE = 3, WATER = 4, CRYSTAL = 5, MUSHROOM = 6;
-  var CELL = 4, PX = 4, GROW = 0.00016;
+  var CELL = 7, PX = 4, GROW = 0.00016;
   var SOLID = [0, 1, 1, 1, 0, 1, 1];
 
   var canvas = document.getElementById("c");
@@ -19,10 +19,11 @@
   var simTick = 0, frameTick = 0;
   var rooms = 0, alive = 0, lastHud = "";
   var painting = false, lastX = -1, lastY = -1;
+  var hoverX = 0, hoverY = 0, hoverOn = false;
   var shake = 0, caveAcc = 0, caveCool = 0;
   var muted = false;
 
-  var PMAX = 96, pc = 0;
+  var PMAX = 160, pc = 0;
   var px = new Float32Array(PMAX), py = new Float32Array(PMAX);
   var pvx = new Float32Array(PMAX), pvy = new Float32Array(PMAX);
   var plife = new Float32Array(PMAX), pmax = new Float32Array(PMAX);
@@ -177,11 +178,11 @@
         if (plife[pc] > 0) return;
       }
       i = pc;
-      px[i] = x + Math.random();
-      py[i] = y + Math.random() * 0.4;
-      pvx[i] = (Math.random() - 0.5) * 0.22;
-      pvy[i] = -0.04 - Math.random() * 0.12;
-      plife[i] = 18 + (Math.random() * 16) | 0;
+      px[i] = x + (Math.random() - 0.5) * 1.4;
+      py[i] = y + (Math.random() - 0.2) * 0.8;
+      pvx[i] = (Math.random() - 0.5) * 0.55;
+      pvy[i] = -0.12 - Math.random() * 0.28;
+      plife[i] = 34 + (Math.random() * 28) | 0;
       pmax[i] = plife[i];
       pr[i] = r; pg[i] = g; pb[i] = b;
       pc = i + 1;
@@ -213,7 +214,7 @@
     var mid = (x0 + x1 - 1) * 0.5;
     var n = 0;
     var cap, x, i, dist, half, center, chance, runCh;
-    if (span < 5) return 0;
+    if (span < 8) return 0;
     cap = span >= 14 ? 4 : span >= 9 ? 3 : 2;
     half = span * 0.5;
     for (x = x0; x < x1 && n < cap; x++) {
@@ -270,8 +271,65 @@
     caveAcc *= 0.35;
   }
 
+  function decayPacked() {
+    var x, y, i, left, right, below;
+    if ((simTick % 12) !== 0) return;
+    for (y = 0; y < H; y++) {
+      for (x = 0; x < W; x++) {
+        i = y * W + x;
+        if (grid[i] !== SOIL || packed[i] === 0) continue;
+        left = x > 0 ? grid[i - 1] : STONE;
+        right = x < W - 1 ? grid[i + 1] : STONE;
+        below = y < H - 1 ? grid[i + W] : STONE;
+        if (below === EMPTY || (left === EMPTY && right === EMPTY)) packed[i]--;
+      }
+    }
+  }
+
+  function soilRepose() {
+    var x, y, i, n = 0, left, right, below, dir, side, down, hgt, yy;
+    for (y = 0; y < H - 1; y++) {
+      for (x = 0; x < W; x++) {
+        i = y * W + x;
+        if (grid[i] !== SOIL || packed[i] > 0) continue;
+        if (nearStone(x, y)) continue;
+        left = x > 0 ? grid[i - 1] : STONE;
+        right = x < W - 1 ? grid[i + 1] : STONE;
+        below = grid[i + W];
+        if (left === EMPTY && right === EMPTY && SOLID[below]) {
+          hgt = 1;
+          for (yy = y - 1; yy >= 0 && hgt < 8; yy--) {
+            if (grid[yy * W + x] !== SOIL) break;
+            if ((x > 0 && grid[yy * W + x - 1] !== EMPTY) || (x < W - 1 && grid[yy * W + x + 1] !== EMPTY)) break;
+            hgt++;
+          }
+          if (hgt >= 4 && Math.random() < 0.04) {
+            grid[i] = SAND;
+            n++;
+            continue;
+          }
+        }
+        for (dir = -1; dir <= 1; dir += 2) {
+          if (x + dir < 0 || x + dir >= W) continue;
+          side = grid[i + dir];
+          down = grid[i + W + dir];
+          if (side !== EMPTY || down !== EMPTY) continue;
+          var back = dir === -1 ? right : left;
+          if (SOLID[below] && SOLID[back]) continue;
+          if (Math.random() < 0.016) {
+            grid[i] = SAND;
+            n++;
+            break;
+          }
+        }
+      }
+    }
+    return n;
+  }
+
   function caveIn() {
     var x, y, x0, x1, row, below, span, i, n = 0, ax = 0, ay = 0, got = 0;
+    decayPacked();
     for (y = 0; y < H - 1; y++) {
       row = y * W;
       below = row + W;
@@ -305,12 +363,17 @@
       n += got;
       if (!ax && !ay) { ax = W * 0.5 * got; ay = (H * 0.5) * got; }
     }
+    got = soilRepose();
+    if (got) {
+      n += got;
+      if (!ax && !ay) { ax = W * 0.5 * got; ay = (H * 0.5) * got; }
+    }
     collapseJuice(n, n ? ax / n : 0, n ? ay / n : 0);
     return n;
   }
 
   function slumpRun() {
-    var x, y, i, below, ch, n = 0, cap = 3, sandAdj;
+    var x, y, i, below, ch, n = 0, cap = 10, sandAdj;
     for (y = 0; y < H - 1 && n < cap; y++) {
       for (x = 0; x < W && n < cap; x++) {
         i = y * W + x;
@@ -505,6 +568,7 @@
         if (y < H - 1 && grid[p + W] === EMPTY && !visited[p + W]) { visited[p + W] = 1; queue[qt++] = p + W; }
       }
       if (sky) continue;
+      if (qt < 10) continue;
       rooms++;
       for (k = 0; k < qt; k++) sealed[queue[k]] = 1;
       grow = wet ? MUSHROOM : CRYSTAL;
