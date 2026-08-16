@@ -1,0 +1,370 @@
+<!DOCTYPE html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,user-scalable=no"><title>Downhill</title><style>html,body{margin:0;height:100%;background:#102034;overflow:hidden;touch-action:none}canvas{display:block;width:100%;height:100%}#hud{position:fixed;top:16px;width:100%;text-align:center;color:#fff;font:22px sans-serif;text-shadow:0 2px 10px #000;opacity:0}#hud.on{opacity:1}#msg{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-align:center;text-shadow:0 3px 16px #000}h1{margin:0 0 8px;letter-spacing:.12em}</style></head><body><div id=hud>0 m</div><div id=msg><h1>DOWNHILL</h1><p>tap or A / D</p></div><script type=importmap>{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js"}}</script><script type=module>
+import * as THREE from "three";
+const hud = document.getElementById("hud");
+const msg = document.getElementById("msg");
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0e1624);
+scene.fog = new THREE.Fog(0x6f88a4, 22, 110);
+const camera = new THREE.PerspectiveCamera(62, innerWidth/innerHeight, 0.1, 220);
+let fov = 62;
+scene.add(new THREE.HemisphereLight(0xc5d8f0, 0x2a3540, 0.85));
+const sun = new THREE.DirectionalLight(0xe8f0ff, 1.55);
+sun.position.set(-30, 40, 10);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -60; sun.shadow.camera.right = 60;
+sun.shadow.camera.top = 60; sun.shadow.camera.bottom = -60;
+sun.shadow.bias = -0.0004;
+scene.add(sun);
+scene.add(new THREE.AmbientLight(0x3a4458, 0.2));
+const rim = new THREE.DirectionalLight(0x6a88bb, 0.45);
+rim.position.set(30, 8, -20);
+scene.add(rim);
+const HALF = 16, TILE_LEN = 70, TILES = 5;
+function snowY(x,z){
+  const bank = Math.max(0, Math.abs(x)-11)*0.38;
+  const mogul = Math.sin(x*0.55+z*0.2)*0.22 + Math.sin(z*0.33)*0.18 + Math.sin(x*1.3+z*0.7)*0.08;
+  const gully = -Math.exp(-((x-1.5)*(x-1.5))/18)*0.35;
+  return bank + mogul + gully;
+}
+
+function snowMat(hex, r){ return new THREE.MeshStandardMaterial({color:hex, roughness:r||0.92, metalness:0.02}); }
+const groundMat = new THREE.MeshStandardMaterial({color:0xf6f9fd, roughness:0.78, metalness:0.08, vertexColors:true});
+const trackMat = new THREE.MeshStandardMaterial({color:0xb9c6d4, roughness:1, transparent:true, opacity:0.85});
+const tiles = [];
+const tileGeo = new THREE.PlaneGeometry(HALF*2+10, TILE_LEN, 36, 48);
+{
+  const pos = tileGeo.attributes.position;
+  const col = new Float32Array(pos.count*3);
+  for(let i=0;i<pos.count;i++){
+    const x = pos.getX(i), y = pos.getY(i);
+    const bank = Math.max(0, Math.abs(x)-11)*0.38;
+    const mogul = Math.sin(x*0.55+y*0.2)*0.22 + Math.sin(y*0.33)*0.18 + Math.sin(x*1.3+y*0.7)*0.08;
+    const gully = -Math.exp(-((x-1.5)*(x-1.5))/18)*0.35;
+    pos.setZ(i, bank + mogul + gully);
+    const k = 0.93 + mogul*0.08;
+    col[i*3]=k*0.93; col[i*3+1]=k*0.96; col[i*3+2]=k;
+  }
+  tileGeo.setAttribute("color", new THREE.BufferAttribute(col,3));
+  tileGeo.computeVertexNormals();
+}
+for(let i=0;i<TILES;i++){
+  const m = new THREE.Mesh(tileGeo, groundMat);
+  m.rotation.x = -Math.PI/2;
+  m.receiveShadow = true;
+  scene.add(m);
+  tiles.push(m);
+}
+function makePine(){
+  const g = new THREE.Group();
+  const bark = new THREE.MeshStandardMaterial({color:0x2c1c12, roughness:1});
+  const needle = new THREE.MeshStandardMaterial({color:0x0e2a16, roughness:0.78});
+  const snow = new THREE.MeshStandardMaterial({color:0xf2f6fb, roughness:0.95});
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.2,2.1,7), bark);
+  trunk.position.y = 0.95; trunk.castShadow = true; g.add(trunk);
+  const h = 1.6 + Math.random()*1.4;
+  const layers = 5 + (Math.random()*3|0);
+  for(let i=0;i<layers;i++){
+    const f = i/(layers-1);
+    const r = (1.35 - f*0.95) * (0.85+Math.random()*0.25);
+    const hh = 0.7 + Math.random()*0.35;
+    const c = new THREE.Mesh(new THREE.ConeGeometry(r, hh, 6 + (i%2)), needle);
+    c.position.set((Math.random()-0.5)*0.15, 1.15 + f*h, (Math.random()-0.5)*0.15);
+    c.rotation.y = Math.random()*6;
+    c.rotation.z = (Math.random()-0.5)*0.12;
+    c.castShadow = true; c.receiveShadow = true;
+    g.add(c);
+    if(i>1){
+      const cap = new THREE.Mesh(new THREE.ConeGeometry(r*0.55, 0.18, 6), snow);
+      cap.position.copy(c.position); cap.position.y += hh*0.28;
+      cap.rotation.copy(c.rotation);
+      g.add(cap);
+    }
+  }
+  g.scale.setScalar(0.85 + Math.random()*0.5);
+  return g;
+}
+function makeRock(){
+  const m = new THREE.Mesh(new THREE.DodecahedronGeometry(0.55,0), new THREE.MeshStandardMaterial({color:0x5b5a58, roughness:0.95}));
+  m.scale.set(1.1,0.7,0.9); m.castShadow = true; return m;
+}
+function makeSkier(jacket, pants){
+  jacket = jacket || 0xb83228; pants = pants || 0x1a1f28;
+  const g = new THREE.Group();
+  const j = new THREE.MeshStandardMaterial({color:jacket, roughness:0.55});
+  const p = new THREE.MeshStandardMaterial({color:pants, roughness:0.7});
+  const skiM = new THREE.MeshStandardMaterial({color:0x141820, roughness:0.3, metalness:0.2});
+  const helmM = new THREE.MeshStandardMaterial({color:0xe8eef4, roughness:0.4});
+  const bootM = new THREE.MeshStandardMaterial({color:0x2a2018, roughness:0.8});
+  const poleM = new THREE.MeshStandardMaterial({color:0xb8bcc2, metalness:0.4, roughness:0.3});
+
+  for (const s of [-1, 1]) {
+    const ski = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.04, 1.65), skiM);
+    ski.position.set(s * 0.11, 0.02, 0.22);
+    ski.castShadow = true;
+    g.add(ski);
+    const tip = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.03, 0.16), skiM);
+    tip.position.set(s * 0.11, 0.07, 1.02);
+    tip.rotation.x = -0.45;
+    g.add(tip);
+    const boot = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.09, 0.2), bootM);
+    boot.position.set(s * 0.11, 0.08, 0.18);
+    g.add(boot);
+  }
+
+  const hips = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), p);
+  hips.scale.set(1.2, 0.75, 0.9);
+  hips.position.set(0, 0.42, 0.12);
+  g.add(hips);
+
+  for (const s of [-1, 1]) {
+    const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.28, 8), p);
+    thigh.position.set(s * 0.08, 0.28, 0.16);
+    thigh.rotation.x = 0.55;
+    g.add(thigh);
+    const shin = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.05, 0.22, 8), p);
+    shin.position.set(s * 0.1, 0.14, 0.2);
+    g.add(shin);
+  }
+
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.28, 6, 10), j);
+  body.position.set(0, 0.72, 0.18);
+  body.rotation.x = 0.55;
+  body.castShadow = true;
+  g.add(body);
+
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.08, 8), j);
+  neck.position.set(0, 0.92, 0.28);
+  g.add(neck);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 10), helmM);
+  head.position.set(0, 1.04, 0.32);
+  g.add(head);
+  const brim = new THREE.Mesh(new THREE.SphereGeometry(0.125, 12, 8, 0, Math.PI*2, 0, 0.7), new THREE.MeshStandardMaterial({color:0x1a222c, roughness:0.25}));
+  brim.position.set(0, 1.02, 0.36);
+  brim.rotation.x = 1.2;
+  g.add(brim);
+
+  for (const s of [-1, 1]) {
+    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.035, 0.28, 4, 8), j);
+    arm.position.set(s * 0.2, 0.72, 0.22);
+    arm.rotation.z = -s * 0.55;
+    arm.rotation.x = 0.7;
+    g.add(arm);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.95, 6), poleM);
+    pole.position.set(s * 0.28, 0.42, 0.12);
+    pole.rotation.x = 0.35;
+    pole.rotation.z = -s * 0.08;
+    g.add(pole);
+  }
+  return g;
+}
+const player = makeSkier();
+scene.add(player);
+const hazards = [];
+function placeHazards(){
+  for(const h of hazards) scene.remove(h.mesh);
+  hazards.length = 0;
+  for(let z=20; z<TILE_LEN*TILES-8; z+=6){
+    const side = Math.random()<0.5 ? -1 : 1;
+    const mesh = makePine();
+    const x = side * (7 + Math.random()*7);
+    mesh.position.set(x, 0, z);
+    scene.add(mesh);
+    hazards.push({kind:"tree", mesh, x, z, r:0.55, vz:0});
+  }
+  for(let z=70; z<TILE_LEN*TILES-10; z+=14){
+    const kind = Math.random()<0.45 ? "rock" : "skier";
+    const mesh = kind==="rock" ? makeRock() : makeSkier(0x2b6cb0, 0x222222);
+    const x = (Math.random()*2-1) * 5;
+    mesh.position.set(x, kind==="rock"?0.22:0, z);
+    if(kind==="skier") mesh.rotation.y = Math.PI;
+    scene.add(mesh);
+    hazards.push({kind, mesh, x, z, r: kind==="rock"?0.55:0.5, vz: kind==="skier"? 8+Math.random()*4 : 0});
+  }
+}
+const SPRAY_N = 520;
+const sprayPos = new Float32Array(SPRAY_N*3);
+const sprayVel = [];
+const sprayGeo = new THREE.BufferGeometry();
+sprayGeo.setAttribute("position", new THREE.BufferAttribute(sprayPos,3));
+const spray = new THREE.Points(sprayGeo, new THREE.PointsMaterial({color:0xf4f8fc, size:0.55, transparent:true, opacity:1, depthWrite:false}));
+scene.add(spray);
+for(let i=0;i<SPRAY_N;i++){ sprayVel.push(new THREE.Vector3()); sprayPos[i*3+1]=-20; }
+const flakeN = 400;
+const flakePos = new Float32Array(flakeN*3);
+for(let i=0;i<flakeN;i++){
+  flakePos[i*3] = (Math.random()*2-1)*40;
+  flakePos[i*3+1] = Math.random()*18;
+  flakePos[i*3+2] = Math.random()*220;
+}
+const flakes = new THREE.Points(new THREE.BufferGeometry().setAttribute("position", new THREE.BufferAttribute(flakePos,3)),
+  new THREE.PointsMaterial({color:0xffffff, size:0.07, transparent:true, opacity:0.55, depthWrite:false}));
+scene.add(flakes);
+const tracks = [];
+function addTrack(x,z){
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.9), trackMat);
+  m.rotation.x = -Math.PI/2;
+  m.position.set(x, 0.03, z);
+  scene.add(m);
+  tracks.push(m);
+  if(tracks.length>180){ scene.remove(tracks.shift()); }
+}
+let state = "ready", steer = 0, lean = 0, edge = 0;
+let vx=0, vz=0, x=0, z=0, yaw=0, dist=0, best=0, wipeT=0, lastTrack=0;
+const keys = {};
+let touchX = 0, touching=false;
+function resetRun(start){
+  x=0; z=0; vx=0; vz = start? 9 : 0; yaw=0; lean=0; edge=0; dist=0; wipeT=0; lastTrack=0;
+  player.rotation.set(0,Math.PI,0);
+  player.position.set(0, snowY(0,0)+0.02, 0);
+  for(let i=0;i<TILES;i++) tiles[i].position.set(0,0, i*TILE_LEN + TILE_LEN/2);
+  placeHazards();
+  while(tracks.length) scene.remove(tracks.pop());
+}
+resetRun(false);
+function setState(s){
+  state=s;
+  if(s==="ready"){
+    hud.classList.remove("on");
+    msg.innerHTML = "<h1>DOWNHILL</h1><p>tap or press A / D</p>" + (best? "<p class=big>best "+best+" m</p>":"");
+    msg.style.display="flex";
+  } else if(s==="run"){
+    hud.classList.add("on");
+    msg.style.display="none";
+    resetRun(true);
+  } else {
+    hud.classList.add("on");
+    msg.innerHTML = "<h1>WIPED OUT</h1><p class=big>"+(dist|0)+" m</p><p>tap to retry</p>";
+    msg.style.display="flex";
+    if(dist>best) best=dist|0;
+  }
+}
+function startOrRetry(){ if(state!=="run") setState("run"); }
+addEventListener("keydown", e=>{
+  keys[e.code]=true;
+  if(["ArrowLeft","ArrowRight","KeyA","KeyD","Space"].includes(e.code)){ e.preventDefault(); startOrRetry(); }
+});
+addEventListener("keyup", e=> keys[e.code]=false);
+function onPtr(e, down){
+  const cx = e.touches ? e.touches[0].clientX : e.clientX;
+  if(down){ touching=true; touchX=cx; startOrRetry(); }
+  else if(!e.touches || e.touches.length===0) touching=false;
+  else touchX = e.touches[0].clientX;
+}
+addEventListener("pointerdown", e=> onPtr(e,true));
+addEventListener("pointerup", e=> onPtr(e,false));
+addEventListener("pointermove", e=> { if(touching) touchX=e.clientX; });
+addEventListener("touchstart", e=> onPtr(e,true), {passive:false});
+addEventListener("touchmove", e=> { e.preventDefault(); onPtr(e,true); }, {passive:false});
+addEventListener("touchend", e=> onPtr(e,false));
+function emitSpray(amount, skid){
+  let n = amount|0;
+  while(n--){
+    const i = (Math.random()*SPRAY_N)|0;
+    const side = Math.random()<0.5? -0.13: 0.13;
+    sprayPos[i*3] = x + side;
+    sprayPos[i*3+1] = 0.2;
+    sprayPos[i*3+2] = z - 0.3;
+    sprayVel[i].set((Math.random()-0.5)*(skid?3.4:1.4), 1.8+Math.random()*2.4, -2.2-Math.random()*3);
+  }
+}
+const clock = new THREE.Clock();
+function tick(){
+  const dt = Math.min(clock.getDelta(), 0.033);
+  requestAnimationFrame(tick);
+  let input=0;
+  if(keys.ArrowLeft||keys.KeyA) input-=1;
+  if(keys.ArrowRight||keys.KeyD) input+=1;
+  if(touching) input += (touchX/innerWidth - 0.5)*2;
+  input = THREE.MathUtils.clamp(input,-1,1);
+  steer = THREE.MathUtils.damp(steer, input, 8, dt);
+  if(state==="run"){
+    vz = Math.min(28, vz + 3.2*dt);
+    const skid = Math.abs(steer)*(vz/18) > 0.55;
+    const grip = skid? 4.2 : 9.5;
+    vx += ((steer * (skid? 9.5: 7.2)) - vx) * Math.min(1, grip*dt);
+    x += vx*dt; z += vz*dt; dist = z;
+    if(x>HALF-0.8){ x=HALF-0.8; vx*=-0.2; emitSpray(8,true); }
+    if(x<-HALF+0.8){ x=-HALF+0.8; vx*=-0.2; emitSpray(8,true); }
+    lean = THREE.MathUtils.damp(lean, -steer*0.95, 10, dt);
+    yaw = THREE.MathUtils.damp(yaw, -steer*0.4, 8, dt);
+    const ground = snowY(x,z);
+    const sink = 0.02 + (skid?0.01:0);
+    player.position.set(x, ground + sink, z);
+    player.rotation.set(0.18 + (vz/28)*0.28 + Math.abs(steer)*0.18, Math.PI + yaw, lean);
+    if(z-lastTrack>0.45){ lastTrack=z; addTrack(x-0.13, z-0.2); addTrack(x+0.13, z-0.2); }
+    emitSpray(skid? 70: 36, true);
+    for(const h of hazards){
+      if(h.vz){ h.z += h.vz*dt; h.mesh.position.z = h.z; }
+      const dx=x-h.x, dz=z-h.z;
+      if(dx*dx+dz*dz < (h.r+0.35)*(h.r+0.35) && h.z>z-1.2 && h.z<z+1.4) setState("wiped");
+    }
+    hud.textContent = (dist|0) + " m";
+  } else if(state==="wiped"){
+    wipeT += dt;
+    player.rotation.x += 2.8*dt;
+    player.rotation.z += 1.6*dt;
+    player.position.y = Math.max(0.2, player.position.y - 1.2*dt);
+    vx*=0.9; vz*=0.86; x+=vx*dt; z+=vz*dt;
+    player.position.x=x; player.position.z=z;
+  } else {
+    player.position.set(0, snowY(0,0)+0.02, 0);
+    player.rotation.set(0,Math.PI,0);
+  }
+  const baseZ = player.position.z;
+  for(const t of tiles){ if(t.position.z + TILE_LEN/2 < baseZ-20) t.position.z += TILE_LEN*TILES; }
+  for(const h of hazards){
+    if(h.z < baseZ-18){
+      h.z += TILE_LEN*TILES*0.55;
+      h.x = (Math.random()*2-1)*(HALF-2.2);
+      h.mesh.position.set(h.x, h.kind==="rock"?0.22:0, h.z);
+    }
+  }
+  for(let i=0;i<SPRAY_N;i++){
+    sprayPos[i*3] += sprayVel[i].x*dt;
+    sprayPos[i*3+1] += sprayVel[i].y*dt;
+    sprayPos[i*3+2] += sprayVel[i].z*dt;
+    sprayVel[i].y -= 8*dt;
+    if(sprayPos[i*3+1]<0) sprayPos[i*3+1]=-20;
+  }
+  spray.geometry.attributes.position.needsUpdate = true;
+  for(let i=0;i<flakeN;i++){
+    flakePos[i*3] += -4*dt;
+    flakePos[i*3+1] -= 3.2*dt;
+    flakePos[i*3+2] += 2*dt;
+    if(flakePos[i*3+1]<0){
+      flakePos[i*3+1]=16;
+      flakePos[i*3]=player.position.x+(Math.random()*2-1)*30;
+      flakePos[i*3+2]=player.position.z+Math.random()*80;
+    }
+  }
+  flakes.geometry.attributes.position.needsUpdate = true;
+  const spd = state==="run" ? vz/28 : 0;
+  const look = new THREE.Vector3(player.position.x*0.85, player.position.y+0.9, player.position.z+7);
+  const cam = new THREE.Vector3(player.position.x*0.55 + lean*1.2, player.position.y+2.4 - spd*0.4, player.position.z-6.2 + spd*0.8);
+  camera.position.lerp(cam, 1-Math.pow(0.0008, dt));
+  camera.lookAt(look);
+  fov = THREE.MathUtils.damp(fov, 62 + spd*16, 4, dt);
+  camera.fov = fov; camera.updateProjectionMatrix();
+  camera.position.x += (Math.random()-0.5)*spd*0.04;
+  camera.position.y += (Math.random()-0.5)*spd*0.03;
+  sun.position.set(player.position.x-40, 30, player.position.z+8);
+  sun.target.position.copy(player.position);
+  sun.target.updateMatrixWorld();
+  renderer.render(scene, camera);
+}
+addEventListener("resize", ()=>{
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+tick();
+
+</script></body></html>
