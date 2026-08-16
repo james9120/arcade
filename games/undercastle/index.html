@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#0a080c" />
-  <title>Undercastle</title>
+  <title>Undercastle · s20</title>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -63,6 +63,7 @@
       display: flex; align-items: center; gap: 0.45rem;
     }
     #stats {
+      display: none;
       pointer-events: none;
       text-align: right;
       font-size: 0.62rem; font-weight: 700;
@@ -130,6 +131,17 @@
     }
     #tools button#clear.on { color: #f6e4c0; }
     #tools button:active { transform: scale(0.97); }
+    #tools .tool-empty {
+      flex: 0.88;
+      min-width: 2.2rem;
+      max-width: 3.4rem;
+      min-height: 3.35rem;
+      border-radius: 0.8rem;
+      border: 1px dashed #3a3028;
+      background: #100e0c;
+      box-shadow: inset 0 0 0 1px #1c1814;
+      pointer-events: none;
+    }
 
     #app:not(.play) #tools { display: none; }
     #app:not(.play) #title, #app:not(.play) #hud, #app:not(.play) #menu, #app:not(.play) #goal {
@@ -287,7 +299,7 @@
     <div id="stage">
       <a id="home" href="../../">Arcade</a>
       <button type="button" id="menu">Menu</button>
-      <div id="title">Undercastle</div>
+      <div id="title">Undercastle · s20</div>
       <div id="goal"></div>
       <div id="toast"></div>
       <div id="hud">
@@ -303,14 +315,14 @@
       <canvas id="c"></canvas>
     </div>
     <nav id="tools">
-      <button type="button" data-tool="dig">
+      <button type="button" data-tool="dig" class="on">
         <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
           <path d="M9.8 2.2l4 4-1.2 1.2-4-4L9.8 2.2z" fill="currentColor"/>
           <path d="M8.2 5.2l2.6 2.6-6.4 6.2H2.2v-2.1L8.2 5.2z" fill="currentColor" opacity="0.85"/>
         </svg>
         Dig
       </button>
-      <button type="button" data-tool="soil" class="on">
+      <button type="button" data-tool="soil">
         <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
           <path d="M2 11.2c1.4-3.2 3-5.4 6-5.4s4.6 2.2 6 5.4H2z" fill="currentColor"/>
           <path d="M3.2 11.2h9.6v2.2H3.2z" fill="currentColor" opacity="0.7"/>
@@ -330,6 +342,7 @@
         </svg>
         Water
       </button>
+      <div class="tool-empty" aria-hidden="true"></div>
       <button type="button" id="clear" data-tool="clear">
         <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
           <path d="M4 4l8 8M12 4L4 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
@@ -342,8 +355,8 @@
         <div class="wordmark">Undercastle</div>
         <p class="tag">Carve a palace from the earth.</p>
         <div id="stamp">Master Builder</div>
-        <button type="button" class="cta primary" id="btn-sandbox">Sandbox</button>
-        <button type="button" class="cta" id="btn-charter">Charter</button>
+        <button type="button" class="cta primary" id="btn-continue">Continue</button>
+        <button type="button" class="cta" id="btn-new">New</button>
         <div class="row">
           <button type="button" class="cta" id="btn-how">How</button>
           <button type="button" class="cta" id="btn-mute2">Mute</button>
@@ -358,10 +371,2126 @@
       </div>
     </div>
   </div>
-  <script src="game-sim.js"></script>
-  <script src="game-view.js"></script>
-  <script src="game-input.js"></script>
-  <script src="game-audio.js"></script>
+  <script>
+(function () {
+
+  "use strict";
+
+  var EMPTY = 0, SOIL = 1, SAND = 2, STONE = 3, WATER = 4, CRYSTAL = 5, MUSHROOM = 6;
+  var CELL = 7, PX = 4, GROW = 0.00016;
+  var SOLID = [0, 1, 1, 1, 0, 1, 1];
+
+  var canvas = document.getElementById("c");
+  var ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+  var statsEl = document.getElementById("stats");
+  var muteBtn = document.getElementById("mute");
+  var buttons = document.querySelectorAll("#tools button");
+
+  var W = 0, H = 0, N = 0, cssW = 0, cssH = 0, dpr = 1;
+  var grid, spans, visited, moved, queue, sealed, light, glowR, glowG, glowB, colLight, packed, held;
+  var off, offCtx, img, pix, imgW = 0, imgH = 0;
+
+  var tool = "dig";
+  var simTick = 0, frameTick = 0;
+  var rooms = 0, alive = 0, lastHud = "";
+  var painting = false, lastX = -1, lastY = -1;
+  var hoverX = 0, hoverY = 0, hoverOn = false;
+  var zoom = 1, viewX = 0, viewY = 0;
+  var pins = {}, pinching = false, pinchDist0 = 0, pinchZoom0 = 1, pinchFX = 0, pinchFY = 0;
+  var shake = 0, caveAcc = 0, caveCool = 0;
+  var muted = false;
+
+  var PMAX = 160, pc = 0;
+  var px = new Float32Array(PMAX), py = new Float32Array(PMAX);
+  var pvx = new Float32Array(PMAX), pvy = new Float32Array(PMAX);
+  var plife = new Float32Array(PMAX), pmax = new Float32Array(PMAX);
+  var pr = new Uint8Array(PMAX), pg = new Uint8Array(PMAX), pb = new Uint8Array(PMAX);
+
+  var motes = [];
+  var audio = null;
+
+  var SAVE_KEY = "undercastle.v1";
+  var appEl = document.getElementById("app");
+  var goalEl = document.getElementById("goal");
+  var toastEl = document.getElementById("toast");
+  var stampEl = document.getElementById("stamp");
+  var menuBtn = document.getElementById("menu");
+  var mute2 = document.getElementById("btn-mute2");
+  var screen = "title";
+  var playing = false;
+  var mode = "sandbox";
+  var charterStep = 0;
+  var charterDone = false;
+  var hallTime = 0;
+  var goldFlash = 0;
+  var dirty = false;
+  var lastSaveAt = 0;
+  var lastFrameT = 0;
+  var toastT = 0;
+  var loadedOnce = false;
+  var pendingSave = null;
+
+  var SKY_DAY = 0.25, SKY_NIGHT = 0.75;
+  var skyLock = null, skyClock = SKY_DAY, skyCaptureBooted = false;
+  try {
+    var skyQ = (new URLSearchParams(window.location.search).get("sky") || "").toLowerCase();
+    if (skyQ === "day") skyLock = "day";
+    else if (skyQ === "night") skyLock = "night";
+  } catch (e) {}
+
+  function skyPhase() {
+    if (skyLock === "day") return SKY_DAY;
+    if (skyLock === "night") return SKY_NIGHT;
+    return skyClock;
+  }
+
+  function skyDayness() {
+    return 0.5 + 0.5 * Math.cos((skyPhase() - SKY_DAY) * Math.PI * 2);
+  }
+
+  function sunCell() {
+    var d = skyPhase() - SKY_DAY;
+    return { x: W * (0.28 + d * 0.50), y: H * (0.08 + d * d * 1.05) };
+  }
+
+  function moonCell() {
+    var d = skyPhase() - SKY_NIGHT;
+    return { x: W * (0.78 + d * 0.46), y: H * (0.10 + d * d * 0.90) };
+  }
+
+  function skyPix(px, py) {
+    var gx = (px / PX) | 0, gy = (py / PX) | 0;
+    if (gx < 0 || gy < 0 || gx >= W || gy >= H) return false;
+    var i = gy * W + gx;
+    return grid[i] === EMPTY && !sealed[i];
+  }
+
+  function clamp8(v) {
+    return v < 0 ? 0 : v > 255 ? 255 : v | 0;
+  }
+
+  function hash(x, y) {
+    var n = ((x * 374761393) + (y * 668265263)) >>> 0;
+    n = Math.imul(n ^ (n >>> 13), 1274126177);
+    return n >>> 0;
+  }
+
+  function alloc() {
+    grid = new Uint8Array(N);
+    spans = new Uint16Array(N);
+    visited = new Uint8Array(N);
+    moved = new Uint8Array(N);
+    queue = new Int32Array(N);
+    sealed = new Uint8Array(N);
+    light = new Float32Array(N);
+    glowR = new Float32Array(N);
+    glowG = new Float32Array(N);
+    glowB = new Float32Array(N);
+    colLight = new Float32Array(W);
+    packed = new Uint8Array(N);
+    held = new Uint8Array(N);
+    imgW = W * PX;
+    imgH = H * PX;
+    off = document.createElement("canvas");
+    off.width = imgW;
+    off.height = imgH;
+    offCtx = off.getContext("2d", { alpha: false });
+    img = offCtx.createImageData(imgW, imgH);
+    pix = img.data;
+  }
+
+  function worldHasDirt() {
+    var i, n = 0;
+    for (i = 0; i < N; i++) {
+      if (grid[i] === SOIL || grid[i] === SAND) n++;
+    }
+    return n >= 80;
+  }
+
+  function plantHill() {
+    var floorY = H - 3;
+    var hillW = Math.max(10, ((W * 48) / 100) | 0);
+    var peak = 13;
+    var cx = (W >> 1) + ((hash(7, 3) % 5) - 2);
+    var half = hillW * 0.5;
+    var x, y, i, dx, u, n, h;
+    for (x = 0; x < W; x++) {
+      dx = (x + 0.5 - cx) / half;
+      if (dx < -1 || dx > 1) continue;
+      u = dx < 0 ? -dx : dx;
+      n = ((hash(x, 29) & 7) - 3) * 0.35;
+      h = (peak * (1 - u * u) + n + 0.5) | 0;
+      if (h < 1) h = 1;
+      if (h > 16) h = 16;
+      for (y = floorY - h; y < floorY; y++) {
+        if (y < 0) continue;
+        i = y * W + x;
+        grid[i] = SOIL;
+        packed[i] = 255;
+      }
+    }
+  }
+
+  function generate() {
+    grid.fill(EMPTY);
+    sealed.fill(0);
+    if (packed) packed.fill(0);
+    var x, y;
+    for (y = H - 3; y < H; y++) {
+      for (x = 0; x < W; x++) grid[y * W + x] = STONE;
+    }
+    plantHill();
+    pc = 0;
+    shake = 0;
+    caveAcc = 0;
+    caveCool = 0;
+    rooms = 0;
+    alive = 0;
+    hallTime = 0;
+    dirty = true;
+    seedMotes();
+  }
+
+  function seedMotes() {
+    motes.length = 0;
+    var i, n = 14;
+    for (i = 0; i < n; i++) {
+      motes.push({
+        x: Math.random() * Math.max(W, 1),
+        y: Math.random() * Math.max(H * 0.55, 1),
+        vx: (Math.random() - 0.5) * 0.015,
+        vy: (Math.random() - 0.4) * 0.01,
+        ph: Math.random() * 6.28
+      });
+    }
+  }
+
+  function fit() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var cw = canvas.clientWidth;
+    var ch = canvas.clientHeight;
+    if (cw < 8 || ch < 8) return false;
+    cssW = cw;
+    cssH = ch;
+    canvas.width = (cw * dpr) | 0;
+    canvas.height = (ch * dpr) | 0;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    var nw = Math.max(24, (cw / CELL) | 0);
+    var nh = Math.max(24, (ch / CELL) | 0);
+    if (nw !== W || nh !== H) {
+      var oldG = grid, oldW = W, oldH = H;
+      W = nw;
+      H = nh;
+      N = W * H;
+      alloc();
+      generate();
+      if (oldG && oldW) blitGrid(oldG, oldW, oldH);
+      else if (!loadedOnce) {
+        loadedOnce = true;
+        bootSave();
+      }
+    }
+    clampView();
+    return true;
+  }
+
+  function blitGrid(src, sw, sh) {
+    var cw = Math.min(W, sw), ch = Math.min(H, sh), x, y;
+    for (y = 0; y < ch; y++) {
+      var sy = sh - ch + y, dy = H - ch + y;
+      for (x = 0; x < cw; x++) grid[dy * W + x] = src[sy * sw + x];
+    }
+  }
+
+  function nearStone(x, y) {
+    var dx, dy, xx, yy;
+    for (dy = -1; dy <= 1; dy++) {
+      yy = y + dy;
+      if (yy < 0 || yy >= H) continue;
+      for (dx = -1; dx <= 1; dx++) {
+        xx = x + dx;
+        if (xx < 0 || xx >= W) continue;
+        if (grid[yy * W + xx] === STONE) return true;
+      }
+    }
+    return false;
+  }
+
+  function spawnDust(x, y, n, r, g, b) {
+    var i, k;
+    for (k = 0; k < n; k++) {
+      if (pc >= PMAX) {
+        for (i = 0; i < PMAX; i++) if (plife[i] <= 0) { pc = i; break; }
+        if (plife[pc] > 0) return;
+      }
+      i = pc;
+      px[i] = x + (Math.random() - 0.5) * 1.4;
+      py[i] = y + (Math.random() - 0.2) * 0.8;
+      pvx[i] = (Math.random() - 0.5) * 0.55;
+      pvy[i] = -0.12 - Math.random() * 0.28;
+      plife[i] = 34 + (Math.random() * 28) | 0;
+      pmax[i] = plife[i];
+      pr[i] = r; pg[i] = g; pb[i] = b;
+      pc = i + 1;
+    }
+  }
+
+  function tryCrumble(x, y, ch) {
+    if (x < 0 || y < 0 || x >= W || y >= H) return 0;
+    var i = y * W + x;
+    if (grid[i] !== SOIL) return 0;
+    if (packed[i] > 0) return 0;
+    if (nearStone(x, y)) return 0;
+    if (Math.random() >= ch) return 0;
+    grid[i] = SAND;
+    return 1;
+  }
+
+  function crumbleNear(x, y, span) {
+    var ch = 0.07 + span * 0.028;
+    if (ch > 0.42) ch = 0.42;
+    return tryCrumble(x - 1, y, ch)
+      + tryCrumble(x + 1, y, ch)
+      + tryCrumble(x, y - 1, ch * 0.82)
+      + tryCrumble(x - 1, y - 1, ch * 0.48)
+      + tryCrumble(x + 1, y - 1, ch * 0.48);
+  }
+
+
+  function dirtWidth(x, y) {
+    if (y < 0 || y >= H || x < 0 || x >= W || grid[y * W + x] !== SOIL) return 0;
+    var x0 = x, x1 = x + 1;
+    while (x0 > 0 && grid[y * W + x0 - 1] === SOIL) x0--;
+    while (x1 < W && grid[y * W + x1] === SOIL) x1++;
+    return x1 - x0;
+  }
+
+  function thinDirt(x, y) {
+    var w = dirtWidth(x, y);
+    return w > 0 && w <= 3;
+  }
+
+  function isDirtColumn(x, y) {
+    if (!thinDirt(x, y)) return 0;
+    var h = 1, yy;
+    for (yy = y; yy >= 0; yy--) {
+      if (grid[yy * W + x] !== SOIL) break;
+      if ((x > 0 && isHangSoil(yy, x - 1)) || (x < W - 1 && isHangSoil(yy, x + 1))) return 0;
+    }
+    for (yy = y - 1; yy >= 0; yy--) {
+      if (!thinDirt(x, yy)) break;
+      h++;
+    }
+    for (yy = y + 1; yy < H; yy++) {
+      if (!thinDirt(x, yy)) break;
+      h++;
+    }
+    return h >= 2;
+  }
+
+  function isFreeSliver(x, y) {
+    if (!isHangSoil(y, x)) return 0;
+    var x0 = x, x1, under;
+    while (x0 > 0 && isHangSoil(y, x0 - 1)) x0--;
+    x1 = roofRunEnd(y, x0);
+    under = y + 1;
+    if (x0 > 0 && grid[under * W + x0 - 1] === SOIL) return 0;
+    if (x1 < W && grid[under * W + x1] === SOIL) return 0;
+    return 1;
+  }
+
+  function failSpan(x0, x1, y, span) {
+    var n = 0;
+    var x, i;
+    if (span < 1) return 0;
+    for (x = x0; x < x1; x++) {
+      i = y * W + x;
+      if (grid[i] !== SOIL) continue;
+      if (packed[i] > 0) continue;
+      if (nearStone(x, y)) continue;
+      if (span >= 3 && span < 8 && !isFreeSliver(x, y)) continue;
+      grid[i] = SAND;
+      n++;
+      n += crumbleNear(x, y, span);
+    }
+    return n;
+  }
+
+  function collapseJuice(n, ax, ay) {
+    if (caveCool > 0) caveCool--;
+    if (n <= 0) {
+      caveAcc *= 0.8;
+      return;
+    }
+    caveAcc = caveAcc * 0.7 + n;
+    var dust = n <= 2 ? 2 : n <= 6 ? 3 + (n >> 1) : Math.min(12, 6 + (n >> 2));
+    spawnDust(ax, ay, dust, 196, 164, 104);
+    if (caveAcc < 3) return;
+    if (caveAcc < 7) {
+      shake = Math.max(shake, 0.26 + caveAcc * 0.05);
+      return;
+    }
+    if (caveCool > 0) return;
+    shake = Math.min(3.4, Math.max(shake, 0.95 + caveAcc * 0.07));
+    sfxRumble(caveAcc | 0);
+    caveCool = 40;
+    caveAcc *= 0.35;
+  }
+
+  function decayPacked() {
+    var x, y, i, left, right, below, supported, span, hgt, yy, tick;
+    tick = (simTick % 8) === 0;
+    for (y = 0; y < H; y++) {
+      for (x = 0; x < W; x++) {
+        i = y * W + x;
+        if (grid[i] !== SOIL) continue;
+        left = x > 0 ? grid[i - 1] : STONE;
+        right = x < W - 1 ? grid[i + 1] : STONE;
+        below = y < H - 1 ? grid[i + W] : STONE;
+        supported = !!(SOLID[below] && below !== SAND);
+        span = spans[i];
+        if (isDirtColumn(x, y) || isFreeSliver(x, y)) {
+          packed[i] = 0;
+          continue;
+        }
+        if (below === EMPTY && span >= 8) {
+          if (packed[i] === 255) packed[i] = 0;
+          else if (tick && packed[i] > 0) packed[i]--;
+          continue;
+        }
+        if (below === SAND) {
+          if (packed[i] === 255) packed[i] = 0;
+          else if (tick && packed[i] > 0) packed[i]--;
+          continue;
+        }
+        if (supported || (span >= 3 && span < 8)) {
+          if (packed[i] === 255) continue;
+          if (supported) {
+            packed[i] = 255;
+            continue;
+          }
+          if (tick) {
+            if (packed[i] > 0) packed[i]--;
+            else packed[i] = 255;
+          }
+        } else {
+          if (packed[i] === 255) packed[i] = 40;
+          else if (tick && packed[i] > 0) packed[i]--;
+        }
+      }
+    }
+  }
+
+  function soilRepose() {
+    var x, y, i, n = 0, left, right, below, dir, side, down, hgt, yy;
+    for (y = 0; y < H - 1; y++) {
+      for (x = 0; x < W; x++) {
+        i = y * W + x;
+        if (grid[i] !== SOIL || packed[i] > 0) continue;
+        if (isDirtColumn(x, y) || isFreeSliver(x, y)) {
+          grid[i] = SAND;
+          n++;
+          continue;
+        }
+        if (nearStone(x, y)) continue;
+        left = x > 0 ? grid[i - 1] : STONE;
+        right = x < W - 1 ? grid[i + 1] : STONE;
+        below = grid[i + W];
+        for (dir = -1; dir <= 1; dir += 2) {
+          if (x + dir < 0 || x + dir >= W) continue;
+          side = grid[i + dir];
+          down = grid[i + W + dir];
+          if (side !== EMPTY || down !== EMPTY) continue;
+          var back = dir === -1 ? right : left;
+          if (SOLID[below] && SOLID[back]) continue;
+          if (Math.random() < 0.016) {
+            grid[i] = SAND;
+            n++;
+            break;
+          }
+        }
+      }
+    }
+    return n;
+  }
+
+
+  function isHangSoil(y, x) {
+    return x >= 0 && x < W && y >= 0 && y < H - 1
+      && grid[y * W + x] === SOIL && grid[(y + 1) * W + x] === EMPTY;
+  }
+
+  function roofRunEnd(y, x0) {
+    var x1 = x0 + 1;
+    var t, skipped = 0;
+    while (x1 < W) {
+      if (isHangSoil(y, x1)) {
+        x1++;
+        continue;
+      }
+      t = grid[y * W + x1];
+      if (!skipped && (t === EMPTY || t === SAND) && isHangSoil(y, x1 + 1)) {
+        skipped = 1;
+        x1++;
+        continue;
+      }
+      break;
+    }
+    return x1;
+  }
+
+  function caveIn() {
+    var x, y, x0, x1, row, below, span, i, n = 0, ax = 0, ay = 0, got = 0;
+    for (y = 0; y < H - 1; y++) {
+      row = y * W;
+      below = row + W;
+      x = 0;
+      while (x < W) {
+        if (grid[row + x] === SOIL && grid[below + x] === EMPTY) {
+          x0 = x;
+          x1 = roofRunEnd(y, x0);
+          span = x1 - x0;
+          for (x = x0; x < x1; x++) {
+            i = row + x;
+            if (grid[i] === SOIL && grid[below + x] === EMPTY) spans[i] = span;
+            else spans[i] = 0;
+          }
+          x = x1;
+        } else {
+          spans[row + x] = 0;
+          x++;
+        }
+      }
+    }
+    decayPacked();
+    for (y = 0; y < H - 1; y++) {
+      row = y * W;
+      below = row + W;
+      x = 0;
+      while (x < W) {
+        if (grid[row + x] === SOIL && grid[below + x] === EMPTY) {
+          x0 = x;
+          x1 = roofRunEnd(y, x0);
+          span = x1 - x0;
+          got = failSpan(x0, x1, y, span);
+          if (got) {
+            n += got;
+            ax += ((x0 + x1 - 1) * 0.5) * got;
+            ay += y * got;
+          }
+          x = x1;
+        } else {
+          x++;
+        }
+      }
+    }
+    got = slumpRun();
+    if (got) {
+      n += got;
+      if (!ax && !ay) { ax = W * 0.5 * got; ay = (H * 0.5) * got; }
+    }
+    got = soilRepose();
+    if (got) {
+      n += got;
+      if (!ax && !ay) { ax = W * 0.5 * got; ay = (H * 0.5) * got; }
+    }
+    collapseJuice(n, n ? ax / n : 0, n ? ay / n : 0);
+    return n;
+  }
+
+  function slumpRun() {
+    var x, y, i, below, ch, n = 0, cap = 10, sandAdj;
+    for (y = 0; y < H - 1 && n < cap; y++) {
+      for (x = 0; x < W && n < cap; x++) {
+        i = y * W + x;
+        if (grid[i] !== SOIL || packed[i] > 0) continue;
+        if (nearStone(x, y)) continue;
+        below = grid[i + W];
+        if (below !== EMPTY && below !== SAND) continue;
+        sandAdj = below === SAND
+          || (x > 0 && grid[i - 1] === SAND)
+          || (x < W - 1 && grid[i + 1] === SAND)
+          || (y > 0 && grid[i - W] === SAND);
+        if (!sandAdj) continue;
+        ch = below === SAND ? 0.18 : 0.10;
+        if (spans[i] >= 6) ch += 0.10;
+        else if (spans[i] >= 4) ch += 0.04;
+        if (Math.random() < ch) {
+          grid[i] = SAND;
+          n++;
+        }
+      }
+    }
+    return n;
+  }
+
+  function swapInto(i, dest) {
+    var t = grid[dest];
+    grid[dest] = grid[i];
+    grid[i] = t;
+    moved[dest] = 1;
+  }
+
+  function sandOpen(i) {
+    var t = grid[i];
+    return t === EMPTY || t === WATER;
+  }
+
+  function sandSteep(dest) {
+    if (!sandOpen(dest)) return 0;
+    if (dest + W >= N) return 1;
+    return sandOpen(dest + W) ? 2 : 1;
+  }
+
+  function stepSand() {
+    moved.fill(0);
+    var x, y, n, i, d, ltr, dest, ls, rs;
+    for (y = H - 2; y >= 0; y--) {
+      ltr = ((y + simTick) & 1) === 0;
+      for (n = 0; n < W; n++) {
+        x = ltr ? n : W - 1 - n;
+        i = y * W + x;
+        if (grid[i] !== SAND || moved[i]) continue;
+        d = i + W;
+        if (sandOpen(d)) {
+          swapInto(i, d);
+          continue;
+        }
+        ls = x > 0 ? sandSteep(d - 1) : 0;
+        rs = x < W - 1 ? sandSteep(d + 1) : 0;
+        if (ls < 2 && rs < 2) {
+          if (ls !== 1 && rs !== 1) continue;
+          if ((simTick & 7) !== 0) continue;
+          if ((hash(x, y) % 5) !== 0) continue;
+        }
+        if (ls > rs) dest = d - 1;
+        else if (rs > ls) dest = d + 1;
+        else dest = ((hash(x, y) & 1) ? d + 1 : d - 1);
+        swapInto(i, dest);
+      }
+    }
+  }
+
+  function markHeldStone() {
+    held.fill(0);
+    var qh = 0, qt = 0, i, x, y, p, below;
+    for (i = 0; i < N; i++) {
+      if (grid[i] !== STONE) continue;
+      x = i % W;
+      y = (i / W) | 0;
+      if (y >= H - 3 || x === 0 || x === W - 1) {
+        held[i] = 1;
+        queue[qt++] = i;
+      }
+    }
+    while (qh < qt) {
+      p = queue[qh++];
+      x = p % W;
+      y = (p / W) | 0;
+      if (x > 0 && grid[p - 1] === STONE && !held[p - 1]) { held[p - 1] = 1; queue[qt++] = p - 1; }
+      if (x < W - 1 && grid[p + 1] === STONE && !held[p + 1]) { held[p + 1] = 1; queue[qt++] = p + 1; }
+      if (y > 0 && grid[p - W] === STONE && !held[p - W]) { held[p - W] = 1; queue[qt++] = p - W; }
+      if (y < H - 1 && grid[p + W] === STONE && !held[p + W]) { held[p + W] = 1; queue[qt++] = p + W; }
+    }
+  }
+
+  function stepStone() {
+    markHeldStone();
+    moved.fill(0);
+    var x, y, n, i, d, ltr;
+    for (y = H - 2; y >= 0; y--) {
+      ltr = ((y + simTick) & 1) === 0;
+      for (n = 0; n < W; n++) {
+        x = ltr ? n : W - 1 - n;
+        i = y * W + x;
+        if (grid[i] !== STONE || held[i] || moved[i]) continue;
+        d = i + W;
+        if (grid[d] === EMPTY || grid[d] === WATER) swapInto(i, d);
+      }
+    }
+  }
+
+  function tryEmpty(i, dest) {
+    if (grid[dest] !== EMPTY) return false;
+    grid[dest] = WATER;
+    grid[i] = EMPTY;
+    moved[dest] = 1;
+    return true;
+  }
+
+  function lookDrop(x, y, dir, maxd) {
+    var d, xx, t, below;
+    for (d = 1; d <= maxd; d++) {
+      xx = x + dir * d;
+      if (xx < 0 || xx >= W) return 99;
+      t = grid[y * W + xx];
+      if (t !== EMPTY && t !== WATER) return 99;
+      if (y < H - 1) {
+        below = grid[(y + 1) * W + xx];
+        if (below === EMPTY) return d;
+      }
+    }
+    return 99;
+  }
+
+  function countEmpty(x, y, dir) {
+    var d, xx, t, n = 0;
+    for (d = 1; d <= 8; d++) {
+      xx = x + dir * d;
+      if (xx < 0 || xx >= W) return n;
+      t = grid[y * W + xx];
+      if (t !== EMPTY) return n;
+      n++;
+    }
+    return n;
+  }
+
+  function stepWater() {
+    moved.fill(0);
+    var x, y, n, i, ltr, dl, dr, ld, rd, le, re;
+    for (y = H - 2; y >= 0; y--) {
+      ltr = ((y + simTick) & 1) === 0;
+      for (n = 0; n < W; n++) {
+        x = ltr ? n : W - 1 - n;
+        i = y * W + x;
+        if (grid[i] !== WATER || moved[i]) continue;
+        if (tryEmpty(i, i + W)) continue;
+        dl = x > 0 && grid[i + W - 1] === EMPTY;
+        dr = x < W - 1 && grid[i + W + 1] === EMPTY;
+        if (dl || dr) {
+          if (dl && dr) {
+            ld = (y + 2 < H && grid[i + W + W - 1] === EMPTY) ? 0 : 1;
+            rd = (y + 2 < H && grid[i + W + W + 1] === EMPTY) ? 0 : 1;
+            if (ld !== rd) tryEmpty(i, ld < rd ? i + W - 1 : i + W + 1);
+            else tryEmpty(i, (hash(x, y) & 1) ? i + W + 1 : i + W - 1);
+          } else if (dl) tryEmpty(i, i + W - 1);
+          else tryEmpty(i, i + W + 1);
+          continue;
+        }
+        ld = lookDrop(x, y, -1, 12);
+        rd = lookDrop(x, y, 1, 12);
+        if (ld < 99 || rd < 99) {
+          if (ld < rd && x > 0) tryEmpty(i, i - 1);
+          else if (rd < ld && x < W - 1) tryEmpty(i, i + 1);
+          else if (ld === rd) {
+            if ((hash(x, y) & 1) && x < W - 1) tryEmpty(i, i + 1);
+            else if (x > 0) tryEmpty(i, i - 1);
+          }
+          continue;
+        }
+        if (grid[i + W] === WATER) {
+          dl = x > 0 && grid[i - 1] === EMPTY;
+          dr = x < W - 1 && grid[i + 1] === EMPTY;
+          if (dl && dr) {
+            le = countEmpty(x, y, -1);
+            re = countEmpty(x, y, 1);
+            if (le !== re) tryEmpty(i, le > re ? i - 1 : i + 1);
+            else tryEmpty(i, (hash(x, y) & 1) ? i + 1 : i - 1);
+          } else if (dl) tryEmpty(i, i - 1);
+          else if (dr) tryEmpty(i, i + 1);
+          continue;
+        }
+        if (x > 1 && grid[i - 1] === EMPTY && grid[i - 2] === WATER) tryEmpty(i, i - 1);
+        else if (x < W - 2 && grid[i + 1] === EMPTY && grid[i + 2] === WATER) tryEmpty(i, i + 1);
+      }
+    }
+  }
+
+  function adjWater(p, x, y) {
+    if (x > 0 && grid[p - 1] === WATER) return true;
+    if (x < W - 1 && grid[p + 1] === WATER) return true;
+    if (y > 0 && grid[p - W] === WATER) return true;
+    if (y < H - 1 && grid[p + W] === WATER) return true;
+    return false;
+  }
+
+  function isAir(t) {
+    return t === EMPTY || t === CRYSTAL || t === MUSHROOM;
+  }
+
+  function isGround(t) {
+    return t === SOIL || t === SAND || t === STONE;
+  }
+
+  function isShell(t) {
+    return t === SOIL || t === STONE;
+  }
+
+  function hasRoof(x, y) {
+    var yy, t;
+    for (yy = y - 1; yy >= 0; yy--) {
+      t = grid[yy * W + x];
+      if (isShell(t)) return 1;
+    }
+    return 0;
+  }
+
+  function life() {
+    visited.fill(0);
+    sealed.fill(0);
+    rooms = 0;
+    var i, p, x, y, qh, qt, wet, grow, k, below, newC = 0, t, floor, leftW, rightW, nx, ny, j;
+    for (i = 0; i < N; i++) {
+      t = grid[i];
+      if (!isAir(t) || visited[i]) continue;
+      x = i % W;
+      y = (i / W) | 0;
+      if (!hasRoof(x, y)) continue;
+      qh = 0;
+      qt = 0;
+      queue[qt++] = i;
+      visited[i] = 1;
+      wet = false;
+      floor = 0;
+      leftW = 0;
+      rightW = 0;
+      while (qh < qt) {
+        p = queue[qh++];
+        x = p % W;
+        y = (p / W) | 0;
+        if (!wet && adjWater(p, x, y)) wet = true;
+        if (y >= H - 1 || isGround(grid[p + W])) floor = 1;
+        if (x === 0 || (x > 0 && isShell(grid[p - 1]))) leftW = 1;
+        if (x === W - 1 || (x < W - 1 && isShell(grid[p + 1]))) rightW = 1;
+        for (k = 0; k < 4; k++) {
+          nx = x + (k === 0 ? -1 : k === 1 ? 1 : 0);
+          ny = y + (k === 2 ? -1 : k === 3 ? 1 : 0);
+          if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+          j = ny * W + nx;
+          if (visited[j] || !isAir(grid[j]) || !hasRoof(nx, ny)) continue;
+          visited[j] = 1;
+          queue[qt++] = j;
+        }
+      }
+      if (!floor || !leftW || !rightW) continue;
+      if (qt < 1 || qt > 400) continue;
+      rooms++;
+      for (k = 0; k < qt; k++) sealed[queue[k]] = 1;
+      grow = wet ? MUSHROOM : CRYSTAL;
+      for (k = 0; k < qt; k++) {
+        p = queue[k];
+        if (grid[p] !== EMPTY) continue;
+        y = (p / W) | 0;
+        if (y >= H - 1) continue;
+        below = grid[p + W];
+        if (below !== SOIL && below !== SAND && below !== STONE) continue;
+        if (Math.random() < GROW) {
+          grid[p] = grow;
+          if (grow === CRYSTAL) newC++;
+        }
+      }
+    }
+    for (i = 0; i < N; i++) {
+      if ((grid[i] === CRYSTAL || grid[i] === MUSHROOM) && !sealed[i]) grid[i] = EMPTY;
+    }
+    alive = 0;
+    for (i = 0; i < N; i++) {
+      if (grid[i] === CRYSTAL || grid[i] === MUSHROOM) alive++;
+    }
+    if (newC > 0) sfxChime();
+  }
+
+  function step() {
+    caveIn();
+    stepStone();
+    stepSand();
+    stepWater();
+    life();
+    simTick++;
+  }
+
+  function stampGlow(cx, cy, r, g, b, rad) {
+    var dx, dy, xx, yy, i, d, f;
+    for (dy = -rad; dy <= rad; dy++) {
+      yy = cy + dy;
+      if (yy < 0 || yy >= H) continue;
+      for (dx = -rad; dx <= rad; dx++) {
+        xx = cx + dx;
+        if (xx < 0 || xx >= W) continue;
+        d = dx * dx + dy * dy;
+        if (d > rad * rad) continue;
+        f = 1 - Math.sqrt(d) / (rad + 0.35);
+        f *= f;
+        i = yy * W + xx;
+        glowR[i] += r * f;
+        glowG[i] += g * f;
+        glowB[i] += b * f;
+      }
+    }
+  }
+
+  function computeLight() {
+    var x, y, i, t, pass, L, a, dx, dy, xx, yy, blocked, pulse, cave, face, lx, slope;
+    var day = skyDayness();
+    var night = 1 - day;
+    var body = day > 0.45 ? sunCell() : moonCell();
+    var lightX = body.x;
+    var amb = 0.10 + 0.80 * day;
+    var floorS = 0.22 + 0.12 * night;
+    var floorE = 0.030 + 0.090 * day;
+    var floorSeal = 0.07 + 0.11 * day;
+    var colFloor = 0.040 + 0.120 * day;
+    glowR.fill(0);
+    glowG.fill(0);
+    glowB.fill(0);
+
+    for (x = 0; x < W; x++) {
+      colLight[x] = amb + (0.07 + 0.11 * day) * Math.max(0, 1 - Math.abs(x - lightX) / (W * 0.72));
+    }
+    for (y = 0; y < H; y++) {
+      for (x = 0; x < W; x++) {
+        i = y * W + x;
+        t = grid[i];
+        if (t === EMPTY || t === CRYSTAL || t === MUSHROOM) {
+          light[i] = colLight[x];
+          colLight[x] *= 0.9994 - 0.0009 * night;
+        } else if (t === WATER) {
+          light[i] = colLight[x] * (0.70 + 0.10 * day);
+          colLight[x] *= 0.88 - 0.06 * night;
+        } else {
+          light[i] = colLight[x] * (0.52 + 0.18 * day);
+          colLight[x] *= t === STONE ? (0.55 - 0.08 * night) : (0.42 - 0.08 * night);
+        }
+        if (colLight[x] < colFloor) colLight[x] = colFloor;
+      }
+    }
+
+    for (pass = 0; pass < 2; pass++) {
+      for (y = 0; y < H; y++) {
+        for (x = 0; x < W; x++) {
+          i = y * W + x;
+          t = grid[i];
+          if (t !== EMPTY && t !== WATER && t !== CRYSTAL && t !== MUSHROOM) continue;
+          L = light[i];
+          if (x > 0 && light[i - 1] * 0.72 > L) L = light[i - 1] * 0.72;
+          if (x < W - 1 && light[i + 1] * 0.72 > L) L = light[i + 1] * 0.72;
+          if (y > 0 && light[i - W] * 0.84 > L) L = light[i - W] * 0.84;
+          light[i] = L;
+        }
+      }
+    }
+
+    pulse = 0.62 + 0.38 * Math.sin(frameTick * 0.075);
+    for (y = 0; y < H; y++) {
+      for (x = 0; x < W; x++) {
+        i = y * W + x;
+        t = grid[i];
+        if (t === CRYSTAL) stampGlow(x, y, 0.20, 0.18, 0.16, 1);
+        else if (t === MUSHROOM) stampGlow(x, y, 0.16 * pulse, 0.11 * pulse, 0.05 * pulse, 1);
+      }
+    }
+
+    lx = (lightX / Math.max(1, W - 1)) - 0.5;
+    for (y = 0; y < H; y++) {
+      for (x = 0; x < W; x++) {
+        i = y * W + x;
+        t = grid[i];
+        blocked = 0;
+        for (dy = -1; dy <= 1; dy++) {
+          yy = y + dy;
+          for (dx = -1; dx <= 1; dx++) {
+            if (!dx && !dy) continue;
+            xx = x + dx;
+            if (xx < 0 || yy < 0 || xx >= W || yy >= H) { blocked++; continue; }
+            if (SOLID[grid[yy * W + xx]]) blocked++;
+          }
+        }
+        a = blocked * 0.125;
+        L = light[i] * (1 - a * 0.36);
+        if (sealed[i]) L *= 0.32;
+        else {
+          cave = 0;
+          if (y > 0 && sealed[i - W]) cave++;
+          if (y < H - 1 && sealed[i + W]) cave++;
+          if (x > 0 && sealed[i - 1]) cave++;
+          if (x < W - 1 && sealed[i + 1]) cave++;
+          if (cave) L *= 1 - 0.11 * cave;
+        }
+        if (day > 0.02) {
+          L *= 1 - day * ((x / W - 0.5) * (x / W - 0.5) * 0.28 + (y / H) * (y / H) * 0.06);
+        }
+        if (night > 0.02) {
+          L *= 1 - night * (1 - x / W) * 0.22;
+          L *= 1 - night * (y / H) * 0.08;
+        }
+        if (t !== EMPTY && t !== WATER && t !== CRYSTAL && t !== MUSHROOM) {
+          face = 0;
+          if (x > 0 && (grid[i - 1] === EMPTY || grid[i - 1] === WATER)) face -= 1;
+          if (x < W - 1 && (grid[i + 1] === EMPTY || grid[i + 1] === WATER)) face += 1;
+          slope = 1 + face * lx * (0.16 + 0.40 * night);
+          if (slope < 0.62) slope = 0.62;
+          if (slope > 1.28) slope = 1.28;
+          L *= slope;
+          if (night > 0.12) {
+            var moonAdd = 0.08 * (x / W);
+            if (y > 0 && (grid[i - W] === EMPTY || grid[i - W] === WATER || grid[i - W] === CRYSTAL || grid[i - W] === MUSHROOM)) moonAdd += 0.16;
+            if (x < W - 1 && (grid[i + 1] === EMPTY || grid[i + 1] === WATER)) moonAdd += 0.20;
+            if (x < W - 1 && y > 0 && (grid[i + 1 - W] === EMPTY || grid[i + 1 - W] === WATER)) moonAdd += 0.12;
+            if (x > 0 && (grid[i - 1] === EMPTY || grid[i - 1] === WATER)) moonAdd -= 0.10;
+            if (y < H - 1 && grid[i + W] === EMPTY) moonAdd -= 0.08;
+            L += night * moonAdd;
+          }
+        }
+        if (t === SOIL) {
+          light[i] = L < floorS ? floorS : L > 1.2 ? 1.2 : L;
+        } else if (t === STONE || t === SAND) {
+          var fs = floorS * 0.86;
+          light[i] = L < fs ? fs : L > 1.2 ? 1.2 : L;
+        } else if (sealed[i] && t === EMPTY) {
+          light[i] = L < floorSeal ? floorSeal : L > 1.2 ? 1.2 : L;
+        } else {
+          light[i] = L < floorE ? floorE : L > 1.2 ? 1.2 : L;
+        }
+      }
+    }
+  }
+
+  function nearWaterCell(x, y) {
+    var i = y * W + x;
+    if (x > 0 && grid[i - 1] === WATER) return true;
+    if (x < W - 1 && grid[i + 1] === WATER) return true;
+    if (y > 0 && grid[i - W] === WATER) return true;
+    if (y < H - 1 && grid[i + W] === WATER) return true;
+    return false;
+  }
+
+  function writeAlbedo() {
+    var x, y, i, t, sx, sy, o, row, base, hr, hg, hb, n, facet, h, surface, g;
+    var tw, spark, u, t2, day, night, r1, g1, b1, r2, g2, b2, r3, g3, b3, block;
+    var emptyAbove, waterAbove;
+    day = skyDayness();
+    night = 1 - day;
+
+    for (y = 0; y < H; y++) {
+      for (x = 0; x < W; x++) {
+        i = y * W + x;
+        t = grid[i];
+        h = hash(x, y);
+        emptyAbove = y === 0 || grid[i - W] === EMPTY || grid[i - W] === CRYSTAL || grid[i - W] === MUSHROOM;
+        waterAbove = y > 0 && grid[i - W] === WATER;
+
+        if (t === EMPTY) {
+          if (sealed[i]) {
+            hr = 16; hg = 14; hb = 18;
+          } else {
+            u = y / Math.max(1, H - 4);
+            if (u > 1) u = 1;
+            r1 = 252 * day + 12 * night; g1 = 224 * day + 14 * night; b1 = 168 * day + 38 * night;
+            r2 = 230 * day + 12 * night; g2 = 168 * day + 16 * night; b2 = 92 * day + 34 * night;
+            r3 = 196 * day + 14 * night; g3 = 122 * day + 16 * night; b3 = 74 * day + 30 * night;
+            if (u < 0.32) {
+              t2 = u / 0.32;
+              hr = (r1 * (1 - t2) + r2 * t2) | 0;
+              hg = (g1 * (1 - t2) + g2 * t2) | 0;
+              hb = (b1 * (1 - t2) + b2 * t2) | 0;
+            } else {
+              t2 = (u - 0.32) / 0.68;
+              hr = (r2 * (1 - t2) + r3 * t2) | 0;
+              hg = (g2 * (1 - t2) + g3 * t2) | 0;
+              hb = (b2 * (1 - t2) + b3 * t2) | 0;
+            }
+          }
+        } else if (t === SOIL) {
+          surface = emptyAbove && !waterAbove;
+          g = h % 8;
+          if (surface) {
+            hr = 154; hg = 88; hb = 46;
+          } else {
+            hr = g === 0 ? 126 : g < 4 ? 162 : 114;
+            hg = g === 0 ? 70 : g < 4 ? 90 : 62;
+            hb = g === 0 ? 38 : g < 4 ? 48 : 34;
+          }
+          if (y < H - 1 && grid[i + W] === EMPTY && spans[i] >= 3) {
+            var stress = spans[i] >= 6 ? 0.70 : spans[i] >= 4 ? 0.82 : 0.90;
+            hr = (hr * stress) | 0;
+            hg = (hg * stress) | 0;
+            hb = (hb * stress) | 0;
+          }
+        } else if (t === SAND) {
+          g = h % 3;
+          hr = g === 0 ? 184 : g === 1 ? 214 : 198;
+          hg = g === 0 ? 148 : g === 1 ? 180 : 164;
+          hb = g === 0 ? 86 : g === 1 ? 112 : 98;
+        } else if (t === STONE) {
+          g = h % 5;
+          if (y >= H - 3) {
+            if (y === H - 3) { hr = 112 + (g < 2 ? 14 : 0); hg = 116 + (g < 2 ? 10 : 0); hb = 122 + (g < 2 ? 8 : 0); }
+            else if (y === H - 2) { hr = 92 + (g === 0 ? 12 : 0); hg = 96 + (g === 0 ? 10 : 0); hb = 104 + (g === 0 ? 8 : 0); }
+            else { hr = 74 + (g === 0 ? 14 : 0); hg = 78 + (g === 0 ? 12 : 0); hb = 86 + (g === 0 ? 10 : 0); }
+          } else {
+            hr = g === 0 ? 150 : g === 1 ? 128 : 110;
+            hg = g === 0 ? 154 : g === 1 ? 132 : 114;
+            hb = g === 0 ? 160 : g === 1 ? 138 : 120;
+          }
+        } else if (t === WATER) {
+          g = (x + y + (frameTick >> 3)) & 3;
+          hr = g === 0 ? 16 : 10;
+          hg = g === 0 ? 176 : g === 1 ? 148 : 120;
+          hb = g === 0 ? 196 : g === 1 ? 174 : 156;
+          if (emptyAbove) { hr = 64; hg = 214; hb = 226; }
+        } else if (t === CRYSTAL) {
+          g = h % 4;
+          if (g === 0) { hr = 196; hg = 86; hb = 210; }
+          else if (g === 1) { hr = 64; hg = 206; hb = 168; }
+          else if (g === 2) { hr = 226; hg = 78; hb = 108; }
+          else { hr = 236; hg = 214; hb = 92; }
+        } else {
+          g = h % 3;
+          hr = g === 0 ? 196 : g === 1 ? 214 : 178;
+          hg = g === 0 ? 72 : g === 1 ? 96 : 62;
+          hb = g === 0 ? 48 : g === 1 ? 58 : 40;
+        }
+
+        if (t !== EMPTY && t !== WATER && nearWaterCell(x, y)) {
+          hr = (hr * 0.72 + 28) | 0;
+          hg = (hg * 0.78 + 36) | 0;
+          hb = (hb * 0.82 + 48) | 0;
+        }
+
+        base = ((y * PX) * imgW + (x * PX)) << 2;
+        for (sy = 0; sy < PX; sy++) {
+          row = base + ((sy * imgW) << 2);
+          for (sx = 0; sx < PX; sx++) {
+            n = ((h >>> (sx + sy * 3)) & 7) - 3;
+            facet = (sx + sy < 3) ? 10 : -8;
+            o = row + (sx << 2);
+            if (t === EMPTY) {
+              tw = ((h + sx * 17 + sy * 31) & 255);
+              if (!sealed[i] && night > 0.55 && y < H * 0.30 && tw < 2 && (h % 11) === 0) {
+                var star = 120 + (tw === 0 ? 70 : 22);
+                pix[o] = star; pix[o + 1] = star; pix[o + 2] = star + 10; pix[o + 3] = 255;
+              } else {
+                pix[o] = clamp8(hr + n); pix[o + 1] = clamp8(hg + n); pix[o + 2] = clamp8(hb + n); pix[o + 3] = 255;
+              }
+            } else if (t === SOIL && emptyAbove && !waterAbove && sy <= 1) {
+              pix[o] = clamp8((sy === 0 ? 92 : 78) + n * 3);
+              pix[o + 1] = clamp8((sy === 0 ? 118 : 102) + n * 2);
+              pix[o + 2] = clamp8((sy === 0 ? 38 : 28) + n);
+              pix[o + 3] = 255;
+            } else if (t === WATER && emptyAbove && sy === 0) {
+              pix[o] = clamp8(110 + 50 * day); pix[o + 1] = clamp8(200 + 20 * day); pix[o + 2] = clamp8(208 + 16 * day); pix[o + 3] = 255;
+            } else if (t === WATER) {
+              spark = ((h + frameTick * 13 + sx * 7 + sy * 11) >>> 0) % 47;
+              if (spark === 0 && day > 0.35) { pix[o] = 190; pix[o + 1] = 230; pix[o + 2] = 232; pix[o + 3] = 255; }
+              else {
+                pix[o] = clamp8(hr + n + facet);
+                pix[o + 1] = clamp8(hg + n + facet);
+                pix[o + 2] = clamp8(hb + n + facet);
+                pix[o + 3] = 255;
+              }
+            } else if (t === CRYSTAL) {
+              tw = ((h + (frameTick >> 2) + sx + sy * 3) >>> 0) % 22;
+              if ((sx === 1 && sy === 0) || tw === 0) {
+                pix[o] = 248; pix[o + 1] = 250; pix[o + 2] = 255; pix[o + 3] = 255;
+              } else {
+                pix[o] = clamp8(hr + facet * 2 + n);
+                pix[o + 1] = clamp8(hg + facet * 2 + n);
+                pix[o + 2] = clamp8(hb + facet + n);
+                pix[o + 3] = 255;
+              }
+            } else if (t === MUSHROOM) {
+              if (sy >= 2) {
+                pix[o] = clamp8(198 + n); pix[o + 1] = clamp8(176 + n); pix[o + 2] = clamp8(128 + n); pix[o + 3] = 255;
+              } else if (sy === 0 && (sx === 0 || sx === 3)) {
+                pix[o] = clamp8(hr * 0.72 + n); pix[o + 1] = clamp8(hg * 0.72 + n); pix[o + 2] = clamp8(hb * 0.72 + n); pix[o + 3] = 255;
+              } else {
+                pix[o] = clamp8(hr + n + facet);
+                pix[o + 1] = clamp8(hg + n);
+                pix[o + 2] = clamp8(hb + n);
+                pix[o + 3] = 255;
+              }
+            } else if (t === STONE) {
+              block = (sx < 1 ? 16 : 0) + (sy < 1 ? 10 : 0) + (sx + sy > 5 ? -14 : 0);
+              pix[o] = clamp8(hr + n * 2 + block);
+              pix[o + 1] = clamp8(hg + n * 2 + block);
+              pix[o + 2] = clamp8(hb + n + block);
+              pix[o + 3] = 255;
+            } else if (t !== EMPTY && t !== WATER && nearWaterCell(x, y) && sy === 0 && sx < 2) {
+              pix[o] = clamp8(hr + 48); pix[o + 1] = clamp8(hg + 52); pix[o + 2] = clamp8(hb + 58); pix[o + 3] = 255;
+            } else {
+              pix[o] = clamp8(hr + n * 4 + facet);
+              pix[o + 1] = clamp8(hg + n * 3 + facet);
+              pix[o + 2] = clamp8(hb + n * 2 + facet);
+              pix[o + 3] = 255;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  function lightingPass() {
+    var x, y, i, sx, sy, o, row, base, L, warm, cool, gr, gg, gb, r, g, b, t, mul, rr, gg2, bb;
+    var day = skyDayness();
+    var night = 1 - day;
+    for (y = 0; y < H; y++) {
+      for (x = 0; x < W; x++) {
+        i = y * W + x;
+        L = light[i];
+        t = grid[i];
+        if (t === EMPTY) { warm = L * (4 + 12 * day); cool = (1 - L) * (8 + 14 * night); }
+        else if (t === SOIL) { warm = L * (10 + 16 * day); cool = (1 - L) * 2; }
+        else if (t === WATER) { warm = L * 4; cool = (1 - L) * (6 + 8 * night); }
+        else { warm = L * (8 + 16 * day); cool = (1 - L) * (8 + 10 * night); }
+        if (sealed[i]) cool += 6;
+        gr = glowR[i] * 255;
+        gg = glowG[i] * 255;
+        gb = glowB[i] * 255;
+        mul = (0.22 + 0.08 * night) + (0.44 + 0.28 * day) * L;
+        base = ((y * PX) * imgW + (x * PX)) << 2;
+        for (sy = 0; sy < PX; sy++) {
+          row = base + ((sy * imgW) << 2);
+          for (sx = 0; sx < PX; sx++) {
+            o = row + (sx << 2);
+            r = pix[o];
+            g = pix[o + 1];
+            b = pix[o + 2];
+            rr = r * mul + gr + warm;
+            gg2 = g * mul + gg + warm * 0.42;
+            bb = b * mul + gb + cool;
+            if (t === SOIL) {
+              if (rr < 58) rr = 58;
+              if (gg2 < 34) gg2 = 34;
+              if (bb > rr * 0.48) bb = rr * 0.48;
+              if (rr < bb + 16) rr = bb + 16;
+            } else if (t === STONE) {
+              if (rr < 36) { rr = 36; gg2 = 38; bb = 44; }
+            } else if (t === WATER && night > 0.5) {
+              rr *= 0.62; gg2 *= 0.68; bb = Math.min(148, bb * 0.72);
+            }
+            pix[o]     = clamp8(rr);
+            pix[o + 1] = clamp8(gg2);
+            pix[o + 2] = clamp8(bb);
+          }
+        }
+      }
+    }
+  }
+
+  function stampHalo(cx, cy, rad, cr, cg, cb, amt, stretch) {
+    var rad2 = rad * rad;
+    var x0 = Math.max(0, (cx - rad) | 0), x1 = Math.min(imgW, (cx + rad + 1) | 0);
+    var y0 = Math.max(0, (cy - rad) | 0), y1 = Math.min(imgH, (cy + rad + 1) | 0);
+    var x, y, dx, dy, d2, f, o;
+    for (y = y0; y < y1; y++) {
+      dy = y - cy;
+      for (x = x0; x < x1; x++) {
+        if (!skyPix(x, y)) continue;
+        dx = x - cx;
+        d2 = dx * dx + dy * dy * stretch;
+        if (d2 > rad2) continue;
+        f = 1 - d2 / rad2;
+        f = f * f * amt;
+        o = (y * imgW + x) << 2;
+        pix[o]     = clamp8(pix[o] + f * cr);
+        pix[o + 1] = clamp8(pix[o + 1] + f * cg);
+        pix[o + 2] = clamp8(pix[o + 2] + f * cb);
+      }
+    }
+  }
+
+  function stampDisc(cx, cy, rad, cr, cg, cb, amt, moon) {
+    var rad2 = rad * rad;
+    var x0 = Math.max(0, (cx - rad) | 0), x1 = Math.min(imgW, (cx + rad + 1) | 0);
+    var y0 = Math.max(0, (cy - rad) | 0), y1 = Math.min(imgH, (cy + rad + 1) | 0);
+    var x, y, dx, dy, d2, o, k, crater, edge;
+    for (y = y0; y < y1; y++) {
+      dy = y - cy;
+      for (x = x0; x < x1; x++) {
+        if (!skyPix(x, y)) continue;
+        dx = x - cx;
+        d2 = dx * dx + dy * dy;
+        if (d2 > rad2) continue;
+        edge = 1 - Math.sqrt(d2) / (rad + 0.35);
+        k = amt * (0.72 + 0.28 * edge);
+        if (moon) {
+          crater = hash(x >> 1, y >> 1) & 255;
+          if (crater < 40) k *= 0.72;
+          else if (crater > 230) k *= 1.08;
+        }
+        o = (y * imgW + x) << 2;
+        pix[o]     = clamp8(pix[o] * (1 - k) + cr * k);
+        pix[o + 1] = clamp8(pix[o + 1] * (1 - k) + cg * k);
+        pix[o + 2] = clamp8(pix[o + 2] * (1 - k) + cb * k);
+      }
+    }
+  }
+
+  function stampSun() {
+    var day = skyDayness();
+    var cx, cy, rad, amt, body;
+    if (day > 0.22) {
+      body = sunCell();
+      cx = body.x * PX;
+      cy = Math.max(PX * 1.15, body.y * PX);
+      rad = Math.max(10, W * PX * 0.042);
+      amt = Math.min(1, (day - 0.22) / 0.35);
+      stampHalo(cx, cy, rad * 4.6, 255, 210, 110, 0.46 * amt, 1.18);
+      stampDisc(cx, cy, rad, 255, 246, 205, amt, false);
+    }
+    if (day < 0.78) {
+      body = moonCell();
+      cx = body.x * PX;
+      cy = Math.max(PX * 1.15, body.y * PX);
+      rad = Math.max(7.0, W * PX * 0.028);
+      amt = Math.min(1, (0.78 - day) / 0.35);
+      stampHalo(cx, cy, rad * 1.7, 150, 168, 210, 0.14 * amt, 1.02);
+      stampDisc(cx, cy, rad, 208, 214, 228, amt, true);
+    }
+  }
+
+  function overlaySparkles() {
+    var x, y, i, t, h, sx, sy, o, base, row, tw;
+    for (y = 0; y < H; y++) {
+      for (x = 0; x < W; x++) {
+        i = y * W + x;
+        t = grid[i];
+        h = hash(x, y + (frameTick >> 2));
+        if (t === EMPTY && !sealed[i] && skyDayness() > 0.55 && y < H * 0.3 && (h % 97) === 0) {
+          o = (((y * PX + 1) * imgW + (x * PX + 1)) << 2);
+          pix[o] = 230; pix[o + 1] = 210; pix[o + 2] = 170;
+        } else if (t === WATER) {
+          if (skyDayness() > 0.28 && ((h + frameTick * 3) % 41) === 0) {
+            sx = h % PX; sy = (h >> 3) % PX;
+            o = (((y * PX + sy) * imgW + (x * PX + sx)) << 2);
+            pix[o] = 200; pix[o + 1] = 228; pix[o + 2] = 230;
+          }
+        } else if (t === CRYSTAL) {
+          tw = (h + frameTick) % 22;
+          if (tw < 2) {
+            o = (((y * PX + 1) * imgW + (x * PX + 1)) << 2);
+            pix[o] = 255; pix[o + 1] = 255; pix[o + 2] = 255;
+          }
+        } else if (t === STONE && y >= H - 3 && (h % 53) === 0) {
+          o = (((y * PX + (h % 4)) * imgW + (x * PX + ((h >> 2) % 4))) << 2);
+          pix[o] = clamp8(pix[o] + 40);
+          pix[o + 1] = clamp8(pix[o + 1] + 28);
+          pix[o + 2] = clamp8(pix[o + 2] + 16);
+        }
+      }
+    }
+  }
+
+  function plotWorldPixel(fx, fy, r, g, b, a) {
+    var x = (fx * PX) | 0, y = (fy * PX) | 0;
+    if (x < 0 || y < 0 || x >= imgW || y >= imgH) return;
+    var o = (y * imgW + x) << 2;
+    var k = a, ik = 1 - k;
+    pix[o]     = clamp8(pix[o] * ik + r * k);
+    pix[o + 1] = clamp8(pix[o + 1] * ik + g * k);
+    pix[o + 2] = clamp8(pix[o + 2] * ik + b * k);
+  }
+
+  function stepParticles() {
+    var i, a;
+    for (i = 0; i < PMAX; i++) {
+      if (plife[i] <= 0) continue;
+      plife[i]--;
+      px[i] += pvx[i];
+      pvy[i] += 0.018;
+      py[i] += pvy[i];
+      pvx[i] *= 0.96;
+      a = plife[i] / pmax[i];
+      plotWorldPixel(px[i], py[i], pr[i], pg[i], pb[i], a);
+      plotWorldPixel(px[i] + 0.35, py[i], pr[i], pg[i], pb[i], a);
+      plotWorldPixel(px[i], py[i] + 0.35, pr[i], pg[i], pb[i], a * 0.85);
+      plotWorldPixel(px[i] + 0.35, py[i] + 0.35, pr[i], pg[i], pb[i], a * 0.7);
+      plotWorldPixel(px[i] + 0.7, py[i] + 0.15, pr[i], pg[i], pb[i], a * 0.4);
+    }
+    for (i = 0; i < motes.length; i++) {
+      a = motes[i];
+      a.x += a.vx;
+      a.y += a.vy;
+      a.ph += 0.03;
+      if (a.x < 0) a.x = W;
+      if (a.x > W) a.x = 0;
+      if (a.y < 0) a.y = H * 0.5;
+      if (a.y > H * 0.62) a.y = 0;
+      if (W > 0) {
+        var gi = ((a.y) | 0) * W + ((a.x) | 0);
+        if (gi >= 0 && gi < N && grid[gi] === EMPTY && !sealed[gi] && skyDayness() > 0.4) {
+          plotWorldPixel(a.x, a.y, 220, 190, 140, (0.10 + 0.12 * Math.sin(a.ph)) * skyDayness());
+        }
+      }
+    }
+  }
+
+  function render() {
+    if (N === 0) return;
+    computeLight();
+    writeAlbedo();
+    lightingPass();
+    stampSun();
+    overlaySparkles();
+    stepParticles();
+    offCtx.putImageData(img, 0, 0);
+
+    var ox = 0, oy = 0;
+    if (shake > 0.04) {
+      ox = ((hash(frameTick, 3) % 5) - 2) * (shake / 2);
+      oy = ((hash(frameTick, 7) % 5) - 2) * (shake / 2);
+      if (ox > 2) ox = 2; if (ox < -2) ox = -2;
+      if (oy > 2) oy = 2; if (oy < -2) oy = -2;
+      shake *= shake > 1.2 ? 0.88 : 0.76;
+    } else shake = 0;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = "#0a080c";
+    ctx.fillRect(0, 0, cssW, cssH);
+    if (W > 0 && H > 0 && off) {
+      if (zoom > zoomMax()) zoom = zoomMax();
+      if (zoom < 1) zoom = 1;
+      var vw = W / zoom, vh = H / zoom;
+      ctx.drawImage(off, viewX * PX, viewY * PX, vw * PX, vh * PX, ox, oy, cssW, cssH);
+    }
+
+    if (playing && hoverOn && W > 0) {
+      var cellPx = cssW / (W / zoom);
+      var br = brushRadius();
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc((hoverX - viewX) * cellPx, (hoverY - viewY) * cellPx, br * cellPx, 0, Math.PI * 2);
+      ctx.strokeStyle = tool === "dig" ? "rgba(240,200,140,0.85)" : "rgba(255,236,200,0.7)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,220,160,0.08)";
+      ctx.fill();
+      ctx.restore();
+    }
+
+    lastHud = "";
+  }
+
+  function canPaint(x, y) {
+    return x >= 0 && y >= 0 && x < W && y < H;
+  }
+
+  function brushRadius() {
+    if (tool === "water") return 3.0;
+    if (tool === "stone") return 3.4;
+    if (tool === "dig") return 4.6;
+    return 5.4;
+  }
+
+  function paintBrush(cx, cy) {
+    var r = brushRadius();
+    var r2 = r * r;
+    var x0 = Math.floor(cx - r), x1 = Math.ceil(cx + r);
+    var y0 = Math.floor(cy - r), y1 = Math.ceil(cy + r);
+    var x, y, i, t, ddx, ddy, d2, fall, changed = 0, crumbs = 0;
+    for (y = y0; y <= y1; y++) {
+      for (x = x0; x <= x1; x++) {
+        if (!canPaint(x, y)) continue;
+        ddx = x + 0.5 - cx;
+        ddy = y + 0.5 - cy;
+        d2 = ddx * ddx + ddy * ddy;
+        if (d2 > r2 + 0.2) continue;
+        fall = 1 - Math.sqrt(d2) / (r + 0.15);
+        if (fall < 0.16) continue;
+        if (tool === "dig") {
+          if (fall < 0.74 && (hash(x, y) & 255) > fall * 290) continue;
+        } else if (tool === "soil") {
+          if (fall < 0.52 && (hash(x, y) & 255) > fall * 340) continue;
+        } else if (tool === "stone") {
+          if (fall < 0.28) continue;
+        } else if (fall < 0.22) continue;
+        if (y >= H - 3 && tool !== "water") continue;
+        i = y * W + x;
+        t = grid[i];
+        if (tool === "dig") {
+          if (t === EMPTY) continue;
+          if (t === SOIL && fall < 0.48 && (hash(x, y + 11) & 3) === 0) {
+            grid[i] = SAND;
+            crumbs++;
+          } else {
+            grid[i] = EMPTY;
+          }
+          packed[i] = 0;
+          changed++;
+        } else if (tool === "soil") {
+          if (t === EMPTY || t === SAND || t === WATER || t === SOIL) {
+            grid[i] = SOIL;
+            packed[i] = 48;
+            changed++;
+          }
+        } else if (tool === "stone") {
+          if (t !== STONE) {
+            grid[i] = STONE;
+            packed[i] = 0;
+            changed++;
+          }
+        } else if (tool === "water") {
+          if (t === EMPTY) { grid[i] = WATER; changed++; }
+        }
+      }
+    }
+    if (changed) {
+      sfxPaint(tool, changed);
+      dirty = true;
+      if (tool === "dig") {
+        spawnDust(cx, cy, Math.min(28, 10 + changed), 255, 236, 190);
+        spawnDust(cx, cy, Math.min(16, 6 + (changed >> 1)), 232, 196, 120);
+        if (crumbs) spawnDust(cx, cy, crumbs ? 3 : 2, 168, 136, 86);
+      }
+    }
+    return changed;
+  }
+
+  function paintLine(x0, y0, x1, y1) {
+    var dx = x1 - x0, dy = y1 - y0;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    var steps = Math.max(1, Math.ceil(dist * 8));
+    var i, u;
+    for (i = 0; i <= steps; i++) {
+      u = i / steps;
+      paintBrush(x0 + dx * u, y0 + dy * u);
+    }
+  }
+
+  function zoomMax() {
+    var zx, zy, z;
+    if (W < 28 || H < 22) return 1;
+    zx = W / 28;
+    zy = H / 22;
+    z = zx < zy ? zx : zy;
+    if (!(z > 1)) z = 1;
+    return z;
+  }
+
+  function clampView() {
+    var vw, vh;
+    if (zoom < 1) zoom = 1;
+    if (zoom > zoomMax()) zoom = zoomMax();
+    vw = W / zoom;
+    vh = H / zoom;
+    if (viewX < 0) viewX = 0;
+    if (viewY < 0) viewY = 0;
+    if (viewX + vw > W) viewX = W - vw;
+    if (viewY + vh > H) viewY = H - vh;
+    if (zoom <= 1) {
+      viewX = 0;
+      viewY = 0;
+    }
+  }
+
+  function applyZoom(next, focusX, focusY) {
+    var vw, vh, fx, fy, maxz;
+    maxz = zoomMax();
+    if (next > maxz) next = maxz;
+    if (next < 1) next = 1;
+    if (next === zoom) return;
+    vw = W / zoom;
+    vh = H / zoom;
+    if (vw <= 0 || vh <= 0) return;
+    fx = (focusX - viewX) / vw;
+    fy = (focusY - viewY) / vh;
+    zoom = next;
+    clampView();
+    vw = W / zoom;
+    vh = H / zoom;
+    viewX = focusX - fx * vw;
+    viewY = focusY - fy * vh;
+    clampView();
+  }
+
+  function clientToWorld(cx, cy) {
+    var r = canvas.getBoundingClientRect();
+    var x = viewX + ((cx - r.left) / r.width) * (W / zoom);
+    var y = viewY + ((cy - r.top) / r.height) * (H / zoom);
+    return [x, y];
+  }
+
+  function eventCell(e) {
+    var src = e;
+    if ((e.clientX == null || e.clientY == null) && e.touches && e.touches[0]) src = e.touches[0];
+    else if ((e.clientX == null || e.clientY == null) && e.changedTouches && e.changedTouches[0]) src = e.changedTouches[0];
+    return clientToWorld(src.clientX, src.clientY);
+  }
+
+  function pinCount() {
+    var n = 0, id;
+    for (id in pins) if (Object.prototype.hasOwnProperty.call(pins, id)) n++;
+    return n;
+  }
+
+  function pinPair() {
+    var a = null, b = null, id;
+    for (id in pins) {
+      if (!Object.prototype.hasOwnProperty.call(pins, id)) continue;
+      if (!a) a = pins[id];
+      else if (!b) b = pins[id];
+    }
+    return a && b ? [a, b] : null;
+  }
+
+  function beginPinch() {
+    var pair = pinPair(), dx, dy, mid;
+    if (!pair) return;
+    endPaint();
+    pinching = true;
+    dx = pair[0].x - pair[1].x;
+    dy = pair[0].y - pair[1].y;
+    pinchDist0 = Math.sqrt(dx * dx + dy * dy) || 1;
+    pinchZoom0 = zoom;
+    mid = clientToWorld((pair[0].x + pair[1].x) * 0.5, (pair[0].y + pair[1].y) * 0.5);
+    pinchFX = mid[0];
+    pinchFY = mid[1];
+  }
+
+  function movePinch() {
+    var pair = pinPair(), dx, dy, dist;
+    if (!pair || !pinching) return;
+    dx = pair[0].x - pair[1].x;
+    dy = pair[0].y - pair[1].y;
+    dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    applyZoom(pinchZoom0 * (dist / pinchDist0), pinchFX, pinchFY);
+  }
+
+  function pointerOnCanvas(e) {
+    var r, x, y;
+    if (e.clientX == null || e.clientY == null) return false;
+    r = canvas.getBoundingClientRect();
+    x = e.clientX;
+    y = e.clientY;
+    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+  }
+
+  function endPaint(e) {
+    painting = false;
+    lastX = lastY = -1;
+    if (e && e.pointerId != null) {
+      try { canvas.releasePointerCapture(e.pointerId); } catch (err) {}
+    }
+  }
+
+  function onDown(e) {
+    if (!playing) return;
+    if (e.pointerType !== "touch" && e.button !== undefined && e.button !== 0) return;
+    if (!pointerOnCanvas(e)) return;
+    e.preventDefault();
+    unlockAudio();
+    pins[e.pointerId] = { x: e.clientX, y: e.clientY };
+    if (pinCount() >= 2) {
+      beginPinch();
+      return;
+    }
+    painting = true;
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    var c = eventCell(e);
+    lastX = c[0];
+    lastY = c[1];
+    hoverX = c[0];
+    hoverY = c[1];
+    hoverOn = true;
+    paintBrush(c[0], c[1]);
+  }
+
+  function onMove(e) {
+    if (pins[e.pointerId]) {
+      pins[e.pointerId].x = e.clientX;
+      pins[e.pointerId].y = e.clientY;
+    }
+    if (pinching) {
+      e.preventDefault();
+      movePinch();
+      return;
+    }
+    if (!pointerOnCanvas(e)) {
+      if (painting) endPaint(e);
+      hoverOn = false;
+      return;
+    }
+    var c = eventCell(e);
+    hoverX = c[0];
+    hoverY = c[1];
+    hoverOn = true;
+    if (!painting) return;
+    e.preventDefault();
+    paintLine(lastX, lastY, c[0], c[1]);
+    lastX = c[0];
+    lastY = c[1];
+  }
+
+  function onUp(e) {
+    if (e && e.pointerId != null) delete pins[e.pointerId];
+    if (pinCount() < 2) pinching = false;
+    endPaint(e);
+  }
+
+  function onLeave() {
+    hoverOn = false;
+  }
+
+  var listenOpts = { passive: false };
+  canvas.addEventListener("pointerdown", onDown, listenOpts);
+  canvas.addEventListener("pointermove", onMove, listenOpts);
+  canvas.addEventListener("pointerup", onUp, listenOpts);
+  canvas.addEventListener("pointercancel", onUp, listenOpts);
+  canvas.addEventListener("pointerleave", onLeave);
+  canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  canvas.addEventListener("wheel", function (e) {
+    if (!playing || W <= 0) return;
+    e.preventDefault();
+    if (e.deltaY < 0 && zoom >= zoomMax()) return;
+    var c = eventCell(e);
+    applyZoom(zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12), c[0], c[1]);
+  }, listenOpts);
+  window.addEventListener("pointerup", onUp, listenOpts);
+  window.addEventListener("blur", function () { endPaint(); pins = {}; pinching = false; });
+
+  function selectTool(next) {
+    tool = next;
+    buttons.forEach(function (b) {
+      b.classList.toggle("on", b.getAttribute("data-tool") === next);
+    });
+  }
+
+  function gridToB64(g) {
+    var i, n = g.length, bin = "";
+    for (i = 0; i < n; i++) bin += String.fromCharCode(g[i]);
+    return btoa(bin);
+  }
+
+  function b64ToGrid(str, dest) {
+    var bin = atob(str), n = Math.min(bin.length, dest.length), i;
+    for (i = 0; i < n; i++) dest[i] = bin.charCodeAt(i) & 7;
+  }
+
+  function readSave() {
+    try {
+      var raw = localStorage.getItem(SAVE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  function writeSave() {
+    if (!grid || N === 0) return;
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify({
+        v: 1, W: W, H: H,
+        grid: gridToB64(grid),
+        mode: mode,
+        muted: muted,
+        tool: tool,
+        charterStep: charterStep,
+        charterDone: charterDone,
+        hallTime: hallTime
+      }));
+      lastSaveAt = performance.now();
+      dirty = false;
+    } catch (e) {}
+  }
+
+  function bootSave() {
+    var data = readSave();
+    pendingSave = data;
+    if (!data) {
+      refreshStamp();
+      syncMuteUI();
+      refreshPlayLabels();
+      return;
+    }
+    muted = !!data.muted;
+    charterDone = !!data.charterDone;
+    charterStep = data.charterStep | 0;
+    if (charterStep > 3) charterStep = 3;
+    mode = data.mode === "charter" ? "charter" : "sandbox";
+    hallTime = +data.hallTime || 0;
+    if (data.grid && data.W && data.H) {
+      if (packed) packed.fill(0);
+      var tmp = new Uint8Array(data.W * data.H);
+      try { b64ToGrid(data.grid, tmp); blitGrid(tmp, data.W, data.H); } catch (e) {}
+      if (!worldHasDirt()) generate();
+    }
+    selectTool("dig");
+    refreshStamp();
+    syncMuteUI();
+    refreshPlayLabels();
+    updateGoal();
+  }
+
+  function refreshStamp() {
+    stampEl.classList.toggle("on", charterDone);
+  }
+
+  function syncMuteUI() {
+    muteBtn.classList.toggle("off", muted);
+    muteBtn.setAttribute("aria-label", muted ? "Unmute" : "Mute");
+    mute2.textContent = muted ? "Unmute" : "Mute";
+    if (audio) audio.master.gain.setTargetAtTime(muted ? 0 : 0.34, audio.ctx.currentTime, 0.03);
+  }
+
+  function setMute(on) {
+    muted = !!on;
+    syncMuteUI();
+    dirty = true;
+    writeSave();
+    if (!audio) unlockAudio();
+    else if (audio.ctx.state === "suspended") audio.ctx.resume();
+  }
+
+  function refreshPlayLabels() {
+    var data = readSave();
+    var has = !!(data && data.grid);
+    var cont = document.getElementById("btn-continue");
+    var neu = document.getElementById("btn-new");
+    if (cont) {
+      cont.style.display = has ? "" : "none";
+      cont.textContent = "Continue";
+    }
+    if (neu) {
+      neu.classList.toggle("primary", !has);
+      neu.textContent = "New";
+    }
+  }
+
+  function setScreen(next) {
+    screen = next;
+    playing = next === "play";
+    appEl.className = next;
+    if (!playing) painting = false;
+    if (next === "play") updateGoal();
+    if (next === "title") refreshPlayLabels();
+  }
+
+  function startMode(nextMode) {
+    unlockAudio();
+    mode = nextMode;
+    setScreen("play");
+    dirty = true;
+    writeSave();
+    updateGoal();
+  }
+
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    toastT = 2.2;
+  }
+
+  function flashGold() {
+    goldFlash = 1.1;
+    statsEl.classList.add("gold");
+    goalEl.classList.add("gold");
+  }
+
+  function hallStanding() {
+    if (N === 0) return false;
+    var x, y, i, roofed = 0, collapsing = 0, volume = 0, t;
+    for (y = 0; y < H - 1; y++) {
+      for (x = 0; x < W; x++) {
+        i = y * W + x;
+        t = grid[i];
+        if ((t === SOIL || t === STONE) && grid[i + W] === EMPTY) {
+          roofed++;
+          if (t === SOIL && spans[i] >= 6 && !nearStone(x, y)) collapsing++;
+        }
+        if (t === EMPTY && y > 0 && y < H - 3 && SOLID[grid[i - W]]) volume++;
+      }
+    }
+    return volume >= 12 && roofed >= 6 && collapsing === 0;
+  }
+
+  function updateGoal() {
+    if (mode !== "charter") {
+      goalEl.textContent = "";
+      return;
+    }
+    if (charterStep <= 0) goalEl.textContent = "I  Hall  " + hallTime.toFixed(1) + "s";
+    else if (charterStep === 1) goalEl.textContent = "II  Seal a dry room";
+    else if (charterStep === 2) goalEl.textContent = "III  Wet cellar";
+    else goalEl.textContent = "Master builder";
+  }
+
+  function completeGoal(msg) {
+    charterStep++;
+    if (charterStep >= 3) {
+      charterStep = 3;
+      charterDone = true;
+      refreshStamp();
+      msg = "Master builder";
+    }
+    flashGold();
+    sfxFanfare();
+    showToast(msg);
+    dirty = true;
+    writeSave();
+    updateGoal();
+  }
+
+  function stepCharter(dt) {
+    if (mode !== "charter" || !playing) return;
+    if (charterStep === 0) {
+      if (hallStanding()) {
+        hallTime += dt;
+        if (hallTime >= 10) {
+          hallTime = 10;
+          completeGoal("The hall stands");
+        }
+      } else {
+        hallTime = Math.max(0, hallTime - dt * 1.6);
+      }
+      if ((frameTick & 7) === 0) updateGoal();
+    } else if (charterStep === 1) {
+      var i, hasC = false;
+      for (i = 0; i < N; i++) if (grid[i] === CRYSTAL) { hasC = true; break; }
+      if (hasC) completeGoal("A crystal is born");
+    } else if (charterStep === 2) {
+      var j, hasM = false;
+      for (j = 0; j < N; j++) if (grid[j] === MUSHROOM) { hasM = true; break; }
+      if (hasM) completeGoal("The cellar lives");
+    }
+  }
+
+  function sfxFanfare() {
+    if (!audio || muted) return;
+    var t = nowMs();
+    tone(t, 784, "sine", 0.07, 0.18);
+    tone(t + 0.08, 988, "sine", 0.07, 0.2);
+    tone(t + 0.16, 1176, "sine", 0.08, 0.32);
+  }
+
+  buttons.forEach(function (btn) {
+    function hit(e) {
+      if (e.target !== btn && !btn.contains(e.target)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      unlockAudio();
+      var next = btn.getAttribute("data-tool");
+      if (next === "clear") {
+        generate();
+        hallTime = 0;
+        selectTool("soil");
+        sfxClear();
+        dirty = true;
+        writeSave();
+        updateGoal();
+        return;
+      }
+      selectTool(next);
+    }
+    btn.addEventListener("pointerdown", hit);
+    btn.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+  });
+
+  muteBtn.addEventListener("click", function () { setMute(!muted); });
+  mute2.addEventListener("click", function () { unlockAudio(); setMute(!muted); });
+  document.getElementById("btn-continue").addEventListener("click", function () {
+    startMode("sandbox");
+  });
+  document.getElementById("btn-new").addEventListener("click", function () {
+    generate();
+    hallTime = 0;
+    charterStep = 0;
+    startMode("sandbox");
+  });
+  document.getElementById("btn-how").addEventListener("click", function () { unlockAudio(); setScreen("how"); });
+  document.getElementById("btn-gotit").addEventListener("click", function () { setScreen("title"); });
+  menuBtn.addEventListener("click", function () {
+    writeSave();
+    setScreen("title");
+  });
+
+  function makeNoise(ctx, dur) {
+    var n = (ctx.sampleRate * dur) | 0;
+    var buf = ctx.createBuffer(1, n, ctx.sampleRate);
+    var d = buf.getChannelData(0), i, acc = 0;
+    for (i = 0; i < n; i++) {
+      acc = acc * 0.97 + (Math.random() * 2 - 1) * 0.03;
+      d[i] = acc * 6 + (Math.random() * 2 - 1) * 0.25;
+    }
+    return buf;
+  }
+
+  function unlockAudio() {
+    if (audio) {
+      if (audio.ctx.state === "suspended") audio.ctx.resume();
+      return;
+    }
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    var actx = new AC();
+    var master = actx.createGain();
+    master.gain.value = muted ? 0 : 0.34;
+    master.connect(actx.destination);
+
+    var noiseBuf = makeNoise(actx, 1.4);
+    var bedSrc = actx.createBufferSource();
+    bedSrc.buffer = noiseBuf;
+    bedSrc.loop = true;
+    var bedF = actx.createBiquadFilter();
+    bedF.type = "lowpass";
+    bedF.frequency.value = 190;
+    bedF.Q.value = 0.7;
+    var bedG = actx.createGain();
+    bedG.gain.value = 0.045;
+    bedSrc.connect(bedF);
+    bedF.connect(bedG);
+    bedG.connect(master);
+    bedSrc.start();
+
+    var hum = actx.createOscillator();
+    hum.type = "sine";
+    hum.frequency.value = 52;
+    var humG = actx.createGain();
+    humG.gain.value = 0.012;
+    hum.connect(humG);
+    humG.connect(master);
+    hum.start();
+
+    var lfo = actx.createOscillator();
+    lfo.frequency.value = 0.07;
+    var lfoG = actx.createGain();
+    lfoG.gain.value = 40;
+    lfo.connect(lfoG);
+    lfoG.connect(bedF.frequency);
+    lfo.start();
+
+    audio = { ctx: actx, master: master, noise: noiseBuf, last: { dig: 0, soil: 0, stone: 0, water: 0, rumble: 0, chime: 0 } };
+  }
+
+  function nowMs() { return audio ? audio.ctx.currentTime : 0; }
+
+  function sfxPaint(kind, n) {
+    if (!audio || muted) return;
+    var t = nowMs();
+    var key = kind === "dig" ? "dig" : kind === "stone" ? "stone" : kind === "water" ? "water" : "soil";
+    if (t - audio.last[key] < 0.07) return;
+    audio.last[key] = t;
+    var ctx = audio.ctx;
+    if (kind === "dig") {
+      burstNoise(t, 0.07, 900, 1.2, 0.16);
+    } else if (kind === "stone") {
+      tone(t, 88, "triangle", 0.14, 0.12);
+      burstNoise(t, 0.04, 400, 0.7, 0.08);
+    } else if (kind === "water") {
+      burstNoise(t, 0.12, 720, 0.5, 0.1);
+    } else {
+      burstNoise(t, 0.055, 420, 0.8, 0.1);
+      tone(t, 70, "sine", 0.05, 0.08);
+    }
+  }
+
+  function sfxRumble(n) {
+    if (!audio || muted) return;
+    var t = nowMs();
+    if (t - audio.last.rumble < (n >= 12 ? 0.42 : 0.62)) return;
+    audio.last.rumble = t;
+    var dur = 0.38 + Math.min(0.5, n * 0.022);
+    var gain = 0.14 + Math.min(0.16, n * 0.008);
+    tone(t, 40, "sine", gain, dur);
+    tone(t, 61, "triangle", 0.06 + Math.min(0.06, n * 0.004), dur * 0.75);
+    burstNoise(t, Math.min(0.7, 0.28 + n * 0.018), 130, 0.55, 0.1 + Math.min(0.1, n * 0.006));
+  }
+
+  function sfxChime() {
+    if (!audio || muted) return;
+    var t = nowMs();
+    if (t - audio.last.chime < 0.18) return;
+    audio.last.chime = t;
+    tone(t, 1046, "sine", 0.07, 0.28);
+    tone(t + 0.03, 1568, "sine", 0.045, 0.22);
+  }
+
+  function sfxClear() {
+    if (!audio || muted) return;
+    burstNoise(nowMs(), 0.16, 260, 0.5, 0.08);
+  }
+
+  function tone(t, freq, type, gain, dur) {
+    if (!audio) return;
+    var ctx = audio.ctx;
+    var o = ctx.createOscillator();
+    var g = ctx.createGain();
+    o.type = type;
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(gain, t);
+    g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+    o.connect(g);
+    g.connect(audio.master);
+    o.start(t);
+    o.stop(t + dur + 0.02);
+  }
+
+  function burstNoise(t, dur, freq, q, gain) {
+    if (!audio) return;
+    var ctx = audio.ctx;
+    var src = ctx.createBufferSource();
+    src.buffer = audio.noise;
+    var f = ctx.createBiquadFilter();
+    f.type = "bandpass";
+    f.frequency.value = freq;
+    f.Q.value = q;
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(gain, t);
+    g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+    src.connect(f);
+    f.connect(g);
+    g.connect(audio.master);
+    src.start(t);
+    src.stop(t + dur + 0.02);
+  }
+
+  window.addEventListener("resize", fit);
+  if (window.ResizeObserver) new ResizeObserver(fit).observe(canvas);
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) { endPaint(); writeSave(); }
+    if (!audio) return;
+    if (document.hidden) audio.ctx.suspend();
+    else if (!muted) audio.ctx.resume();
+  });
+
+  function frame(now) {
+    if (N === 0) fit();
+    var dt = lastFrameT ? Math.min(0.05, (now - lastFrameT) / 1000) : 0.016;
+    lastFrameT = now || 0;
+    if (N > 0) {
+      if (!skyLock) {
+        skyClock += dt / 90;
+        if (skyClock >= 1) skyClock -= 1;
+      }
+      if (skyLock && !skyCaptureBooted) {
+        skyCaptureBooted = true;
+      }
+      step();
+      step();
+      if (playing) {
+        stepCharter(dt);
+        if (dirty && now - lastSaveAt > 3000) writeSave();
+      }
+      if (goldFlash > 0) {
+        goldFlash -= dt;
+        if (goldFlash <= 0) {
+          goldFlash = 0;
+          statsEl.classList.remove("gold");
+          goalEl.classList.remove("gold");
+        }
+      }
+      if (toastT > 0) {
+        toastT -= dt;
+        if (toastT <= 0) toastEl.classList.remove("show");
+      }
+      render();
+      frameTick++;
+    }
+    requestAnimationFrame(frame);
+  }
+
+  if (!fit()) {
+    requestAnimationFrame(function retry() {
+      if (!fit()) requestAnimationFrame(retry);
+    });
+  }
+  requestAnimationFrame(frame);
+})();
+  </script>
+
+
 
 </body>
 </html>
