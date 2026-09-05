@@ -1,0 +1,51 @@
+name: Tap arc polish validation
+on:
+  push:
+    branches: [feature/web-swing-natural-tap-wallrun]
+    paths:
+      - tests/_tap_takeup.py
+      - .github/workflows/web-swing-tap-polish.yml
+permissions:
+  contents: write
+concurrency:
+  group: tap-arc-polish
+  cancel-in-progress: true
+jobs:
+  validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    env:
+      LIBGL_ALWAYS_SOFTWARE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply the bounded take-up refinement
+        run: |
+          python tests/_tap_takeup.py
+          python -c "from pathlib import Path; s=Path('games/web-swing/index.html').read_text(); Path('/tmp/web-swing.js').write_text(s.split('<script>')[1].split('</script>')[0])"
+          node --check /tmp/web-swing.js
+      - run: pip install playwright==1.55.0
+      - run: playwright install --with-deps chromium webkit
+      - run: python tests/web_swing_browser.py
+      - name: Archive exact test sources
+        if: always()
+        run: |
+          mkdir -p test-results/test-sources
+          cp tests/web_swing_browser.py tests/web_swing_flow_checks.js tests/web_swing_natural_checks.js test-results/test-sources/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: web-swing-natural-traversal-final
+          path: test-results/
+          retention-days: 7
+      - name: Retain only validated game and tests
+        if: success() && github.ref == 'refs/heads/feature/web-swing-natural-tap-wallrun'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add games/web-swing/index.html tests/web_swing_natural_checks.js
+          git rm tests/_tap_takeup.py .github/workflows/web-swing-tap-polish.yml
+          git commit -m "Polish long tap swings with gradual stamina-powered web take-up"
+          git push origin HEAD:feature/web-swing-natural-tap-wallrun
