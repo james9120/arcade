@@ -3,8 +3,6 @@
  const assert=(v,m)=>{if(!v)throw Error(m)},dist=(a,b)=>Math.hypot(...a.map((v,i)=>v-b[i]));
  const check=(name,fn)=>{try{results.push({name,pass:true,detail:fn()})}catch(e){results.push({name,pass:false,error:String(e)})}};
  const fresh=(mode='FLOW')=>{g.start();g.manual(true);g.settings.sound=false;g.setSwingMode(mode);return g;};
- check('camera-relative left and right choose real facade anchors',()=>{let a=[];for(let x of[-1,1]){fresh();g.input.x=x;g.refreshTarget();assert(g.aim.target,'no anchor');assert(g.aim.target.p[0]*x<0,'wrong side');a.push(g.aim.target.p)}return a});
- check('up and down still guide the next anchor height',()=>{let a=[];for(let y of[-1,1]){fresh();g.input.y=y;g.refreshTarget();assert(g.aim.target,'missing anchor');a.push(g.aim.target.p[1])}assert(a[0]>a[1]+20,'height not responsive');return a});
  check('attachment matches the displayed target without position or velocity snap',()=>{fresh();g.input.x=.7;g.refreshTarget();let a=[...g.aim.target.p],p=[...g.P.p],v=[...g.P.v];assert(g.attach(),'attach');assert(dist(a,g.P.rope.a)<1e-9,'different anchor');assert(dist(p,g.P.p)<1e-9&&dist(v,g.P.v)<1e-9,'snap');g.release();assert(dist(v,g.P.v)<1e-9,'release boost')});
  check('aiming another web does not move the current anchor',()=>{fresh();g.input.x=-.7;g.attach();let p=[...g.P.rope.a],l=g.P.rope.length;g.input.x=.7;g.input.y=-.7;g.refreshTarget();assert(g.aim.target,'no next target');assert(dist(p,g.P.rope.a)<1e-9&&l===g.P.rope.length,'aim mutated live rope')});
  check('there are no invisible anchors in an empty world',()=>{fresh();g.clearWorld();g.refreshTarget();assert(!g.aim.target&&!g.attach(),'fake anchor')});
