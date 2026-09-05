@@ -1,0 +1,26 @@
+name: Apply Web Swing World Polish
+on:
+  push:
+    branches: [feature/web-swing-world-pass]
+    paths: [games/web-swing/polish.py, .github/workflows/web-swing-polish.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/web-swing-world-pass
+      - name: Apply polish transform
+        run: python3 games/web-swing/polish.py
+      - name: Remove transform and one-shot workflow
+        run: rm games/web-swing/polish.py .github/workflows/web-swing-polish.yml
+      - name: Commit generated game
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "Polish Web Swing speed animation and city variety"
+          git push origin HEAD:feature/web-swing-world-pass
