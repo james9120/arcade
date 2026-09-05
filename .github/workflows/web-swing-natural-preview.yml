@@ -7,7 +7,7 @@ on:
       - tests/web_swing_natural_checks.js
       - .github/workflows/web-swing-natural-preview.yml
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: natural-traversal-preview
   cancel-in-progress: true
@@ -22,17 +22,32 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Compose hash-guarded runtime and regression tests
+      - name: Compose hash-guarded runtime and reviewed corrections
         run: |
           python tests/_natural_build.py
+          python tests/_natural_refine.py
           python -c "from pathlib import Path; s=Path('games/web-swing/index.html').read_text(); Path('/tmp/web-swing.js').write_text(s.split('<script>')[1].split('</script>')[0])"
           node --check /tmp/web-swing.js
       - run: pip install playwright==1.55.0
       - run: playwright install --with-deps chromium webkit
       - run: python tests/web_swing_browser.py
+      - name: Archive the exact test sources
+        if: always()
+        run: |
+          mkdir -p test-results/test-sources
+          cp tests/web_swing_browser.py tests/web_swing_flow_checks.js tests/web_swing_natural_checks.js test-results/test-sources/
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: web-swing-natural-traversal-results
           path: test-results/
           retention-days: 7
+      - name: Commit only the tested runtime and regressions to the feature branch
+        if: success() && github.ref == 'refs/heads/feature/web-swing-natural-tap-wallrun'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add games/web-swing/index.html tests/web_swing_browser.py tests/web_swing_flow_checks.js tests/web_swing_natural_checks.js
+          git rm tests/_natural_build.py tests/_natural_traversal.js tests/_natural_refine.py tests/_natural_browser_extra.py .github/workflows/web-swing-natural-preview.yml
+          git commit -m "Ship validated predictive auto-web, direct screen taps and wall running"
+          git push origin HEAD:feature/web-swing-natural-tap-wallrun
