@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#b4d6e2">
-<meta name="downhill-build" content="valley-traffic-4">
-<meta name="description" content="Endless downhill skiing with living ski traffic, rolling descents, deformable snow and big air.">
+<meta name="downhill-build" content="flow-lines-5">
+<meta name="description" content="Find your line. Link close calls, slipstream skiers, and send natural jump lines through an endless mountain.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Downhill · Endless Ski</title>
@@ -27,8 +27,12 @@ canvas { display:block; width:100%; height:100%; touch-action:none; outline:none
 .scorebox { text-align:right; }
 .flow { margin-top:6px; display:flex; gap:7px; align-items:center; justify-content:flex-end; height:14px; }
 #multiplier { font-size:12px; font-weight:850; color:var(--accent); transition:transform .15s; }
-.flow-track { width:45px; height:3px; border-radius:2px; background:rgba(44,85,99,.12); overflow:hidden; }
+.flow-track { width:56px; height:3px; border-radius:2px; background:rgba(44,85,99,.12); overflow:hidden; }
 #flowFill { display:block; height:100%; width:0; background:var(--accent); border-radius:2px; transition:width .15s linear; }
+.runline { height:17px; margin-top:3px; font-size:9px; font-weight:800; letter-spacing:1.2px; color:#315e70; }
+.hud.sending #multiplier { color:#087e84; transform:scale(1.2); }
+.hud.sending #flowFill { background:#12a7a2; }
+.hud.sending .flow-track { box-shadow:0 0 10px #42c3c480; }
 #intro { pointer-events:none; position:absolute; z-index:3; top:30%; left:0; width:100%; text-align:center; transition:opacity .24s,transform .35s; }
 #intro.hidden { opacity:0; transform:translateY(-12px); visibility:hidden; }
 .eyebrow { font-size:9px; font-weight:750; letter-spacing:3px; margin:0 0 13px; opacity:.64; }
@@ -76,9 +80,9 @@ h2 { font-size:45px; line-height:1.0; font-weight:850; letter-spacing:-2px; marg
 <canvas id="slope" tabindex="0" aria-label="Drag left or right to carve. On a keyboard, use the arrow keys or A and D."></canvas>
 <div class="hud is-idle" id="hud" aria-hidden="true">
 <div><div class="label">DISTANCE</div><div class="value"><span id="distance">0</span><span class="unit" id="distanceUnit">m</span></div></div>
-<div class="scorebox"><div class="label">SCORE</div><div class="value" id="score">0</div><div class="flow"><div class="flow-track"><i id="flowFill"></i></div><span id="multiplier">×1</span></div></div>
+<div class="scorebox"><div class="label">SCORE</div><div class="value" id="score">0</div><div class="flow"><div class="flow-track"><i id="flowFill"></i></div><span id="multiplier">×1</span></div><div class="runline" id="lineReadout"></div></div>
 </div>
-<div id="intro"><p class="eyebrow">THE MOUNTAIN NEVER ENDS</p><h1>DOWNHILL<span class="title-dot">.</span></h1><button id="start" class="instruction" type="button" aria-label="Start skiing. Drag left or right to carve.">Tap or drag to ski</button><svg class="gesture" viewBox="0 0 66 28" aria-hidden="true"><path d="M7 17 Q33 -1 59 17" fill="none" stroke="#8baab2" stroke-width="1.5" stroke-linecap="round"/><circle cx="33" cy="14" r="4" fill="#e66c43"/></svg></div>
+<div id="intro"><p class="eyebrow">FIND YOUR LINE. KEEP IT ALIVE.</p><h1>DOWNHILL<span class="title-dot">.</span></h1><button id="start" class="instruction" type="button" aria-label="Start skiing. Drag left or right to carve.">Tap or drag to ski</button><svg class="gesture" viewBox="0 0 66 28" aria-hidden="true"><path d="M7 17 Q33 -1 59 17" fill="none" stroke="#8baab2" stroke-width="1.5" stroke-linecap="round"/><circle cx="33" cy="14" r="4" fill="#e66c43"/></svg></div>
 <div id="desktopHint">DRAG TO CARVE &nbsp; / &nbsp; A D &nbsp; OR &nbsp; ← →</div>
 <section id="crash" aria-label="Run results" aria-hidden="true">
 <div class="result"><p class="eyebrow" id="crashEyebrow">A LITTLE TOO CLOSE</p><h2>One more run.</h2><div class="stats"><div class="stat"><strong id="finalDistance">0 m</strong><span>DISTANCE</span></div><div class="stat"><strong id="finalScore">0</strong><span>SCORE</span></div></div><button id="again" type="button"><span>Again</span><span class="again-arrow" aria-hidden="true">↗</span></button><p id="crashDetail">Fresh snow. A fresh line.</p></div>
@@ -91,7 +95,7 @@ const stage = document.getElementById('game');
 const startButton = document.getElementById('start');
 const canvas = document.getElementById('slope');
 const ctx = canvas.getContext('2d', { alpha:true, desynchronized:false });
-const ui = Object.fromEntries(['hud','intro','desktopHint','distance','distanceUnit','score','multiplier','flowFill','crash','again','finalDistance','finalScore','crashEyebrow','crashDetail'].map(id => [id,document.getElementById(id)]));
+const ui = Object.fromEntries(['hud','intro','desktopHint','distance','distanceUnit','score','multiplier','flowFill','crash','again','finalDistance','finalScore','crashEyebrow','crashDetail','lineReadout'].map(id => [id,document.getElementById(id)]));
 const TAU = Math.PI * 2, STEP = 1/120, BACK = 25, FAR = 215, HALF = 10.4, PLAYER_R = .38;
 const MAX_OBJECTS = 440, MAX_PARTICLES = 230, MAX_TRACKS = 220, MAX_POPUPS = 5;
 const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
@@ -107,6 +111,12 @@ let nextRow=0, nextEvent=0, event=null, nextNaturalJump=0, shake=0, crashTime=0,
 let finalDistance=0, finalScore=0, trackClock=0, sprayClock=0, fastClock=0, turnClock=0, ambientClock=0;
 let objects=[], route=[], clearings=[], tracks=[], particles=[], popups=[];
 let prevPlayerX=0, prevWorldZ=0;
+let pieces=[], patternBag=[], patternCount=0;
+let styleChain=0, chainUntil=0, chainKind='', surge=0, surgeLock=0;
+let draftTime=0, draftId=0, drafting=false, surgeFlash=0, turnDebt=0;
+let bestScore=0,bestDistance=0;
+try { const b=JSON.parse(localStorage.getItem('downhill.best.v1')||'{}');bestScore=Number(b.score)||0;bestDistance=Number(b.distance)||0; } catch {}
+
 let player, stats;
 // Downhill-positive coordinates; traffic has a separate random stream.
 const FALL = .62, CAMERA_BACK = 24, MAX_SKIERS = 6, MAX_NPC_TRAIL = 88;
@@ -137,16 +147,20 @@ const p=Math.max(0,z+origin)/390, i=Math.floor(p), t=smooth((p-i-.5)*2);
 const a=moods[i===0?0:Math.floor(hash(i*137+81)*5)], b=moods[Math.floor(hash((i+1)*137+81)*5)];
 return {snow:a.snow.map((v,k)=>lerp(v,b.snow[k],t)),pine:lerp(a.pine,b.pine,t),rock:lerp(a.rock,b.rock,t),powder:lerp(a.powder,b.powder,t),ice:lerp(a.ice,b.ice,t)};
 }
-const difficultyAt = z => 1-Math.exp(-Math.max(0,z+origin)/1900);
-const corridorAt = z => 2.35-.52*difficultyAt(z);
+const difficultyAt = z => 1-Math.exp(-Math.max(0,z+origin)/1300);
+const corridorAt = z => 1.72-.35*difficultyAt(z);
+function nearbyChallenge() {
+return objects.some(o=>(o.type==='tree'||o.type==='rock')&&Math.abs(o.z-worldZ)<13&&Math.abs(o.x-player.x)<4.7);
+}
 function ensureRoute(to) {
 while(route[route.length-1].z < to) {
-const a=route[route.length-1], dz=rand(13,19);
-let slope=clamp(a.slope*.55+rand(-.12,.12),-.15,.15);
-if(Math.abs(a.x)>5.3) slope=lerp(slope,-Math.sign(a.x)*.13,.68);
-let x=clamp(a.x+slope*dz,-6.2,6.2);
-if(a.z+origin<65) { x=0; slope=0; }
-route.push({z:a.z+dz,x,slope});
+const a=route[route.length-1], dz=14.5+hash(Math.floor((a.z+origin)/15)+702)*3.5;
+const z=a.z+dz, d=z+origin;
+// Smooth, seeded fall line. Its maximum lateral gradient remains steerable.
+const fade=smooth((d-28)/65), phase=hash(82)*TAU;
+const target=fade*(4.7*Math.sin(d*.030+phase+.70*Math.sin(d*.00391))+1.15*Math.sin(d*.0717+phase*.8));
+const x=a.x+clamp(target-a.x,-dz*.33,dz*.33);
+route.push({z,x:clamp(x,-5.6,5.6),slope:(x-a.x)/dz});
 }
 }
 function pathAt(z) {
@@ -160,90 +174,103 @@ return clearings.some(c=>z>c.from-r && z<c.to+r && Math.abs(x-c.x)<c.width+r);
 }
 function addObstacle(type,x,z,size=1) {
 const r=(type==='tree'?.48:.78)*size, safe=corridorAt(z), line=pathAt(z);
-if(Math.abs(x-line)<safe+r+.4 || protectedByJump(x,z,r)) return false;
+if(Math.abs(x-line)<safe+r+.16 || protectedByJump(x,z,r)) return false;
 if(objects.some(o=>(o.type==='tree'||o.type==='rock')&&Math.hypot(o.x-x,o.z-z)<o.r+r+.8)) return false;
 const h=type==='tree'?rand(4.0,6.0)*size:rand(.8,1.35)*size;
 objects.push({type,x,z,r,h,size,variant:rng(),passed:false,nearDone:false,line,safe});
 stats.generated++;
 return true;
 }
-function addJump(z,kind='small',x=pathAt(z)) {
-if(objects.some(o=>o.type==='jump'&&Math.abs(o.z-z)<23)) return false;
-const big=kind==='huge', medium=kind==='medium';
-const w=big?4.8:medium?3.6:2.8, h=big?2.5:medium?1.65:.95;
-objects.push({type:'jump',x,z,w,h,depth:big?10:medium?7:5.5,kind,used:false,r:w/2});
-const c={x,from:z-5,to:z+(big?105:medium?85:65),width:w*.5+2.2};
+function addJump(z,kind='small',x=pathAt(z),tag='') {
+if(objects.some(o=>o.type==='jump'&&Math.abs(o.z-z)<25))return false;
+const big=kind==='huge',medium=kind==='medium',w=big?4.2:medium?3.4:2.9,h=big?2.55:medium?1.6:1.05;
+objects.push({type:'jump',x,z,w,h,depth:big?10:medium?7:5.5,kind,used:false,r:w/2,tag});
+// A narrow, optional airborne line, not a clearing spanning the entire piste.
+const c={x,from:z-7,to:z+(big?76:medium?58:43),width:w*.5+.65};
 clearings.push(c);
-objects=objects.filter(o=>o.type!=='tree'&&o.type!=='rock'||!(o.z>c.from-o.r&&o.z<c.to+o.r&&Math.abs(o.x-x)<c.width+o.r));
-stats.generated++;
-return true;
+objects=objects.filter(o=>(o.type!=='tree'&&o.type!=='rock')||!(o.z>c.from-o.r&&o.z<c.to+o.r&&Math.abs(o.x-x)<c.width+o.r));
+stats.generated++;return true;
 }
 function chooseEvent(z) {
-const types=['chute','slalom','bigAir','gap','powder','chain','ridge'];
-const kind=types[Math.floor(rng()*types.length)];
-event={kind,start:z,end:z+rand(58,94),nextFeature:z+8};
-nextEvent=event.end+rand(30,65);
-if(kind==='bigAir') { addJump(z+12,'huge'); event.nextFeature=Infinity; }
+if(!patternBag.length){
+patternBag=['slalom','gap','chute','chain','ridge','split','powder'];
+for(let i=patternBag.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[patternBag[i],patternBag[j]]=[patternBag[j],patternBag[i]];}
+}
+const kind=patternCount===0?'slalom':patternCount===1?'gap':patternBag.pop();
+patternCount++;
+const side=rng()<.5?-1:1;
+event={kind,start:z,end:z+(kind==='powder'?rand(38,52):kind==='chain'?rand(118,145):rand(76,108)),nextFeature:z+13,side};
+pieces.push(event);nextEvent=event.end+rand(9,18);
+if(kind==='split') {
+const zz=z+24,x=clamp(pathAt(zz)+side*4.15,-7.6,7.6);
+addJump(zz,'huge',x,'BIG AIR');event.nextFeature=Infinity;
+}
+}
+function makeSlot(z) {
+const x=pathAt(z),half=corridorAt(z)+.27;
+const left=x-half-1.01,right=x+half+1.01;
+const a=addObstacle('rock',left,z,1.22),b=addObstacle('rock',right,z,1.22);
+if(a&&b)objects.push({type:'slot',x,z,w:half*2,r:0,used:false,left,right});
 }
 function generate() {
 ensureRoute(worldZ+FAR+105);
-while(nextRow<worldZ+FAR) {
-const z=nextRow, mood=moodAt(z), diff=difficultyAt(z);
-if(z>=nextEvent) chooseEvent(z);
-if(event && z>event.end) event=null;
-const kind=event?.kind, line=pathAt(z), safe=corridorAt(z);
-const starter=z+origin<45;
-if(z>nextNaturalJump && !starter && kind!=='powder' && kind!=='chain' && kind!=='bigAir') {
-const medium=z+origin>100&&rng()<.58;
-addJump(z+3,medium?'medium':'small',clamp(pathAt(z+3)+rand(-1.6,1.6),-7,7));
-nextNaturalJump=z+rand(68,105);
+while(nextRow<worldZ+FAR){
+const z=nextRow,mood=moodAt(z),diff=difficultyAt(z),starter=z+origin<36;
+if(z>=nextEvent)chooseEvent(z);
+if(event&&z>event.end)event=null;
+const kind=event?.kind||'open',line=pathAt(z),safe=corridorAt(z);
+// First ramp is close enough to offer a decision immediately.
+if(z>nextNaturalJump&&!starter&&!['chain','split','powder','gap'].includes(kind)){
+const zz=z+4,side=rng()<.5?-1:1;
+const offset=zz+origin<85?side*1.0:side*3.8;
+addJump(zz,zz+origin>150&&rng()<.6?'medium':'small',clamp(pathAt(zz)+offset,-7.7,7.7),'SEND IT');
+nextNaturalJump=z+rand(88,125);
 }
-if(kind==='chain' && z>=event.nextFeature) { addJump(z+2,'small',pathAt(z+2)); event.nextFeature=z+55; }
-if(kind==='gap' && z>=event.nextFeature) {
-addObstacle('rock',line-safe-1.65,z+1,1.6); addObstacle('rock',line+safe+1.65,z+1,1.6);
-event.nextFeature=z+32;
+if(kind==='chain'&&z>=event.nextFeature){
+const zz=z+4;
+addJump(zz,'small',clamp(pathAt(zz)+event.side*2.7,-7.3,7.3),'LINK IT');
+event.nextFeature=z+48;
 }
-if(kind==='chute'||kind==='slalom'||kind==='ridge') {
+if(kind==='gap'&&z>=event.nextFeature){makeSlot(z+1);event.nextFeature=z+27;}
+if(['slalom','chute','ridge','split'].includes(kind)){
 const type=kind==='ridge'?'rock':'tree';
-const n=kind==='slalom'?3:2;
-for(let k=0;k<n;k++) {
-const side=k%2?-1:1, zz=z+rand(-1,1);
-addObstacle(type,pathAt(zz)+side*(corridorAt(zz)+1.2+rand(0,1.2)),zz,rand(.9,1.22));
+for(const side of [-1,1]){
+const zz=z+(side===1?1.4:-1.4),size=type==='rock'?1.02:rand(.8,1.10);
+const r=(type==='tree'?.48:.78)*size;
+addObstacle(type,pathAt(zz)+side*(corridorAt(zz)+r+.24),zz,size);
+// Loose outer clusters give the twisting open line readable edges.
+if(kind==='slalom'||kind==='ridge')addObstacle(type,pathAt(zz)+side*(safe+3.2),zz+rand(-2,2),rand(.75,1.2));
 }
 }
-let count=Math.floor(2+mood.pine+mood.rock+diff*2+rand(0,2));
-if(kind==='powder') count=1;
-if(starter) count=2;
-for(let k=0;k<count;k++) {
-const zz=z+rand(-2,3), side=rng()<.5?-1:1;
-let x=rand(-16,16);
-if(starter) x=side*rand(7.2,16);
-if(kind==='slalom') x=line+(Math.floor((z-event.start)/14)%2?1:-1)*rand(4,13);
-addObstacle(rng()<mood.pine/(mood.pine+mood.rock)?'tree':'rock',x,zz,rand(.72,1.18));
+let count=starter?2:kind==='powder'?1:Math.floor(2+mood.pine+mood.rock+diff*1.5);
+for(let k=0;k<count;k++){
+const zz=z+rand(-2,3);let x=rand(-15,15);
+if(starter)x=(rng()<.5?-1:1)*rand(7,15);
+addObstacle(rng()<mood.pine/(mood.pine+mood.rock)?'tree':'rock',x,zz,rand(.72,1.15));
 }
-if(rng()<.75) {
-const side=rng()<.5?-1:1;
-addObstacle(rng()<.66?'tree':'rock',side*rand(19,48),z+rand(-4,4),rand(1.0,1.9));
-}
-if(rng()<.56+mood.powder*.25) objects.push({type:'drift',x:rand(-25,25),z:z+rand(0,7),w:rand(4,12),depth:rand(1,3.5),variant:rng(),r:0});
-if(rng()<mood.ice && !starter) objects.push({type:'ice',x:clamp(line+rand(-5,5),-9,9),z:z+3,w:rand(2.0,3.5),depth:rand(3,6),r:0,variant:rng()});
-nextRow+=rand(10.5,16.5)-diff*2.0;
+if(rng()<.75)addObstacle(rng()<.67?'tree':'rock',(rng()<.5?-1:1)*rand(18,38),z+rand(-3,3),rand(1.0,1.7));
+if(rng()<.5)objects.push({type:'drift',x:rand(-22,22),z:z+rand(0,5),w:rand(4,9),depth:rand(1,3),variant:rng(),r:0});
+if(!starter&&kind==='chute'&&rng()<.32)objects.push({type:'ice',x:line,z:z+3,w:rand(1.6,2.5),depth:rand(3,5),r:0,variant:rng()});
+nextRow+=kind==='powder'?rand(14,19):rand(10,13)-diff;
 }
 objects=objects.filter(o=>o.z>worldZ-17).slice(-MAX_OBJECTS);
-while(route.length>3&&route[1].z<worldZ-26) route.shift();
+while(route.length>3&&route[1].z<worldZ-26)route.shift();
 clearings=clearings.filter(c=>c.to>worldZ-5);
+pieces=pieces.filter(c=>c.end>worldZ-20);
 terrainFeatures=objects.filter(o=>o.type==='jump'&&o.z>worldZ-18&&o.z<worldZ+FAR).slice(0,6);
 }
 function reset(newSeed=freshSeed(),start=true) {
 seed=newSeed>>>0; rng=makeRng(seed);
 state=start?'playing':'idle'; worldZ=0; origin=0; distance=0; score=0; time=0; flow=0; multiplier=1; lastStyle=-10;
-nextRow=20; nextEvent=rand(110,150); nextNaturalJump=49; event=null;
+nextRow=18;nextEvent=66;nextNaturalJump=32;event=null;
+pieces=[];patternBag=[];patternCount=0;
+styleChain=0;chainUntil=0;chainKind='';surge=0;surgeLock=0;draftTime=0;draftId=0;drafting=false;surgeFlash=0;turnDebt=0;
 objects=[]; route=[{z:-40,x:0,slope:0},{z:0,x:0,slope:0}]; clearings=[]; tracks=[]; particles=[]; popups=[];
 shake=0; crashTime=0; resultShown=false; finalDistance=0; finalScore=0; camX=0;
 trackClock=0; sprayClock=0; fastClock=0; turnClock=0; hudClock=0;
 Snow.reset();camLift=naturalHeight(0,0);camBank=0;pitch=Math.atan(slopeGrade(0))+.065;snowClock=0;carveSide=0;carveTravel=0;carveStartX=0;chainClock=0;
-player={x:0,angle:0,speed:13.2,airY:0,boost:0,snowDrag:0,air:0,vy:0,airTime:0,flight:0,trick:null,jumpKind:null,groundLift:0,landSquash:0,ice:false,powder:0,crashRotation:0,crashVX:0};
-stats={generated:0,jumps:0,landings:0,tricks:0,nearMisses:0,crashes:0,carves:0,links:0,maxCombo:1,rebases:0,peakObjects:0,peakParticles:0,passes:0,closePasses:0,brushes:0,trafficSpawned:0,trafficRemoved:0,peakSkiers:0};
+player={x:0,angle:0,speed:15.8,airY:0,boost:0,snowDrag:0,air:0,vy:0,airTime:0,flight:0,trick:null,jumpKind:null,groundLift:0,landSquash:0,ice:false,powder:0,crashRotation:0,crashVX:0};
+stats={generated:0,jumps:0,landings:0,tricks:0,nearMisses:0,crashes:0,carves:0,links:0,maxCombo:1,rebases:0,peakObjects:0,peakParticles:0,passes:0,closePasses:0,brushes:0,trafficSpawned:0,trafficRemoved:0,peakSkiers:0,slots:0,surges:0,drafts:0,maxChain:0};
 skiers=[];trafficRng=makeRng(seed^0x53b7621d);trafficId=0;nextTraffic=85;
 input.pointer=null; input.active=false; input.targetX=0; input.keys.clear(); touchId=null;
 paused=false; frameErrorReported=false;
@@ -269,16 +296,32 @@ const digits=fmt.format(Math.floor(score));
 ui.score.textContent=digits;
 ui.score.style.fontSize=Math.max(16,(H<500?23:28)-Math.max(0,digits.length-8)*1.5)+'px';
 ui.multiplier.textContent='×'+multiplier;
-ui.flowFill.style.width=(flow)+'%';
+ui.flowFill.style.width=(surge>0?surge/4*100:flow)+'%';
+ui.hud.classList.toggle('sending',surge>0);
+ui.lineReadout.textContent=surge>0?'FLOW STATE':drafting?'SLIPSTREAM':styleChain>1&&chainUntil>time?styleChain+' LINK'+(styleChain>1?'S':''):'';
 }
 function popup(text,points=0,accent=false,subtitle='') {
 popups.push({text,points,accent,subtitle,age:0,life:1.45,x:player.x});
 if(popups.length>MAX_POPUPS) popups.shift();
 }
 function styleReward(points,energy,label,accent=false,subtitle='') {
-flow=clamp(flow+energy,0,100); multiplier=Math.min(5,1+Math.floor(flow/20)); stats.maxCombo=Math.max(stats.maxCombo,multiplier);
-const earned=Math.round(points*multiplier); score+=earned; lastStyle=time;
-if(label) popup(label,earned,accent,subtitle);
+const kind=label==='CLOSE PASS'||label==='SLINGSHOT'?'pass':label==='NEAR MISS'||label==='THREAD THE NEEDLE'?'edge':label==='LINKED CARVE'||label==='CLEAN CARVE'?'carve':label==='AIR'||label==='BIG AIR'?'takeoff':'landing';
+const distinct=kind!=='takeoff'&&label;
+if(distinct){
+styleChain=chainUntil>time?Math.min(99,styleChain+1):1;
+chainUntil=time+5.4;chainKind=kind;stats.maxChain=Math.max(stats.maxChain,styleChain);
+}
+const linkEnergy=distinct&&styleChain>1?Math.min(5,styleChain):0;
+flow=clamp(flow+energy+linkEnergy,0,100);
+multiplier=surge>0?5:Math.min(5,1+Math.floor(flow/20));
+stats.maxCombo=Math.max(stats.maxCombo,multiplier);
+const earned=Math.round(points*multiplier*(1+Math.min(8,Math.max(0,styleChain-1))*.07));
+score+=earned;lastStyle=time;
+if(label)popup(label,earned,accent,subtitle);
+if(flow>=80&&surge<=0&&surgeLock<=0){
+surge=4;surgeLock=11;surgeFlash=1;stats.surges++;multiplier=5;
+player.boost=Math.max(player.boost,3);popup('FLOW STATE',0,true,'');
+}
 return earned;
 }
 function emit(x,z,count,power=1,crash=false) {
@@ -292,14 +335,14 @@ function launch(o) {
 o.used=true;
 if(player.air>0||player.speed<10) return;
 const base=o.kind==='huge'?13.5:o.kind==='medium'?10.5:8.1;
-const vy=base*(.79+player.speed/55)-slopeGrade(worldZ)*player.speed*.65;
+const vy=base*(.80+player.speed/65)-slopeGrade(worldZ)*player.speed*.95;
 const relativeVy=vy+slopeGrade(worldZ)*player.speed*Math.cos(player.angle*.64);
 player.airY=groundHeight(player.x,o.z-.08)+.10;player.air=Math.max(.12,player.airY-groundHeight(player.x,worldZ)); player.vy=vy; player.airTime=0; player.flight=(relativeVy+Math.sqrt(relativeVy*relativeVy+48*(o.h+.10)))/24;
 player.jumpKind=o.kind;
 player.trick=o.kind==='huge'&&player.speed>21?'BACKFLIP':player.flight>1.12&&player.speed>17?'360':player.flight>.82?'TAIL GRAB':'STRAIGHT AIR';
 player.groundLift=0; stats.jumps++;
 Snow.impact(player.x,o.z-.35,.55);player.boost=Math.max(player.boost,1.4);
-styleReward(o.kind==='huge'?90:45,7,o.kind==='huge'?'BIG AIR':'AIR',true);
+styleReward(o.kind==='huge'?75:30,4,o.kind==='huge'?'BIG AIR':'AIR',true);
 emit(player.x,worldZ-1,9,1.1);
 }
 function land() {
@@ -327,7 +370,10 @@ ui.crashEyebrow.textContent=cause==='landing'?'ALMOST STUCK THE LANDING':obstacl
 ui.finalDistance.textContent=finalDistance>=10000?(finalDistance/1000).toFixed(1)+' km':fmt.format(Math.floor(finalDistance))+' m';
 ui.finalScore.textContent=fmt.format(finalScore);
 ui.finalScore.style.fontSize=Math.max(15,32-Math.max(0,ui.finalScore.textContent.length-7)*1.8)+'px';
-ui.crashDetail.textContent=stats.maxCombo>1?'Peak flow ×'+stats.maxCombo+' · Fresh snow. A fresh line.':'Fresh snow. A fresh line.';
+const record=finalScore>bestScore;
+bestScore=Math.max(bestScore,finalScore);bestDistance=Math.max(bestDistance,finalDistance);
+try {localStorage.setItem('downhill.best.v1',JSON.stringify({score:bestScore,distance:bestDistance}));}catch{}
+ui.crashDetail.textContent=(record?'New best · ':'Best '+fmt.format(bestScore)+' · ')+(stats.maxChain>1?stats.maxChain+' linked moves':'Fresh line. Again.');
 updateHud(true);
 }
 function sweptDistance(ox,oz,x0,z0,x1,z1) {
@@ -338,6 +384,10 @@ return Math.hypot(ox-(x0+dx*t),oz-(z0+dz*t));
 function collisions() {
 for(const o of objects) {
 const rel=o.z-worldZ;
+if(o.type==='slot') {
+if(!o.used&&prevWorldZ<o.z&&worldZ>=o.z){o.used=true;if(player.air<.8&&Math.abs(player.x-o.x)<o.w*.5-PLAYER_R&&objects.some(r=>r.type==='rock'&&r.z===o.z&&r.x===o.left)&&objects.some(r=>r.type==='rock'&&r.z===o.z&&r.x===o.right)){stats.slots++;styleReward(150,17,'THREAD THE NEEDLE',true);player.boost=Math.max(player.boost,1.1);}}
+continue;
+}
 if(o.type==='jump') {
 if(!o.used&&prevWorldZ<o.z&&worldZ>=o.z&&Math.abs(player.x-o.x)<o.w*.5+.05) launch(o);
 continue;
@@ -363,7 +413,7 @@ const n=10240;Snow.rebase(n); worldZ-=n; prevWorldZ-=n; origin+=n;
 camLift+=FALL*n;player.airY+=FALL*n;nextTraffic-=n;
 for(const skier of skiers){skier.z-=n;skier.prevZ-=n;skier.airY+=FALL*n;for(const t of skier.trail)t.z-=n;}
 nextRow-=n; nextEvent-=n; nextNaturalJump-=n;
-if(event) { event.start-=n; event.end-=n; event.nextFeature-=n; }
+for(const p of pieces){p.start-=n;p.end-=n;p.nextFeature-=n;}
 for(const o of objects) o.z-=n;
 for(const p of route) p.z-=n;
 for(const c of clearings) { c.from-=n; c.to-=n; }
@@ -378,6 +428,9 @@ camLift=approach(camLift,naturalHeight(player.x,worldZ),7,dt);
 pitch=approach(pitch,Math.atan(slopeGrade(worldZ+12))+.065+clamp((player.speed-18)*.002,0,.02),2.0,dt);
 camBank=approach(camBank,reducedMotion?0:-player.angle*.037,3.6,dt);
 player.boost=Math.max(0,player.boost-dt);
+surgeLock=Math.max(0,surgeLock-dt);surgeFlash=Math.max(0,surgeFlash-dt*2);
+if(surge>0){surge=Math.max(0,surge-dt);if(surge===0)flow=Math.min(flow,48);}
+if(time>chainUntil)styleChain=0;
 hudClock+=dt;
 for(const p of particles) { p.age+=dt; p.x+=p.vx*dt; p.z+=p.vz*dt; p.h+=p.vy*dt; p.vy-=9*dt; if(p.h<0) { p.h=0; p.vy=0; } }
 particles=particles.filter(p=>p.age<p.life&&p.z>worldZ-16);
@@ -417,10 +470,10 @@ player.x=clamp(player.x+Math.sin(player.angle)*player.speed*.84*airControl*dt,-H
 if(Math.abs(player.x)===HALF&&Math.abs(oldX-player.x)<.0001) player.angle=approach(player.angle,0,8,dt);
 const mood=moodAt(worldZ), diff=difficultyAt(worldZ);
 player.powder=mood.powder;
-const cruise=16.8+13.0*diff-mood.powder*1.25+Snow.sample(player.x,worldZ,true)*.55;
+const cruise=19.3+9.1*diff-mood.powder*1.05+Snow.sample(player.x,worldZ,true)*.55+(surge>0?4.2:0)+(drafting?2.4:0);
 const grade=clamp((slopeGrade(worldZ)-FALL)*5.8,-1.25,1.25);
 const scrub=player.air>0?0:Math.pow(Math.abs(player.angle),1.55)*(3.6+mood.powder*.85);
-player.speed=clamp(player.speed+((cruise-player.speed)*.48+grade-scrub+(player.ice?.8:0)+(player.boost>0?1.2:0)-player.snowDrag*.28)*dt,8.4,33);
+player.speed=clamp(player.speed+((cruise-player.speed)*.48+grade-scrub+(player.ice?.8:0)+(player.boost>0?1.9:0)-player.snowDrag*.28)*dt,10.2,34);
 const dz=player.speed*Math.cos(player.angle*.64)*dt;
 worldZ+=dz; distance+=dz;
 if(player.air>0) {
@@ -428,7 +481,7 @@ player.airTime+=dt;player.airY+=player.vy*dt;player.vy-=24*dt;player.air=player.
 if(player.air<=0) { land(); if(state==='crashed') return; }
 }
 collisions(); if(state==='crashed') return;
-trafficPasses();
+trafficPasses();updateDraft(dt);
 if(player.air===0) {
 snowClock+=dt;
 if(snowClock>=1/60) {
@@ -438,21 +491,19 @@ player.snowDrag=approach(player.snowDrag,Math.min(2,displaced/n*.4),10,snowClock
 }
 const side=Math.abs(player.angle)>.22?Math.sign(player.angle):0;
 if(side&&side!==carveSide) {
-if(carveSide&&carveTravel>1.5&&time-chainClock<4.5){stats.links++;styleReward(55,9,'LINKED CARVE',true);player.boost=.7;}
+if(carveSide&&carveTravel>2.1&&time-chainClock<4.5&&nearbyChallenge()&&player.speed>14){stats.links++;styleReward(75,12,'LINKED CARVE',true);player.boost=1;}
 carveSide=side;carveTravel=0;carveStartX=player.x;chainClock=time;
 }
 if(side)carveTravel=Math.max(carveTravel,Math.abs(player.x-carveStartX));
 }
-if(time-lastStyle>2.6) flow=Math.max(0,flow-dt*2.6);
-const fast=player.speed>19.5&&Math.abs(player.angle)<.16&&player.air===0;
-if(fast) {
-fastClock+=dt; flow=clamp(flow+dt*1.6,0,100);
-if(fastClock>5) { styleReward(90,5,'FULL SEND',true); fastClock=0; }
-} else fastClock=Math.max(0,fastClock-dt*2);
-if(Math.abs(player.angle)>.24&&Math.abs(player.angle)<.67&&player.air===0&&objects.some(o=>(o.type==='tree'||o.type==='rock')&&o.z>worldZ&&o.z<worldZ+12&&Math.abs(o.x-player.x)<4.5)) {
-turnClock+=dt; if(turnClock>1.4) { styleReward(45,7,'CLEAN CARVE'); stats.carves++; turnClock=0; }
-} else turnClock=Math.max(0,turnClock-dt*.8);
-multiplier=Math.min(5,1+Math.floor(flow/20)); stats.maxCombo=Math.max(stats.maxCombo,multiplier);
+if(time-lastStyle>2.5&&surge<=0)flow=Math.max(0,flow-dt*5.2);
+// Speed contributes to distance score, not infinite free multiplier energy.
+const closeTurn=player.air===0&&Math.abs(player.angle)>.27&&Math.abs(player.angle)<.80&&nearbyChallenge();
+if(closeTurn){
+turnClock+=dt;turnDebt+=Math.abs(player.x-prevPlayerX);
+if(turnClock>1.3&&turnDebt>3.0){styleReward(65,10,'CLEAN CARVE');stats.carves++;turnClock=0;turnDebt=0;}
+}else{turnClock=Math.max(0,turnClock-dt);turnDebt=Math.max(0,turnDebt-dt*2);}
+multiplier=surge>0?5:Math.min(5,1+Math.floor(flow/20));stats.maxCombo=Math.max(stats.maxCombo,multiplier);
 score+=dz*(1.25+player.speed*.036)*multiplier;
 trackClock+=dt;
 if(trackClock>.035) { trackClock=0; tracks.push({x:player.x,z:worldZ,angle:player.angle,age:0,air:player.air>0}); if(tracks.length>MAX_TRACKS) tracks.shift(); }
@@ -575,7 +626,7 @@ function slopeGrade(z) {
 return clamp((naturalHeight(0,z-2)-naturalHeight(0,z+2))/4,.28,.98);
 }
 function updateView() {
-scale=baseScale*(1-clamp((player.speed-15)/24,0,.06));
+scale=baseScale*(1-clamp((player.speed-16)/140,0,.115));
 pitchSin=Math.sin(pitch);pitchCos=Math.cos(pitch);
 const g=naturalHeight(player.x,worldZ)-camLift-cameraAbove;
 const depth=CAMERA_BACK*pitchCos-g*pitchSin;
@@ -625,7 +676,7 @@ n.target=best;
 }
 const desired=clamp(Math.atan2((n.target-n.x)*4.8,Math.max(8,n.speed)),-.58,.58);
 n.angle=approach(n.angle,desired,n.air>0?4:7,dt);
-const pace=n.base+7.8*difficultyAt(n.z)+(slopeGrade(n.z)-FALL)*2;
+const pace=n.base+1.3+8.0*difficultyAt(n.z)+(slopeGrade(n.z)-FALL)*2;
 n.speed=approach(n.speed,pace-Math.abs(n.angle)*1.2,1.1,dt);
 // Brake rather than driving into another skier ahead.
 for(const other of skiers)if(other!==n&&other.z>n.z&&other.z-n.z<7&&Math.abs(other.x-n.x)<1.1)n.speed=Math.min(n.speed,other.speed*.85);
@@ -682,10 +733,23 @@ const gap=Math.abs(player.x-n.x);
 if(gap>7)continue;
 stats.passes++;
 if(gap<1.95&&player.air<1.5&&n.air<1.5) {
-stats.closePasses++;stats.nearMisses++;styleReward(85,10,'CLOSE PASS',true);
-} else styleReward(35,4,'CLEAN PASS');
+stats.closePasses++;stats.nearMisses++;styleReward(n.drafted?190:105,n.drafted?18:13,n.drafted?'SLINGSHOT':'CLOSE PASS',true);
+} else styleReward(n.drafted?145:40,n.drafted?16:5,n.drafted?'SLINGSHOT':'CLEAN PASS',!!n.drafted);
+if(n.drafted)player.boost=Math.max(player.boost,2.4);
 }
 }
+}
+function updateDraft(dt) {
+let leader=null;
+if(player.air<.5)for(const n of skiers){
+const dz=n.z-worldZ;
+if(dz>2.6&&dz<16&&Math.abs(n.x-player.x)<1.0&&n.air<.5&&(!leader||dz<leader.z-worldZ))leader=n;
+}
+if(leader){
+if(draftId!==leader.id){draftId=leader.id;draftTime=0;}
+draftTime=Math.min(2,draftTime+dt);drafting=draftTime>.30;
+if(draftTime>.85&&!leader.drafted){leader.drafted=true;stats.drafts++;player.boost=1.2;popup('SLIPSTREAM',0,false);}
+}else{draftTime=Math.max(0,draftTime-dt*3);drafting=false;if(!draftTime)draftId=0;}
 }
 function drawTrafficTracks() {
 ctx.lineCap='round';
@@ -1033,13 +1097,17 @@ ellipse(p.x-r*.07,p.y+r*.12,r*.9,r*.14,'rgba(255,255,255,.71)');
 }
 function drawRamp(o) {
 const rel=o.z-worldZ;if(rel<-12||rel>FAR)return;
-for(let k=0;k<2;k++) {
-const zz=rel-o.depth*(.42+k*.17),a=project(o.x-.38,zz-.30,.026),b=project(o.x,zz+.34,.026),c=project(o.x+.38,zz-.30,.026);
-ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineTo(c.x,c.y);ctx.strokeStyle='rgba(67,115,143,.53)';ctx.lineWidth=Math.max(1.3,a.s*.075);ctx.lineJoin='round';ctx.stroke();
+for(let k=0;k<3;k++){
+const zz=rel-o.depth*(.25+k*.24),a=project(o.x-.50,zz-.40,.035),b=project(o.x,zz+.43,.035),c=project(o.x+.50,zz-.40,.035);
+ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineTo(c.x,c.y);
+ctx.strokeStyle=o.kind==='huge'?'rgba(222,114,58,.76)':'rgba(52,133,147,.62)';ctx.lineWidth=Math.max(1.4,a.s*.105);ctx.lineJoin='round';ctx.stroke();
 }
-ctx.beginPath();
-for(let i=0;i<=12;i++){const p=project(o.x-o.w*.5+i*o.w/12,rel,.025);if(i===0)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y);}
-ctx.strokeStyle='rgba(155,193,207,.7)';ctx.lineWidth=1.3;ctx.stroke();
+ctx.beginPath();for(let i=0;i<=12;i++){const p=project(o.x-o.w*.5+i*o.w/12,rel,.03);if(i===0)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y);}
+ctx.strokeStyle='rgba(244,187,111,.83)';ctx.lineWidth=2;ctx.stroke();
+if(o.tag&&rel>12&&rel<80){
+const p=project(o.x,rel,.42);ctx.save();ctx.textAlign='center';ctx.font='800 '+clamp(p.s*.65,8,11)+'px -apple-system,BlinkMacSystemFont,sans-serif';
+ctx.fillStyle=o.kind==='huge'?'#bf693c':'#447d88';ctx.fillText(o.tag,p.x,p.y-8);ctx.restore();
+}
 }
 function drawSkier(rider=null) {
 const npc=rider!==null, skier=rider||player, z=npc?rider.z-worldZ:0;
@@ -1060,7 +1128,7 @@ ctx.rotate(rotation); ctx.scale(unit,unit*(1-skier.landSquash*.20));
 if(skier.air>0&&skier.trick==='BACKFLIP') {
 const f=Math.cos(TAU*smooth(clamp((t-.06)/.83,0,1))); ctx.scale(1,(f<0?-1:1)*Math.max(.23,Math.abs(f)));
 }
-const tuck=skier.air>0?Math.sin(Math.PI*t):0, lean=skier.angle*7.5;
+const tuck=skier.air>0?Math.sin(Math.PI*t):clamp((skier.speed-18)/35,0,.32), lean=skier.angle*7.5;
 const wind=time*15,tail=11+skier.speed*.36;
 poly([[lean-3,-25],[lean+3,-23],[lean+Math.sin(wind)*4-3,tail-20],[lean+Math.sin(wind-1)*5-8,tail-11],[lean+Math.sin(wind)*2-7,-15]],suit[4]);
 const grab=skier.air>0&&skier.trick==='TAIL GRAB'?tuck:0;
@@ -1081,7 +1149,7 @@ ctx.strokeStyle='#243f51'; ctx.lineWidth=6;
 for(const side of [-1,1]) { ctx.beginPath(); ctx.moveTo(lean+side*3.8,-9); ctx.lineTo(side*6+lean*.25,-3-tuck*4); ctx.lineTo(side*5.3,3-tuck*2); ctx.stroke(); }
 rounded(-8+lean,-23+tuck*3,16,17,5,suit[0]);
 poly([[-7+lean,-22+tuck*3],[1+lean,-23+tuck*3],[2+lean,-7],[-6+lean,-8]],suit[1]);
-ctx.strokeStyle='#e96a43'; ctx.lineWidth=5.5;
+ctx.strokeStyle=suit[1]; ctx.lineWidth=5.5;
 for(const side of [-1,1]) { const h=hand(side); ctx.beginPath(); ctx.moveTo(side*6+lean,-20+tuck*3); ctx.lineTo(h.x,h.y); ctx.stroke(); ellipse(h.x,h.y,2.8,2.6,'#234452'); }
 rounded(-4+lean,-22+tuck*3,8,10,2.5,suit[2]);
 ellipse(lean,-25+tuck*3,6.7,6.0,'#254b58');
@@ -1126,6 +1194,14 @@ const x=W*.5+side*(W*.37+phase*W*.16),y=H*(.3+phase*.75);
 ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+side*phase*6,y+12+phase*22); ctx.stroke();
 }
 }
+function drawRush(){
+if(reducedMotion||(!drafting&&surge<=0&&surgeFlash<=0))return;
+const a=surge>0?.17:.07;
+const g=ctx.createRadialGradient(W*.5,H*.58,H*.20,W*.5,H*.58,H*.8);
+g.addColorStop(0,'rgba(9,134,157,0)');g.addColorStop(1,'rgba(9,134,157,'+a+')');
+ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+if(drafting){const p=project(player.x,0);ctx.strokeStyle='rgba(54,168,185,.58)';ctx.lineWidth=2;ctx.lineCap='round';for(const side of [-1,1]){ctx.beginPath();ctx.moveTo(p.x+side*18,p.y+11);ctx.quadraticCurveTo(p.x+side*27,p.y+28,p.x+side*29,p.y+44);ctx.stroke();}}
+}
 function render() {
 updateView();
 try {
@@ -1147,7 +1223,7 @@ if(!drawn&&o.z<=worldZ) { drawSkier(); drawn=true; }
 if(o.type==='skier') drawSkier(o); else if(o.type==='tree') drawTree(o); else if(o.type==='rock') drawRock(o); else if(o.type==='jump') drawRamp(o);
 }
 if(!drawn) drawSkier();
-drawParticles(); drawSpeed(); drawPopups(); ctx.restore();
+drawParticles();drawSpeed();drawPopups();ctx.restore();drawRush();
 }
 // Schedule the next frame before drawing: a GPU error cannot kill input or the run.
 function ensureFrame() { if(!frameHandle)frameHandle=requestAnimationFrame(frame); }
@@ -1250,14 +1326,18 @@ resize();reset(freshSeed(),false);ensureFrame();queueSnowRenderer();
 if(new URLSearchParams(location.search).has('test')) {
 window.__downhill={
 start:s=>reset(s===undefined?freshSeed():s,true),
-snapshot:()=>({state,distance,score,multiplier,flow,time,worldZ,origin,player:{...player},counts:{objects:objects.length,tracks:tracks.length,particles:particles.length,route:route.length,clearings:clearings.length,popups:popups.length,skiers:skiers.length,npcTracks:skiers.reduce((a,n)=>a+n.trail.length,0)},stats:{...stats},input:{pointer:input.pointer,active:input.active,targetX:input.targetX},camera:{W,H,scale,playerY,camX},resultShown}),
+snapshot:()=>({state,distance,score,multiplier,flow,time,worldZ,origin,styleChain,chainUntil,surge,drafting,draftTime,player:{...player},counts:{objects:objects.length,tracks:tracks.length,particles:particles.length,route:route.length,clearings:clearings.length,popups:popups.length,pieces:pieces.length,skiers:skiers.length,npcTracks:skiers.reduce((a,n)=>a+n.trail.length,0)},stats:{...stats},input:{pointer:input.pointer,active:input.active,targetX:input.targetX},camera:{W,H,scale,playerY,camX},resultShown}),
 step:(seconds,draw=true)=>{for(let t=0;t<seconds;t+=STEP) update(STEP); if(draw)render();},
 autopilot:(metres,maxSeconds=100000)=>{
 const target=distance+metres;
 for(let i=0;i<maxSeconds/STEP&&distance<target&&state==='playing';i++) { input.active=true;input.targetX=pathAt(worldZ+2);update(STEP); }
 input.active=false;render();return window.__downhill.snapshot();
 },
-pathAt, corridorAt,
+pathAt,corridorAt,
+pieces:()=>pieces.map(p=>({...p})),
+reward:(p,e,l)=>styleReward(p,e,l,true),
+getPopups:()=>popups.map(p=>({...p})),
+landing:land,
 traffic:()=>skiers.map(n=>({id:n.id,x:n.x,z:n.z,angle:n.angle,speed:n.speed,side:n.side,trail:n.trail.length,air:n.air,passed:n.passed})),
 clearTraffic:()=>{skiers=[];nextTraffic=worldZ+1000;},
 spawnSkier,
@@ -1279,7 +1359,7 @@ aim:x=>{input.active=true;input.targetX=x;},
 flow:value=>{flow=value;multiplier=Math.min(5,1+Math.floor(flow/20));},
 pause:v=>{paused=v;lastFrame=0;accumulator=0;},
 render,
-validate:()=>({blocked:objects.filter(o=>(o.type==='tree'||o.type==='rock')&&o.line!==undefined&&Math.abs(o.x-o.line)<o.safe+o.r+.399).length,bounded:objects.length<=MAX_OBJECTS&&particles.length<=MAX_PARTICLES&&tracks.length<=MAX_TRACKS&&popups.length<=MAX_POPUPS&&skiers.length<=MAX_SKIERS&&skiers.every(n=>n.trail.length<=MAX_NPC_TRAIL)})
+validate:()=>({blocked:objects.filter(o=>(o.type==='tree'||o.type==='rock')&&o.line!==undefined&&Math.abs(o.x-o.line)<o.safe+o.r+.159).length,bounded:objects.length<=MAX_OBJECTS&&particles.length<=MAX_PARTICLES&&tracks.length<=MAX_TRACKS&&popups.length<=MAX_POPUPS&&skiers.length<=MAX_SKIERS&&skiers.every(n=>n.trail.length<=MAX_NPC_TRAIL)})
 };
 }
 })();
