@@ -1,0 +1,38 @@
+name: Web Swing regression
+on:
+  push:
+    branches: [feature/web-swing-momentum-rebuild]
+    paths:
+      - games/web-swing/**
+      - tests/web_swing_browser.py
+      - .github/workflows/web-swing-test.yml
+  pull_request:
+    paths:
+      - games/web-swing/**
+      - tests/web_swing_browser.py
+      - .github/workflows/web-swing-test.yml
+permissions:
+  contents: read
+concurrency:
+  group: web-swing-test-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  browser-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      LIBGL_ALWAYS_SOFTWARE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install playwright==1.55.0
+      - run: playwright install --with-deps chromium webkit
+      - run: python tests/web_swing_browser.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: web-swing-browser-results
+          path: test-results/
+          retention-days: 7
