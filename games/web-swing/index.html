@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#111b28"><meta name="apple-mobile-web-app-capable" content="yes">
-<title>Web / Swing — City Flow</title>
+<title>Web / Swing — Natural Flow</title>
 <style>
 :root{color-scheme:dark;--red:#ef384e;--paper:#eef3f5;--muted:#adb9c6;--safe:env(safe-area-inset-bottom,0px)}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101c2b;color:var(--paper);font-family:system-ui,-apple-system,sans-serif;overscroll-behavior:none;touch-action:none;user-select:none;-webkit-user-select:none}button,a{font:inherit;touch-action:none}button{border:0;color:inherit;cursor:pointer}button:focus-visible,a:focus-visible{outline:2px solid #c3edff;outline-offset:5px}#world,#fx{position:fixed;inset:0;width:100%;height:100%;display:block}#fx,#vignette,#danger{pointer-events:none}#vignette{position:fixed;inset:0;background:linear-gradient(#07111f65,transparent 23%,transparent 70%,#07111f85)}#danger{position:fixed;inset:0;box-shadow:inset 0 0 70px #e2294160;opacity:0;transition:opacity .2s}[hidden]{display:none!important}#hud{position:fixed;inset:0;pointer-events:none}.top{position:absolute;top:max(18px,env(safe-area-inset-top));left:22px;right:22px;display:flex;justify-content:space-between;align-items:flex-start}.logo{font-weight:950;font-size:22px;letter-spacing:-1.5px;font-style:italic;line-height:1}.logo i{color:var(--red);font-style:normal}.meta{font-size:8px;letter-spacing:2px;margin-top:9px;text-transform:uppercase;color:#d0dbe3}.toptools{display:flex;gap:8px;align-items:center;pointer-events:auto}.icon{width:39px;height:39px;border:1px solid #ffffff32;background:#0d172681;border-radius:50%;font-size:16px}.clock{font-size:10px;font-variant-numeric:tabular-nums;letter-spacing:1px}.readout{position:absolute;top:calc(max(18px,env(safe-area-inset-top)) + 72px);left:22px;display:flex;gap:21px;text-shadow:0 2px 10px #0008}.readout strong{font-size:23px;letter-spacing:-1px;line-height:1;font-variant-numeric:tabular-nums}.readout small{font-size:9px;color:#ccd6df;margin-left:3px}.readout label{display:block;font-size:7px;letter-spacing:1.8px;margin-top:6px;color:#c4d1dd}.scorebox{position:absolute;right:22px;top:calc(max(18px,env(safe-area-inset-top)) + 74px);text-align:right;text-shadow:0 2px 12px #0009}.scorebox strong{font-size:20px;font-variant-numeric:tabular-nums}.scorebox small{display:block;font-size:8px;letter-spacing:1px;color:#cedee9;margin-top:6px}.bar{width:67px;height:3px;background:#ffffff30;margin-top:9px;margin-left:auto}.bar i{display:block;height:100%;width:100%;background:#eaf2f6}#toast{position:absolute;top:23%;left:16px;right:16px;text-align:center;opacity:0;text-shadow:0 2px 15px #0008;transition:opacity .2s}#toast b{font-style:italic;font-size:25px;font-weight:900;letter-spacing:-1px}#toast small{display:block;font-size:9px;letter-spacing:1.8px;margin-top:7px}#target{position:absolute;width:18px;height:18px;border:1px solid #ffffffa0;transform:translate(-50%,-50%) rotate(45deg);box-shadow:0 0 13px #d2efff20}#target.lock{width:8px;height:8px;background:#fff}#hint{position:absolute;bottom:calc(204px + var(--safe));left:35px;right:35px;font-size:10px;color:#ebf1f5;text-align:center;text-shadow:0 2px 8px #000;font-weight:600}.controls{position:absolute;left:0;right:0;bottom:calc(24px + var(--safe));height:152px}.pad{position:absolute;left:25px;bottom:4px;width:110px;height:110px;border:1px solid #ffffff40;border-radius:50%;background:radial-gradient(circle,#ffffff0e,#11203540);pointer-events:auto;touch-action:none}.pad:before,.pad:after{content:"";position:absolute;background:#ffffff25}.pad:before{height:1px;width:50px;left:29px;top:54px}.pad:after{height:50px;width:1px;left:54px;top:29px}.knob{width:36px;height:36px;position:absolute;top:36px;left:36px;border-radius:50%;background:#e3edf42b;border:1px solid #eaf4ff99;pointer-events:none}.pad label{position:absolute;bottom:-20px;left:0;right:0;text-align:center;font-size:7px;letter-spacing:1.8px;color:#c1ced9}.web{position:absolute;right:25px;bottom:1px;width:108px;height:108px;border-radius:50%;background:radial-gradient(circle at 35% 25%,#fb5366,#c6213b);border:1px solid #ff9aa6;box-shadow:0 0 0 5px #eb364719,0 6px 24px #0004;pointer-events:auto}.web strong{font-size:18px;display:block;font-weight:850;letter-spacing:-.5px}.web small{display:block;font-size:7px;letter-spacing:1px;margin-top:6px}.web .glyph{font-size:25px;line-height:27px;margin-bottom:2px}.web.held{background:radial-gradient(circle at 35% 25%,#eef8fa,#a7cddc);border-color:#fff;color:#112538;box-shadow:0 0 0 5px #ccecff20}.web.rise{box-shadow:0 0 0 7px #edfaff40,0 0 26px #edfaff30}.moves{position:absolute;right:25px;bottom:130px;display:flex;gap:8px;pointer-events:auto}.move{height:35px;min-width:55px;border:1px solid #ffffff40;background:#101e30b0;border-radius:20px;font-size:8px;font-weight:750;letter-spacing:.6px;padding:0 12px}.move:disabled{opacity:.4}.move.on{background:#e0edf5;color:#13263a}.panel{position:fixed;inset:0;z-index:10;display:flex;align-items:center;padding:28px max(28px,7vw) calc(28px + var(--safe));background:linear-gradient(90deg,#071120c9,#09162635);overflow:auto}.card{width:390px;max-width:100%}.eyebrow{font-size:9px;font-weight:750;letter-spacing:2.4px;color:#d9e7ef}.eyebrow:before{content:"";display:inline-block;width:24px;height:2px;background:var(--red);vertical-align:middle;margin-right:10px}h1{font-size:clamp(63px,16vw,88px);font-weight:950;letter-spacing:-6px;line-height:.88;font-style:italic;margin:25px 0 24px}h1 span{color:var(--red)}.strap{font-size:14px;line-height:1.65;color:#e0e8ee;max-width:310px}.line{width:36px;height:1px;background:#ffffff45;margin:24px 0}.lesson{font-size:11px;line-height:1.9;color:#b8c8d7}.lesson b{color:#f3f7f9}.primary{height:53px;width:100%;background:var(--red);border-radius:5px;font-size:11px;font-weight:850;letter-spacing:1.5px;margin-top:24px;box-shadow:0 6px 25px #c9143020}.primary span{float:right;margin-right:16px}.subrow{display:flex;justify-content:space-between;align-items:center;font-size:9px;color:#bacbd8;margin-top:17px}.subrow a{color:inherit;text-decoration:none}.foot{font-size:8px;line-height:1.7;color:#92a6ba;margin-top:22px}.smalltitle{font-size:45px;line-height:1;font-weight:900;font-style:italic;letter-spacing:-2px;margin:24px 0 15px}.results{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin:27px 0 0}.results b{font-size:27px;display:block;letter-spacing:-1px}.results small{font-size:8px;color:#b2c4d3;letter-spacing:1.5px}.settings{display:grid;gap:9px;margin-top:24px}.settings button{padding:14px;background:#122237ba;border:1px solid #ffffff25;border-radius:4px;text-align:left;font-size:11px}.settings span{float:right;color:#cedfe9}.secondary{margin-top:14px;width:100%;background:transparent;color:#b8c9d6;font-size:10px;padding:9px}#error{background:#081324ee;z-index:99}#errorText{font-size:12px;line-height:1.7;overflow-wrap:anywhere}@media(min-width:750px){.controls{left:12%;right:12%}.panel{padding-left:10vw}.top,.readout{left:30px}.top,.scorebox{right:30px}#hint{font-size:11px}.readout{gap:30px}}@media(max-height:520px){.panel{padding:18px 6vw}.card{width:370px}h1{font-size:56px;margin:15px 0}.strap{font-size:11px}.line{margin:12px 0}.lesson{font-size:10px}.primary{margin-top:14px;height:43px}.foot{margin-top:10px}.subrow{margin-top:10px}.controls{bottom:calc(14px + var(--safe));height:105px}.pad{width:86px;height:86px;left:25px}.knob{left:24px;top:24px}.pad:before{left:17px;top:42px}.pad:after{left:42px;top:17px}.web{width:88px;height:88px;right:25px}.web strong{font-size:15px}.web .glyph{font-size:19px;line-height:20px}.moves{right:125px;bottom:2px;flex-direction:column;gap:5px}.move{height:27px}#hint{bottom:30px;left:150px;right:205px;font-size:9px}.readout{top:68px}.scorebox{top:69px}.smalltitle{font-size:34px;margin:15px 0}.settings{gap:6px;margin-top:15px}.settings button{padding:10px}.results{gap:12px;margin-top:17px}}@media(prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -16,9 +16,9 @@ h1{font-size:clamp(42px,14vw,84px);letter-spacing:-.065em}.card{margin-top:auto;
 <canvas id="world" aria-label="Three-dimensional web swinging game"></canvas><canvas id="fx"></canvas><div id="vignette"></div><div id="danger"></div>
 <div id="hud" hidden><div class="top"><div><div class="logo">WEB<i>/</i>SWING</div><div class="meta" id="district">MIDTOWN · NORTHBOUND</div></div><div class="toptools"><span class="clock" id="clock">16:00</span><button class="icon" id="sound" aria-label="Toggle sound">♪</button><button class="icon" id="pause" aria-label="Pause game">Ⅱ</button></div></div>
 <div id="modeBadge">FLOW ASSIST</div><div id="powerHint">↑ POWER SWING</div><div class="readout"><div><strong id="distance">0</strong><small>m</small><label>DISTANCE</label></div><div><strong id="speed">0</strong><small>km/h</small><label>SPEED</label></div><div><strong id="height">0</strong><small>m</small><label>ALTITUDE</label></div></div><div class="scorebox"><strong id="score">0</strong><small id="chain">FLOW ×1</small><div class="bar"><i id="energy"></i></div></div>
-<div id="toast" aria-live="polite"><b></b><small></small></div><div id="target" hidden></div><div id="aimTarget" hidden><div class="aimRing"></div><div id="aimArrow">↑</div><span id="aimText">WEB TARGET</span></div><div id="hint">Left stick aims the next web. Hold WEB to catch; release to fly.</div>
-<div class="controls"><div class="pad" id="pad" role="application" aria-label="Aim the next web. Left or right picks a side; up or down changes anchor height."><div class="knob" id="knob"></div><label>AIM / ↑ POWER</label></div><div class="moves"><button class="move" id="trick">↻ TRICK</button><button class="move" id="dive">↓ DIVE</button><button class="move" id="zip">↗ ZIP</button></div><button class="web" id="web" aria-label="Hold to swing, release to let go"><div class="glyph">✳</div><strong id="webLabel">WEB</strong><small id="webSub">HOLD TO CATCH</small></button></div></div>
-<section class="panel" id="welcome"><div class="card"><div class="eyebrow">CITY FLOW / LIVING STREETS</div><h1>FEEL THE<br><span>FREEFALL.</span></h1><div class="strap">The web catches. Gravity takes over.<br>The next move is yours.</div><div class="line"></div><div class="lesson"><b>Hold WEB</b> to chain swings.<br><b>Left/right</b> aims. <b>Up</b> builds speed and height.<br><b>Release</b> to fly. <b>TRICK</b> for style. <b>ZIP</b> to pull.<br>Choose <b>Manual</b> in Pause for full control.</div><button class="primary" id="start">LEAP INTO THE CITY <span>↗</span></button><div class="subrow"><span id="bestIntro">BEST · 0 m</span><a href="../../">← ARCADE</a></div><div class="foot">Original procedural fan game. Not affiliated with Marvel or Sony.<br>No downloads or dependencies. Day / night repeats every 10 minutes.<br>Keyboard: WASD / arrows aim · Space web · F trick · E zip · R reel · Shift dive</div></div></section>
+<div id="toast" aria-live="polite"><b></b><small></small></div><div id="target" hidden></div><div id="aimTarget" hidden><div class="aimRing"></div><div id="aimArrow">↑</div><span id="aimText">WEB TARGET</span></div><div id="hint">Hold WEB for auto swings. Steer with the stick or tap a building.</div>
+<div class="controls"><div class="pad" id="pad" role="application" aria-label="Steer left or right. Push up for power. Tap the city to choose a web attachment."><div class="knob" id="knob"></div><label>STEER / ↑ POWER</label></div><div class="moves"><button class="move" id="trick">↻ TRICK</button><button class="move" id="dive">↓ DIVE</button><button class="move" id="zip">↗ ZIP</button></div><button class="web" id="web" aria-label="Hold to swing, release to let go"><div class="glyph">✳</div><strong id="webLabel">WEB</strong><small id="webSub">HOLD TO CATCH</small></button></div></div>
+<section class="panel" id="welcome"><div class="card"><div class="eyebrow">NATURAL FLOW / AUTO WEB</div><h1>FEEL THE<br><span>FREEFALL.</span></h1><div class="strap">The web catches. Gravity takes over.<br>The next move is yours.</div><div class="line"></div><div class="lesson"><b>Hold WEB</b> to chain swings.<br><b>Left/right</b> steers. <b>Up</b> builds speed and height.<br><b>Release</b> to fly. <b>TRICK</b> for style. <b>ZIP</b> to pull.<br><b>Tap a building</b> to swing there. Skim walls to run.</div><button class="primary" id="start">LEAP INTO THE CITY <span>↗</span></button><div class="subrow"><span id="bestIntro">BEST · 0 m</span><a href="../../">← ARCADE</a></div><div class="foot">Original procedural fan game. Not affiliated with Marvel or Sony.<br>No downloads or dependencies. Day / night repeats every 10 minutes.<br>Keyboard: WASD / arrows steer · Space web · F trick · E zip · R reel · Shift dive</div></div></section>
 <section class="panel" id="over" hidden><div class="card"><div class="eyebrow" id="endTime">RUN COMPLETE</div><h2 class="smalltitle">ONE MORE<br>SWING.</h2><div class="strap" id="endText">Catch early. Release when the arc carries you up.</div><div class="results"><div><b id="endDistance">0 m</b><small>DISTANCE</small></div><div><b id="endScore">0</b><small>SCORE</small></div><div><b id="endSpeed">0</b><small>TOP SPEED · KM/H</small></div><div><b id="endBest">0 m</b><small>PERSONAL BEST</small></div></div><button class="primary" id="again">ANOTHER RUN <span>↗</span></button><div class="subrow"><span>Every catch is a new chance.</span><a href="../../">← ARCADE</a></div></div></section>
 <section class="panel" id="paused" hidden><div class="card"><div class="eyebrow">TAKE A BREATH</div><h2 class="smalltitle">HOLD THAT<br>THOUGHT.</h2><div class="settings"><button id="swingMode">Swing controls <span id="swingModeLabel">FLOW · ASSISTED</span></button><button id="quality">Graphics <span id="qualityLabel">AUTO</span></button><button id="audioSetting">Sound <span id="audioLabel">ON</span></button><button id="motion">Camera motion <span id="motionLabel">CINEMATIC</span></button></div><button class="primary" id="resume">BACK TO THE SKY <span>↗</span></button><button class="secondary" id="restart">Restart run</button></div></section>
 <section class="panel" id="error" hidden><div class="card"><div class="eyebrow">GRAPHICS INTERRUPTED</div><h2 class="smalltitle">LET'S TRY<br>THAT AGAIN.</h2><p id="errorText">WebGL2 is unavailable. Open this page in an up-to-date Safari or Chrome browser.</p><button class="primary" id="reload">RELOAD GAME</button></div></section>
@@ -271,23 +271,14 @@ function agentGeometry(){props.reset();foliage.reset();const tires=[.04,.045,.05
  for(let b of blocks.values()){let x=b.ix*TILE,z=b.iz*TILE;for(let s of[-1,1]){let green=signal(x,z,2);props.box([x+s*15.7,green?5.99:6.7,z+16.66],[.25,.25,.05],green?[.17,.82,.43]:[.98,.10,.03],4)}for(let i=0;i<3;i++)for(let a=0;a<2;a++){let p=a?[x+41+i*36,4.1,z+22.8]:[x+21.8,4.1,z+42+i*36];if(Math.hypot(p[0]-drawP[0],p[2]-drawP[2])<250){foliage.box(p,[3.3,4.8,3.3],[.17,.28,.16],10);foliage.box(add(p,[.6,1,.3]),[2.9,3.8,3.1],[.23,.34,.19],10)}}if(b.family===4)for(let i=0;i<3;i++)foliage.box([x+TILE/2+(i-1)*8,4.5,z+TILE/2],[5,7,5],[.19,.32,.18])}cityLifeGeometry();props.upload();foliage.upload();}
 // Slab ray cast, with a normal and a radius expansion for continuous collision detection.
 function rayBox(a,d,b,maxT,pad=0){let lo=0,hi=maxT,normal=[0,0,0],mins=[b.x-b.w/2-pad,(b.base||0)-pad,b.z-b.d/2-pad],maxs=[b.x+b.w/2+pad,b.h+pad,b.z+b.d/2+pad];for(let k=0;k<3;k++){if(Math.abs(d[k])<1e-8){if(a[k]<mins[k]||a[k]>maxs[k])return null}else{let t1=(mins[k]-a[k])/d[k],t2=(maxs[k]-a[k])/d[k],enter=Math.min(t1,t2);if(enter>lo){lo=enter;normal=[0,0,0];normal[k]=t1<t2?-1:1}hi=Math.min(hi,Math.max(t1,t2));if(lo>hi)return null}}return{t:lo,n:normal}}
-function visibleAnchor(p,b){let d=sub(p,P.p),dist=len(d);if(dist<.1)return false;for(let q of buildings){if(q===b)continue;let hit=rayBox(P.p,mul(d,1/dist),q,dist-.10);if(hit)return false}return true}
+function visibleAnchor(p,b){let d=sub(p,P.p),dist=len(d);if(dist<.1)return false;for(let q of buildings){let hit=rayBox(P.p,mul(d,1/dist),q,dist-.10);if(hit)return false}return true}
 function steerValue(){return clamp(input.x+(keys.has('KeyD')||keys.has('ArrowRight')?1:0)-(keys.has('KeyA')||keys.has('ArrowLeft')?1:0),-1,1)}
-function forward(){if(settings.swingMode==='FLOW'&&input.web&&Math.abs(steerValue())<.18)return flow.axis===0?[flow.sign,0,0]:[0,0,flow.sign];let h=Math.hypot(P.v[0],P.v[2]);return h>3?[P.v[0]/h,0,P.v[2]/h]:[Math.sin(P.yaw),0,Math.cos(P.yaw)]}
+function forward(){if(settings.swingMode==='FLOW'&&input.web&&!P.wall&&P.rope?.source!=='tap'&&Math.abs(steerValue())<.18)return flow.axis===0?[flow.sign,0,0]:[0,0,flow.sign];let h=Math.hypot(P.v[0],P.v[2]);return h>3?[P.v[0]/h,0,P.v[2]/h]:[Math.sin(P.yaw),0,Math.cos(P.yaw)]}
 
-// The left stick chooses the NEXT facade attachment. Up also powers the live reel, without moving its anchor.
+// Auto-target refresh state. The stick controls character steering and power.
 // A gesture latches the horizontal camera basis so camera follow cannot turn the
 // player's thumb direction while it is held. Neutral keeps momentum-based auto aim.
 const aimControl={active:false,yaw:0,refresh:0,failed:0};
-function aimIntent(){
- let x=steerValue(),y=clamp(input.y+(keys.has('KeyS')||keys.has('ArrowDown')?1:0)-(keys.has('KeyW')||keys.has('ArrowUp')?1:0),-1,1),m=Math.hypot(x,y);
- if(m<.12){aimControl.active=false;x=y=0}else{
-  if(!aimControl.active){aimControl.yaw=cameraYaw;aimControl.active=true}
-  let scale=Math.min(1,(m-.12)/.88)/m;x*=scale;y*=scale;
- }
- let f=aimControl.active?[Math.sin(aimControl.yaw),0,Math.cos(aimControl.yaw)]:forward(),right=cross(f,[0,1,0]);
- return{x,y,active:aimControl.active,f,right,dir:unit(add(mul(f,Math.cos(x*1.12)),mul(right,Math.sin(x*1.12))))};
-}
 const flow={trickQueued:0,axis:2,sign:1,turnIntent:0,air:0,catches:0,releases:0,rescues:0,boost:0,manualRelease:0,toast:0,milestone:0};
 function powerValue(){return clamp(-input.y+(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0),0,1)}
 function reelValue(){
@@ -301,8 +292,14 @@ function setSwingMode(mode){settings.swingMode=mode==='MANUAL'?'MANUAL':'FLOW';f
 function resetFlow(){Object.assign(flow,{trickQueued:0,axis:2,sign:1,turnIntent:0,air:0,catches:0,releases:0,rescues:0,boost:0,manualRelease:0,toast:0,milestone:0})}
 function flowStep(dt){
  flow.manualRelease=Math.max(0,flow.manualRelease-dt);flow.toast=Math.max(0,flow.toast-dt);
- flow.boost=mix(flow.boost,P.rope?powerValue():0,1-Math.exp(-dt*8));
+ flow.boost=mix(flow.boost,(P.rope||P.wall)?powerValue():0,1-Math.exp(-dt*8));
  if(P.rope)flow.air=0;else flow.air+=dt;flow.trickQueued=Math.max(0,flow.trickQueued-dt);if(!P.rope&&flow.air>.04&&flow.trickQueued>0&&P.p[1]>18){flow.trickQueued=0;doTrick();}
+ if(P.wall)return;
+ if(P.rope&&P.rope.source==='tap'){
+  const r=P.rope,along=dot(sub(r.a,P.p),unit([P.v[0],0,P.v[2]]));
+  if(r.age>.72&&P.v[1]>5&&along<12||r.age>2.6){release(true);flow.releases++;}
+  return;
+ }
  if(state!=='playing'||!input.web||settings.swingMode!=='FLOW')return;
  if(Math.abs(steerValue())>.28){flow.turnIntent+=dt;if(flow.turnIntent>.20){flow.axis=Math.abs(P.v[0])>Math.abs(P.v[2])?0:2;flow.sign=Math.sign(P.v[flow.axis])||1;}}else flow.turnIntent=0;
  if(P.rope){
@@ -311,7 +308,7 @@ function flowStep(dt){
   // Early release remains available simply by lifting the WEB finger.
   const ready=r.age>.55&&P.v[1]>(P.p[1]<34?10:5+powerValue()*5)&&horizontal>18&&along<24;
   const overdue=r.age>1.65&&along<0&&horizontal>16&&P.p[1]>12;
-  if((ready||overdue)&&target){release(true);flow.releases++;flow.air=0;}
+  if((ready||overdue)&&(target||P.p[1]>38)){release(true);flow.releases++;flow.air=0;}
   else if(P.p[1]<17&&P.v[1]<-5&&r.zip<=0&&energy>=22&&zipCool<=0){
    r.zip=.65;energy-=22;zipCool=2;flow.rescues++;
    if(flow.toast<=0){say('LOW CATCH','ASSISTED REEL · PUSH UP TO CLIMB');flow.toast=5}
@@ -324,55 +321,203 @@ function flowStep(dt){
   }
  }
 }
+// Travel controls are not a targeting cursor. Intent follows the moving character,
+// with a short prediction of commanded acceleration, never a left/right anchor lock.
+const navigation={turn:0,refresh:0,lastAnchor:null,lastRelease:-10,candidates:0,predictions:0,switches:0};
+const tapControl={id:null,down:null,feedback:null,shots:0,rejected:0};
+const wallControl={cooldown:0,runs:0,exits:0,elapsed:0};
+function resetTraversal(){
+ Object.assign(navigation,{turn:0,refresh:0,lastAnchor:null,lastRelease:-10,candidates:0,predictions:0,switches:0});
+ Object.assign(tapControl,{id:null,down:null,feedback:null,shots:0,rejected:0});
+ Object.assign(wallControl,{cooldown:0,runs:0,exits:0,elapsed:0});P.wall=null;
+}
+function aimIntent(){
+ const f=forward(),right=cross(f,[0,1,0]);
+ // A thumb move steers the body first, instead of snapping the next web across the screen.
+ const h=unit([P.v[0],0,P.v[2]]),base=len(h)>.5&&dot(h,f)>.25?unit(lerp(f,h,.65)):f;
+ const dir=unit(add(base,mul(right,navigation.turn*.28)));
+ return{x:0,y:0,active:false,f,right,dir};
+}
+function surfaceAnchorValid(a,range=106){
+ if(!a||!a.b||!a.p.every(Number.isFinite)||!buildings.includes(a.b))return false;
+ const b=a.b,p=a.p,d=len(sub(p,P.p));
+ if(d<7||d>range||p[1]<6||p[1]>(b.h+.12)||p[1]<(b.base||0)-.12)return false;
+ const ex=Math.abs(p[0]-b.x)-b.w/2,ez=Math.abs(p[2]-b.z)-b.d/2;
+ const onWall=(Math.abs(ex)<.12&&ez<.12)||(Math.abs(ez)<.12&&ex<.12);
+ const onRoof=Math.abs(p[1]-b.h)<.12&&ex<.12&&ez<.12;
+ return (onWall||onRoof)&&visibleAnchor(p,b);
+}
 function anchorScore(a,intent){
  if(!a||!buildings.includes(a.b))return Infinity;
- let d=sub(a.p,P.p),dist=len(d),h=Math.hypot(d[0],d[2]),front=dot(unit([d[0],0,d[2]]),intent.dir),side=dot(d,intent.right);
- if(dist>96||dist<10||d[1]<5||front<.22)return Infinity;
- if(dot(d,intent.f)<Math.max(3,Math.hypot(P.v[0],P.v[2])*.15)*(1-Math.abs(intent.x)*.75))return Infinity;
- if(Math.abs(intent.x)>.24&&side*intent.x<1)return Infinity;
- if(P.rope&&len(sub(a.p,P.rope.a))<7)return Infinity;
- let reach=clamp(Math.hypot(P.v[0],P.v[2])*.61,18,32)-intent.y*7;
- let lift=clamp(19+Math.hypot(P.v[0],P.v[2])*.20+Math.max(0,-P.v[1])*.45,25,43)-intent.y*21;
- let pitchError=Math.abs(d[1]-lift);
- return (1-front)*60+Math.abs(dot(d,intent.dir)-reach)*.45+pitchError*.6+dist*.065+Math.max(0,4-(a.p[1]-dist))*4+(intent.active?0:(Math.sign(side)===-lastSide?0:4));
+ const d=sub(a.p,P.p),dist=len(d),along=dot(d,intent.dir),side=dot(d,intent.right),speed=Math.hypot(P.v[0],P.v[2]);
+ if(dist>104||dist<13||d[1]<10||along<Math.max(4,speed*.13))return Infinity;
+ const front=dot(unit([d[0],0,d[2]]),intent.dir);
+ if(front<.40||P.rope&&len(sub(a.p,P.rope.a))<10)return Infinity;
+ const reach=clamp(speed*.70,21,39),lift=clamp(24+speed*.17+Math.max(0,-P.v[1])*.34,29,49);
+ let score=(1-front)*38+Math.abs(along-reach)*.5+Math.abs(d[1]-lift)*.48+Math.abs(side)*.09;
+ const bottom=a.p[1]-dist;if(bottom<7)return Infinity;
+ score+=Math.max(0,12-bottom)*3.5;
+ if(navigation.lastAnchor&&len(sub(a.p,navigation.lastAnchor))<14)score+=15;
+ return score;
+}
+function predictAnchor(a,intent){
+ let p=[...P.p],v=[...P.v],L=len(sub(a.p,p)),minY=p[1],clearance=Infinity;
+ const nearby=buildings.filter(b=>Math.hypot(b.x-p[0],b.z-p[2])<110),dt=.075;
+ // 0.9 seconds of look-ahead ranks candidates. Real motion/collisions remain at 120 Hz.
+ for(let i=0;i<12;i++){
+  v[1]-=G*dt;let old=p;p=add(p,mul(v,dt));
+  if(input.web)L=Math.max(12,L-clamp((60-p[1])/25,0,1)*5*dt);
+  let d=sub(p,a.p),dist=len(d);if(dist>L){let n=mul(d,1/dist);p=add(a.p,mul(n,L));let radial=dot(v,n);if(radial>0)v=sub(v,mul(n,radial));}
+  minY=Math.min(minY,p[1]);if(p[1]<RADIUS+2)return 10000;
+  const delta=sub(p,old),travel=len(delta);if(travel>.001)for(const b of nearby){
+   const hit=rayBox(old,mul(delta,1/travel),b,travel,.65);if(hit&&hit.t>1e-4)return 10000;
+   if(p[1]<(b.base||0)||p[1]>b.h+1)continue;
+   clearance=Math.min(clearance,Math.hypot(Math.max(0,Math.abs(p[0]-b.x)-b.w/2),Math.max(0,Math.abs(p[2]-b.z)-b.d/2)));
+  }
+ }
+ navigation.predictions++;
+ const progress=dot(sub(p,P.p),intent.dir),lateral=Math.abs(dot(sub(p,P.p),intent.right));
+ return Math.max(0,10-minY)*5+Math.max(0,3.5-clearance)*4+Math.max(0,16-progress)*1.3+lateral*.12;
 }
 function chooseAnchor(){
- let intent=aimIntent(),reach=clamp(Math.hypot(P.v[0],P.v[2])*.61,18,32)-intent.y*7,aim=add(P.p,mul(intent.dir,reach));
- let lift=clamp(19+Math.hypot(P.v[0],P.v[2])*.20+Math.max(0,-P.v[1])*.45,25,43)-intent.y*21,candidates=[];
- for(let b of buildings){
-  if(b.h<P.p[1]+5||Math.hypot(b.x-P.p[0],b.z-P.p[2])>110)continue;
-  let x=clamp(aim[0],b.x-b.w/2,b.x+b.w/2),z=clamp(aim[2],b.z-b.d/2,b.z+b.d/2);
-  if(P.p[0]<b.x-b.w/2)x=b.x-b.w/2-.04;else if(P.p[0]>b.x+b.w/2)x=b.x+b.w/2+.04;else z=P.p[2]<b.z?b.z-b.d/2-.04:b.z+b.d/2+.04;
-  let y=clamp(P.p[1]+lift,(b.base||0)+.2,b.h-.2),p=[x,y,z],d=sub(p,P.p),a={p,b,side:Math.sign(dot(d,intent.right))||1,bottom:y-len(d),x:intent.x,y:intent.y};
-  a.score=anchorScore(a,intent);if(Number.isFinite(a.score))candidates.push(a);
+ const intent=aimIntent(),speed=Math.hypot(P.v[0],P.v[2]),reach=clamp(speed*.70,21,39),lift=clamp(24+speed*.17+Math.max(0,-P.v[1])*.34,29,49),candidates=[];
+ for(const b of buildings){
+  if(b.h<P.p[1]+10||Math.hypot(b.x-P.p[0],b.z-P.p[2])>118)continue;
+  for(const ahead of[.85,1.2]){
+   const aim=add(P.p,mul(intent.dir,reach*ahead));let x=clamp(aim[0],b.x-b.w/2,b.x+b.w/2),z=clamp(aim[2],b.z-b.d/2,b.z+b.d/2);
+   if(P.p[0]<b.x-b.w/2)x=b.x-b.w/2-.04;else if(P.p[0]>b.x+b.w/2)x=b.x+b.w/2+.04;else z=P.p[2]<b.z?b.z-b.d/2-.04:b.z+b.d/2+.04;
+   const y=clamp(P.p[1]+lift,(b.base||0)+.2,b.h-.2),p=[x,y,z],a={p,b,side:Math.sign(dot(sub(p,P.p),intent.right))||1,bottom:y-len(sub(p,P.p)),x:0,y:0};
+   a.score=anchorScore(a,intent);if(Number.isFinite(a.score))candidates.push(a);
+  }
  }
- // Only keep a displayed point while the aim intent is substantially unchanged.
- // A fresh thumb direction wins immediately; no alternating-side auto aim overrides it.
- if(target&&Math.hypot(target.x-intent.x,target.y-intent.y)<.075){let score=anchorScore(target,intent)-3;if(Number.isFinite(score))candidates.push({...target,score})}
- candidates.sort((a,b)=>a.score-b.score);
- for(let a of candidates)if(visibleAnchor(a.p,a.b))return a;
- return null;
+ if(target&&buildings.includes(target.b)){const score=anchorScore(target,intent)-5;if(Number.isFinite(score))candidates.push({...target,score,retained:true});}
+ candidates.sort((a,b)=>a.score-b.score);navigation.candidates=candidates.length;
+ let best=null;for(const a of candidates.slice(0,10)){
+  if(!visibleAnchor(a.p,a.b))continue;
+  const risk=predictAnchor(a,intent);if(risk>=10000)continue;
+  a.score+=risk;if(!best||a.score<best.score)best=a;
+ }
+ return best;
 }
-function refreshTarget(){target=chooseAnchor();aimControl.refresh=1/20;return target}
+function refreshTarget(){
+ const next=chooseAnchor();if(target&&next&&len(sub(target.p,next.p))>2)navigation.switches++;
+ target=next;aimControl.refresh=1/10;return target;
+}
 function targetForCatch(){
- const intent=aimIntent();
- // Attach to the precise preview, not a second random selection on button-down.
- if(target&&Math.hypot(target.x-intent.x,target.y-intent.y)<.075&&Number.isFinite(anchorScore(target,intent))&&visibleAnchor(target.p,target.b))return target;
+ if(target&&Number.isFinite(anchorScore(target,aimIntent()))&&surfaceAnchorValid(target)&&predictAnchor(target,aimIntent())<10000)return target;
  return refreshTarget();
 }
+// Use the exact last-rendered camera and CSS pixels, not the adaptive drawing-buffer size.
+const viewRay={eye:[0,0,0],f:[0,0,1],r:[-1,0,0],u:[0,1,0],tan:1,aspect:1,ready:false};
+function pickScreen(clientX,clientY){
+ const rect=canvas.getBoundingClientRect();if(!viewRay.ready||rect.width<=0||rect.height<=0)return null;
+ const x=(clientX-rect.left)/rect.width*2-1,y=1-(clientY-rect.top)/rect.height*2;
+ if(Math.abs(x)>1||Math.abs(y)>1)return null;
+ const ray=unit(add(viewRay.f,add(mul(viewRay.r,x*viewRay.tan*viewRay.aspect),mul(viewRay.u,y*viewRay.tan))));
+ let nearest=null;
+ for(const b of buildings){const hit=rayBox(viewRay.eye,ray,b,1000);if(hit&&hit.t>.10&&len(hit.n)>.5&&(!nearest||hit.t<nearest.t))nearest={...hit,b};}
+ if(!nearest)return null;
+ const p=add(add(viewRay.eye,mul(ray,nearest.t)),mul(nearest.n,.04)),b=nearest.b;
+ return{p,b,n:nearest.n,side:Math.sign(dot(sub(p,P.p),cross(forward(),[0,1,0])))||1,source:'tap'};
+}
+function fireTap(a,clientX,clientY){
+ if(state!=='playing')return false;
+ if(!surfaceAnchorValid(a,135)){
+  tapControl.rejected++;tapControl.feedback={x:clientX,y:clientY,age:0,ok:false};
+  say('OUT OF REACH','TAP A NEARBY BUILDING');return false;
+ }
+ // Validate before releasing anything. An invalid tap cannot drop a live rope.
+ P.rope=null;if(P.wall)exitWall('tap',false);flow.trickQueued=0;
+ const ok=attach(a,'tap');if(ok){tapControl.shots++;tapControl.feedback={p:[...a.p],x:clientX,y:clientY,age:0,ok:true};flow.air=0;}
+ return ok;
+}
+function setupSceneTaps(){
+ canvas.addEventListener('pointerdown',e=>{
+  if(state!=='playing'||tapControl.id!==null||e.pointerType==='mouse'&&e.button!==0)return;
+  tapControl.id=e.pointerId;tapControl.down={x:e.clientX,y:e.clientY,time:performance.now(),a:pickScreen(e.clientX,e.clientY),moved:false};capture(canvas,e);
+ });
+ canvas.addEventListener('pointermove',e=>{if(e.pointerId===tapControl.id&&tapControl.down&&Math.hypot(e.clientX-tapControl.down.x,e.clientY-tapControl.down.y)>14)tapControl.down.moved=true;});
+ canvas.addEventListener('pointerup',e=>{
+  if(e.pointerId!==tapControl.id)return;const d=tapControl.down;tapControl.id=null;tapControl.down=null;
+  if(d&&!d.moved&&performance.now()-d.time<500)fireTap(d.a,d.x,d.y);
+ });
+ const cancel=e=>{if(e.pointerId===tapControl.id){tapControl.id=null;tapControl.down=null;}};
+ canvas.addEventListener('pointercancel',cancel);canvas.addEventListener('lostpointercapture',cancel);
+}
+function cancelSceneTap(){
+ const id=tapControl.id;tapControl.id=null;tapControl.down=null;
+ if(id!==null)try{canvas.releasePointerCapture(id)}catch(e){}
+}
+function nearestRunningWall(p=P.p){
+ if(wallControl.cooldown>0||p[1]<RADIUS+2.5||input.dive)return null;
+ let best=null;
+ for(const b of buildings){
+  if(p[1]<(b.base||0)+1.2||p[1]>b.h-.55)continue;
+  for(const axis of[0,2])for(const sign of[-1,1]){
+   const along=axis===0?2:0,center=axis===0?b.x:b.z,half=(axis===0?b.w:b.d)/2;
+   const face=center+sign*half,gap=(p[axis]-face)*sign,otherCenter=along===0?b.x:b.z,otherHalf=(along===0?b.w:b.d)/2;
+   if(gap<.39||gap>1.05||Math.abs(p[along]-otherCenter)>otherHalf-.65)continue;
+   const n=[0,0,0];n[axis]=sign;const normalSpeed=dot(P.v,n),tangentSpeed=Math.abs(P.v[along]);
+   if(tangentSpeed<13||normalSpeed>2||-normalSpeed>Math.min(24,tangentSpeed*.8)||energy<9)continue;
+   if(steerValue()*dot(cross(forward(),[0,1,0]),n)>.35)continue;
+   if(!best||gap<best.gap)best={b:{...b},axis,along,sign,n,face,gap,direction:Math.sign(P.v[along])||1};
+  }
+ }
+ return best;
+}
+function enterWall(w){
+ if(!w||P.wall)return false;
+ P.wall={...w,age:0,phase:0,travel:0};P.rope=null;P.flip=null;flow.air=0;target=null;
+ wallControl.runs++;aimControl.refresh=0;say('WALL RUN','PUSH UP TO CLIMB · STEER OUT OR TAP TO LEAVE');haptic(9);return true;
+}
+function exitWall(reason='edge',jump=false){
+ const w=P.wall;if(!w)return;
+ P.wall=null;wallControl.cooldown=.75;wallControl.exits++;flow.air=.16;targetTimer=0;aimControl.refresh=0;
+ if(jump){P.v=add(P.v,mul(w.n,5));P.v[1]+=3.5;tone(180,480,.11,.035);}
+}
+function wallForce(dt){
+ const w=P.wall;if(!w)return null;
+ w.age+=dt;wallControl.elapsed+=dt;w.phase+=dt*clamp(10+Math.abs(P.v[w.along])*.12,11,17);
+ const center=w.along===0?w.b.x:w.b.z,half=(w.along===0?w.b.w:w.b.d)/2;
+ const away=steerValue()*dot(cross(forward(),[0,1,0]),w.n),gap=(P.p[w.axis]-w.face)*w.sign;
+ if(away>.32&&w.age>.12){exitWall('steer',true);return null;}
+ if(w.age>2.3||energy<4||P.p[1]<RADIUS+1.5||P.p[1]>w.b.h-.35||P.p[1]<(w.b.base||0)+1||Math.abs(P.p[w.along]-center)>half-.20||gap>1.8||input.dive){exitWall('edge',false);return null;}
+ energy=Math.max(0,energy-dt*15);const power=powerValue(),f=[0,0,0];
+ f[w.axis]=(clamp((.84-gap)*90-dot(P.v,w.n)*15,-70,70))*w.sign;
+ f[w.along]=w.direction*clamp((35+power*12-Math.abs(P.v[w.along]))*2,-14,14);
+ f[1]=clamp((power*8-1.5-w.age*1.8-P.v[1])*5,-G,30);
+ return f;
+}
+function drawAimPreview(){
+ $('aimTarget').hidden=true;
+ const m=tapControl.feedback;if(!m||m.age>.9)return;
+ const p=m.p&&project(m.p),x=p?p[0]:m.x,y=p?p[1]:m.y;if(x===undefined||y===undefined)return;
+ ctx.save();ctx.globalAlpha=clamp(1-m.age/.9,0,1);ctx.strokeStyle=m.ok?'#d4f6ff':'#ff927f';ctx.lineWidth=1.4;
+ ctx.beginPath();ctx.arc(x,y,11+m.age*15,0,TAU);ctx.stroke();
+ if(m.ok){ctx.beginPath();ctx.moveTo(x-4,y);ctx.lineTo(x+4,y);ctx.moveTo(x,y-4);ctx.lineTo(x,y+4);ctx.stroke();}ctx.restore();
+}
+
 function say(title,detail=''){notice=1.8;$('toast').firstElementChild.textContent=title;$('toast').lastElementChild.textContent=detail;$('toast').style.opacity=1}
 let audio=null,master=null,windGain=null,windFilter=null,trafficGain=null,siren=null,sirenGain=null,sirenPan=null;
 function audioInit(){try{if(audio){audio.resume().catch(()=>{});return}let A=window.AudioContext||window.webkitAudioContext;if(!A)return;audio=new A();master=audio.createGain();master.gain.value=settings.sound?.45:0;master.connect(audio.destination);let b=audio.createBuffer(1,audio.sampleRate*2,audio.sampleRate),d=b.getChannelData(0),v=0;for(let i=0;i<d.length;i++){v=(v+Math.random()*.04-.02)*.985;d[i]=v}let n=audio.createBufferSource();n.buffer=b;n.loop=true;windFilter=audio.createBiquadFilter();windFilter.type='lowpass';windGain=audio.createGain();windGain.gain.value=0;n.connect(windFilter);windFilter.connect(windGain);windGain.connect(master);const trafficFilter=audio.createBiquadFilter();trafficFilter.type='lowpass';trafficFilter.frequency.value=180;trafficGain=audio.createGain();trafficGain.gain.value=0;n.connect(trafficFilter);trafficFilter.connect(trafficGain);trafficGain.connect(master);siren=audio.createOscillator();siren.type='sine';sirenGain=audio.createGain();sirenGain.gain.value=0;siren.connect(sirenGain);if(audio.createStereoPanner){sirenPan=audio.createStereoPanner();sirenGain.connect(sirenPan);sirenPan.connect(master)}else sirenGain.connect(master);siren.start();n.start()}catch(e){audio=null}}
 function tone(f,end,duration=.12,gain=.06,type='triangle'){if(!audio||!master||!settings.sound)return;let t=audio.currentTime,o=audio.createOscillator(),g=audio.createGain();o.type=type;o.frequency.setValueAtTime(f,t);o.frequency.exponentialRampToValueAtTime(Math.max(20,end),t+duration);g.gain.setValueAtTime(gain,t);g.gain.exponentialRampToValueAtTime(.001,t+duration);o.connect(g);g.connect(master);o.start(t);o.stop(t+duration);o.onended=()=>{o.disconnect();g.disconnect()}}
 function haptic(n=8){try{navigator.vibrate?.(n)}catch(e){}}
-function attach(){if(state!=='playing'||P.rope)return false;let a=targetForCatch();if(!a)return false;P.rope={a:[...a.p],length:len(sub(a.p,P.p)),age:0,tension:0,side:a.side,rate:0,zip:0};target=null;aimControl.refresh=0;lastSide=a.side;swingCount++;chain=Math.min(9,1+Math.floor(swingCount/3));if(trickBank){score+=trickBank*chain;say('CLEAN CATCH','+'+trickBank*chain+' STYLE BANKED');trickBank=0}P.flip=null;tone(480,1400,.10,.06);haptic();return true}
-function release(automatic=false){if(!P.rope)return;let r=P.rope;if(r.age>.22&&P.v[1]>4&&len(P.v)>18){score+=50*chain;if(!automatic||swingCount%5===0){say('CLEAN RELEASE','KEEP THE MOMENTUM');tone(670,1000,.1,.025)}}P.rope=null;targetTimer=0;flow.air=0;flow.manualRelease=automatic?0:.10;}
-function doTrick(){if(state!=='playing'||P.flip)return;if(P.rope){flow.trickQueued=3;say('TRICK QUEUED','RELEASE INTO THE NEXT AIR GAP');return;}if(P.p[1]<8){say('NOT ENOUGH AIR','CATCH A WEB FIRST');return}P.flip={t:0,duration:.64,cork:Math.abs(steerValue())>.25,dir:Math.sign(steerValue())||1};tone(360,670,.15,.04)}
-function doZip(){if(state!=='playing'||energy<30||zipCool>0)return;if(!P.rope&&!attach()){say('NO ANCHOR IN REACH','STEER TOWARD A BUILDING');return}P.rope.zip=.80;energy-=30;zipCool=2.3;say('POWER REEL','HOLD WEB · AIM YOUR NEXT CATCH');tone(160,950,.3,.04);haptic(12)}
+function attach(selection=null,source='auto'){
+ if(state!=='playing'||P.rope)return false;
+ const a=selection||targetForCatch();if(!a||!surfaceAnchorValid(a,source==='tap'?135:106))return false;
+ if(P.wall)exitWall('catch',false);
+ P.rope={a:[...a.p],length:len(sub(a.p,P.p)),age:0,tension:0,side:a.side,rate:0,zip:0,source};
+ target=null;aimControl.refresh=0;lastSide=a.side;swingCount++;chain=Math.min(9,1+Math.floor(swingCount/3));
+ if(trickBank){score+=trickBank*chain;say('CLEAN CATCH','+'+trickBank*chain+' STYLE BANKED');trickBank=0}
+ P.flip=null;tone(480,1400,.10,.06);haptic();return true;
+}
+function release(automatic=false){if(!P.rope)return;let r=P.rope;if(r.age>.22&&P.v[1]>4&&len(P.v)>18){score+=50*chain;if(!automatic||swingCount%5===0){say('CLEAN RELEASE','KEEP THE MOMENTUM');tone(670,1000,.1,.025)}}navigation.lastAnchor=[...r.a];navigation.lastRelease=simTime;P.rope=null;targetTimer=0;flow.air=0;flow.manualRelease=automatic?0:.10;}
+function doTrick(){if(state!=='playing'||P.flip)return;if(P.wall)exitWall('jump',true);if(P.rope){flow.trickQueued=3;say('TRICK QUEUED','RELEASE INTO THE NEXT AIR GAP');return;}if(P.p[1]<8){say('NOT ENOUGH AIR','CATCH A WEB FIRST');return}P.flip={t:0,duration:.64,cork:Math.abs(steerValue())>.25,dir:Math.sign(steerValue())||1};tone(360,670,.15,.04)}
+function doZip(){if(state!=='playing'||energy<30||zipCool>0)return;if(P.wall)exitWall('zip',true);if(!P.rope&&!attach()){say('NO ANCHOR IN REACH','STEER TOWARD A BUILDING');return}P.rope.zip=.80;energy-=30;zipCool=2.3;say('POWER REEL','PUSH UP · RIDE THE ARC');tone(160,950,.3,.04);haptic(12)}
 // Only remove OUTWARD radial motion: slack webs cannot push. Reeling does finite work
 // over time, with a bounded radial acceleration; attachment itself never changes p or v.
-function solveRope(dt){let r=P.rope;if(!r)return;let d=sub(P.p,r.a),dist=len(d);if(dist<.01)return;let n=mul(d,1/dist),reel=reelValue(),wanted=r.zip>0?-20:reel>0?-reel*(8+powerValue()*4):-reel*8;r.zip=Math.max(0,r.zip-dt);r.age+=dt;r.rate+=clamp(wanted-r.rate,-42*dt,42*dt);let prev=r.length;r.length=clamp(r.length+r.rate*dt,9,100);let rate=(r.length-prev)/dt,radial=dot(P.v,n);if(dist>r.length){let excess=dist-r.length;P.p=sub(P.p,mul(n,excess));if(radial>rate)P.v=sub(P.v,mul(n,radial-rate));let tang=sub(P.v,mul(n,dot(P.v,n)));r.tension=Math.max(0,len(tang)**2/r.length-G*n[1]);}else r.tension=0;}
-function collide(from){let pos=[...from],remaining=sub(P.p,from);for(let iter=0;iter<3&&len(remaining)>1e-6;iter++){let dist=len(remaining),dir=mul(remaining,1/dist),nearest=null;for(let b of buildings){if(Math.abs(b.x-pos[0])>b.w/2+dist+2||Math.abs(b.z-pos[2])>b.d/2+dist+2)continue;let h=rayBox(pos,dir,b,dist,.40);if(h&&len(h.n)>.5&&dot(dir,h.n)<0&&(!nearest||h.t<nearest.t))nearest=h}if(!nearest){pos=add(pos,remaining);break}let travel=Math.max(0,nearest.t-.003);pos=add(pos,mul(dir,travel));let n=nearest.n,vn=dot(P.v,n);if(vn<0)P.v=sub(P.v,mul(n,vn));remaining=mul(dir,Math.max(0,dist-travel));remaining=sub(remaining,mul(n,Math.min(0,dot(remaining,n))));if(wallCool<=0&&Math.abs(n[1])<.5){wallCool=1.5;say('WALL SKIM','STEER OUT · CATCH A NEW WEB');tone(90,45,.1,.035)}}P.p=pos;
+function solveRope(dt){let r=P.rope;if(!r)return;let d=sub(P.p,r.a),dist=len(d);if(dist<.01)return;let n=mul(d,1/dist),reel=reelValue(),wanted=r.zip>0?-20:reel>0?-reel*(8+powerValue()*4):-reel*8;r.zip=Math.max(0,r.zip-dt);r.age+=dt;r.rate+=clamp(wanted-r.rate,-42*dt,42*dt);let prev=r.length;r.length=clamp(r.length+r.rate*dt,9,r.source==='tap'?135:106);let rate=(r.length-prev)/dt,radial=dot(P.v,n);if(dist>r.length){let excess=dist-r.length;P.p=sub(P.p,mul(n,excess));if(radial>rate)P.v=sub(P.v,mul(n,radial-rate));let tang=sub(P.v,mul(n,dot(P.v,n)));r.tension=Math.max(0,len(tang)**2/r.length-G*n[1]);}else r.tension=0;}
+function collide(from){let pos=[...from],remaining=sub(P.p,from);for(let iter=0;iter<3&&len(remaining)>1e-6;iter++){let dist=len(remaining),dir=mul(remaining,1/dist),nearest=null;for(let b of buildings){if(Math.abs(b.x-pos[0])>b.w/2+dist+2||Math.abs(b.z-pos[2])>b.d/2+dist+2)continue;let h=rayBox(pos,dir,b,dist,.40);if(h&&len(h.n)>.5&&dot(dir,h.n)<0&&(!nearest||h.t<nearest.t))nearest=h}if(!nearest){pos=add(pos,remaining);break}let travel=Math.max(0,nearest.t-.003);pos=add(pos,mul(dir,travel));let n=nearest.n,vn=dot(P.v,n);if(vn<0)P.v=sub(P.v,mul(n,vn));remaining=mul(dir,Math.max(0,dist-travel));remaining=sub(remaining,mul(n,Math.min(0,dot(remaining,n))));if(wallCool<=0&&Math.abs(n[1])<.5){wallCool=1.5;if(!P.wall)say('WALL CONTACT','STEER ALONG THE WALL OR TAP TO SWING');tone(90,45,.1,.035)}}P.p=pos;
  // Facade corners may occlude a held line; detach instead of pulling through a building.
  if(P.rope){let r=P.rope,d=sub(r.a,P.p),dist=len(d);if(dist>2){let dir=mul(d,1/dist);for(let b of buildings){let h=rayBox(P.p,dir,b,dist-.22);if(h&&h.t>.05){P.rope=null;targetTimer=.18;break}}}}}
 function spring(value,velocity,target,k,d,dt){velocity+=(target-value)*k*dt;velocity*=Math.exp(-d*dt);return[value+velocity*dt,velocity]}
@@ -389,7 +534,7 @@ function rigRoot(pos,up,pitch,bank,spin,twist){
 }
 function limbGoals(s,root){
  const r=P.rope,flip=P.flip,vY=P.v[1],dive=input.dive||keys.has('ShiftLeft')||keys.has('ShiftRight'),shoulder=[s*.217,.411,0],attached=r&&s===-r.side;
- const aiming=!flip&&!attached&&aimIntent().active&&target&&s===-target.side;
+ const aiming=false;
  let arm,foot;
  if(attached||aiming){const a=attached?r.a:target.p,d=unit(localVector(root,sub(a,point(root,shoulder))));arm=add(shoulder,mul(d,attached?.602:.586));}
  else if(flip)arm=[s*.16,.09,.28];
@@ -402,6 +547,11 @@ function limbGoals(s,root){
  else if(r){let lead=s===-r.side,tuck=clamp(r.tension/100,0,1);foot=[s*(lead?.14:.17),(lead?-.995:-1.04)+tuck*.075,lead?-.31:-.17-clamp(P.pose.lag,-.1,.35)*.35];}
  else if(s===1)foot=[.17,vY>2?-.89:-1.045,-.28];
  else foot=[-.19,vY>2?-1.015:-.91,-.30-clamp(-vY/40,0,.25)];
+ if(P.wall){
+  const phase=P.wall.phase+(s>0?Math.PI:0),plant=Math.max(0,Math.sin(phase));
+  arm=[s*.27,.17+Math.sin(phase)*.16,-Math.cos(phase)*.24];
+  const wallSide=Math.sign(localVector(root,P.wall.n)[0])||1;foot=[-wallSide*(.43-plant*.18)+s*.055,-.84+plant*.14,Math.cos(phase)*.26];
+ }
  const mode=attached?(r.age<.18?'shoot':'grip'):aiming?'shoot':flip||dive?'relaxed':'open';
  const curves=[0,1,2,3].map(i=>mode==='grip'||mode==='shoot'&&(i===1||i===2)?1:mode==='relaxed'?.36:.08);curves.push(mode==='grip'?1:0);
  return{arm,foot,mode,curves,attached,aiming};
@@ -409,8 +559,8 @@ function limbGoals(s,root){
 function updateRig(dt){
  const cold=!rig.initialized,r=P.rope,vY=P.v[1],dive=input.dive||keys.has('ShiftLeft')||keys.has('ShiftRight');
  if(!cold)rig.prev=copyRig();
- const k=cold?1:1-Math.exp(-dt*13),pitch=r?0:dive?2.65:.34+clamp(-vY/28,0,1)*.90-clamp(vY/28,0,1)*.38+P.pose.lean*.35;
- rig.pitch=mix(rig.pitch,pitch,k);rig.bank=mix(rig.bank,-steerValue()*.24,k);
+ const k=cold?1:1-Math.exp(-dt*13),pitch=P.wall?.12:r?0:dive?2.65:.34+clamp(-vY/28,0,1)*.90-clamp(vY/28,0,1)*.38+P.pose.lean*.35;
+ rig.pitch=mix(rig.pitch,pitch,k);rig.bank=mix(rig.bank,P.wall?0:-steerValue()*.24,k);
  if(P.flip){
   if(rig.token!==P.flip){rig.baseSpin=Math.round(rig.spin/TAU)*TAU;rig.token=P.flip;}
   const q=clamp(P.flip.t/P.flip.duration,0,1),ease=q*q*(3-2*q);
@@ -438,21 +588,21 @@ function interpolatedRig(alpha){
  o.curves=rig.curves.map((v,i)=>v.map((n,j)=>mix(p.curves[i][j],n,alpha)));return o;
 }
 
-function animatePhysics(dt,oldV){P.pose.prevUp=[...P.pose.up];P.acc=smooth(P.acc,mul(sub(P.v,oldV),1/dt),dt*10);let pose=P.pose,force=clamp(dot(P.acc,forward())/25,-1,1),fall=clamp(-P.v[1]/28,-.6,1),a=spring(pose.lean,pose.leanV,force*.20,55,12,dt),b=spring(pose.lag,pose.lagV,fall*.25+force*.24,48,10,dt);pose.lean=a[0];pose.leanV=a[1];pose.lag=b[0];pose.lagV=b[1];let up=P.rope?unit(lerp([0,1,0],unit(sub(P.rope.a,P.p)),.83)):[0,1,0];pose.up=unit(smooth(pose.up,up,dt*13));let h=Math.hypot(P.v[0],P.v[2]);if(h>3)P.yaw+=angleDelta(P.yaw,Math.atan2(P.v[0],P.v[2]))*(1-Math.exp(-dt*8));updateRig(dt);}
-function physics(dt){if(state!=='playing')return;elapsed+=dt;simTime+=dt;dayTime=mod(dayTime+dt,600);P.prev=[...P.p];let oldV=[...P.v];zipCool=Math.max(0,zipCool-dt);wallCool=Math.max(0,wallCool-dt);aimControl.refresh-=dt;if(aimControl.refresh<=0)refreshTarget();energy=Math.min(100,energy+dt*7);let sx=steerValue(),up=reelValue(),dive=input.dive||keys.has('ShiftLeft')||keys.has('ShiftRight'),f=forward(),right=cross(f,[0,1,0]);
+function animatePhysics(dt,oldV){P.pose.prevUp=[...P.pose.up];P.acc=smooth(P.acc,mul(sub(P.v,oldV),1/dt),dt*10);let pose=P.pose,force=clamp(dot(P.acc,forward())/25,-1,1),fall=clamp(-P.v[1]/28,-.6,1),a=spring(pose.lean,pose.leanV,force*.20,55,12,dt),b=spring(pose.lag,pose.lagV,fall*.25+force*.24,48,10,dt);pose.lean=a[0];pose.leanV=a[1];pose.lag=b[0];pose.lagV=b[1];let up=P.wall?unit(add(mul(P.wall.n,.45),[0,.90,0])):P.rope?unit(lerp([0,1,0],unit(sub(P.rope.a,P.p)),.83)):[0,1,0];pose.up=unit(smooth(pose.up,up,dt*13));let h=Math.hypot(P.v[0],P.v[2]);if(h>3)P.yaw+=angleDelta(P.yaw,Math.atan2(P.v[0],P.v[2]))*(1-Math.exp(-dt*8));updateRig(dt);}
+function physics(dt){if(state!=='playing')return;elapsed+=dt;simTime+=dt;navigation.turn=mix(navigation.turn,steerValue(),1-Math.exp(-dt*5));wallControl.cooldown=Math.max(0,wallControl.cooldown-dt);if(tapControl.feedback)tapControl.feedback.age+=dt;dayTime=mod(dayTime+dt,600);P.prev=[...P.p];let oldV=[...P.v];zipCool=Math.max(0,zipCool-dt);wallCool=Math.max(0,wallCool-dt);aimControl.refresh-=dt;if(aimControl.refresh<=0)refreshTarget();energy=Math.min(100,energy+dt*(P.wall?0:7));if(!P.wall)enterWall(nearestRunningWall());let sx=steerValue(),up=reelValue(),dive=input.dive||keys.has('ShiftLeft')||keys.has('ShiftRight'),f=forward(),right=cross(f,[0,1,0]);
  // Small lateral aerodynamic authority in freefall; on-web inputs act in the tangent plane.
- let force=[0,-G,0],steering=mul(right,sx*(P.rope?11:4.2));if(P.rope){let n=unit(sub(P.p,P.rope.a));steering=sub(steering,mul(n,dot(steering,n)));if(up>0){let tangent=sub(f,mul(n,dot(f,n)));steering=add(steering,mul(tangent,up*(3.8+powerValue()*10)))}}if(settings.swingMode==='FLOW'&&input.web){
+ let force=[0,-G,0],steering=mul(right,sx*(P.rope?11:4.2));if(P.rope){let n=unit(sub(P.p,P.rope.a));steering=sub(steering,mul(n,dot(steering,n)));if(up>0){let tangent=sub(f,mul(n,dot(f,n)));steering=add(steering,mul(tangent,up*(3.8+powerValue()*10)))}}if(settings.swingMode==='FLOW'&&input.web&&!P.wall&&P.rope?.source!=='tap'){
   const n=P.rope?unit(sub(P.p,P.rope.a)):null;
   if(P.rope){let drive=mul(f,clamp((44-Math.hypot(P.v[0],P.v[2]))*.45,0,6));drive=sub(drive,mul(n,dot(drive,n)));steering=add(steering,drive);}
   // Centering is only for neutral horizontal input, never fighting a chosen turn.
   if(Math.abs(sx)<.18){const axis=Math.abs(f[2])>=Math.abs(f[0])?0:2,offset=P.p[axis]-Math.round(P.p[axis]/TILE)*TILE;
    if(Math.abs(offset)<TILE*.35){let guard=[0,0,0];guard[axis]=clamp(-offset*3.0-P.v[axis]*2.4,-60,60);if(n)guard=sub(guard,mul(n,dot(guard,n)));steering=add(steering,guard)}
   }
- }force=add(force,steering);let drag=dive?.00008:.00022;force=sub(force,mul(P.v,len(P.v)*drag));P.v=add(P.v,mul(force,dt));P.p=add(P.p,mul(P.v,dt));solveRope(dt);collide(P.prev);animatePhysics(dt,oldV);
+ }force=P.wall?(wallForce(dt)||add(force,steering)):add(force,steering);let drag=dive?.00008:.00022;force=sub(force,mul(P.v,len(P.v)*drag));P.v=add(P.v,mul(force,dt));P.p=add(P.p,mul(P.v,dt));solveRope(dt);collide(P.prev);if(!P.wall)enterWall(nearestRunningWall());animatePhysics(dt,oldV);
  if(!P.p.every(Number.isFinite)||!P.v.every(Number.isFinite)){fail('The simulation lost its state. Reload to restart.');return}if(P.p[1]<=RADIUS){hitGround();return}distance+=Math.hypot(P.p[0]-P.prev[0],P.p[2]-P.prev[2]);score+=len(P.v)*dt*.15;maxSpeed=Math.max(maxSpeed,len(P.v));if(P.flip){P.flip.t+=dt;if(P.flip.t>=P.flip.duration){let value=P.flip.cork?300:200;trickBank+=value;say(P.flip.cork?'CORKSCREW':'BACKFLIP','+'+value+' PENDING · CATCH TO BANK');P.flip=null}}
- flowStep(dt);if(input.web&&!P.rope&&settings.swingMode!=='FLOW'){targetTimer-=dt;if(targetTimer<=0){attach();targetTimer=.10}}if(Math.abs(P.p[0])>TILE*24||Math.abs(P.p[2])>TILE*24)rebase();ensureCity();}
-function rebase(){let ix=Math.floor(P.p[0]/TILE),iz=Math.floor(P.p[2]/TILE),shift=[ix*TILE,0,iz*TILE];origin[0]+=ix;origin[1]+=iz;P.p=sub(P.p,shift);P.prev=sub(P.prev,shift);drawP=sub(drawP,shift);cam=sub(cam,shift);camLook=sub(camLook,shift);if(P.rope)P.rope.a=sub(P.rope.a,shift);if(target)target.p=sub(target.p,shift);for(let c of cars){c.from=sub(c.from,shift);c.to=sub(c.to,shift);if(c.turn){for(const k of['a','b','c','d','p'])c.turn[k]=sub(c.turn[k],shift);c.turn.street-=shift[c.turn.axis===2?0:2]}c.street-=c.axis===2?shift[0]:shift[2];c.pos-=shift[c.axis]}for(let w of walkers){w.street-=w.axis===2?shift[0]:shift[2];w.pos-=shift[w.axis];w.prevPos-=shift[w.axis]}for(let b of cyclists){b.street-=shift[b.axis===2?0:2];b.pos-=shift[b.axis];if(b.prevPos!==undefined)b.prevPos-=shift[b.axis]}blocks.clear();farBlocks.clear();centerKey='';ensureCity(true);target=null;}
-function hitGround(){if(state!=='playing')return;state='dead';P.p[1]=RADIUS;P.rope=null;clearInput();$('hud').hidden=true;$('over').hidden=false;settings.best=Math.max(settings.best,Math.floor(distance));save();$('endDistance').textContent=Math.floor(distance).toLocaleString()+' m';$('endScore').textContent=Math.floor(score).toLocaleString();$('endSpeed').textContent=Math.round(maxSpeed*3.6);$('endBest').textContent=settings.best.toLocaleString()+' m';$('endTime').textContent=Math.floor(elapsed/60)+':'+String(Math.floor(elapsed%60)).padStart(2,'0')+' IN THE AIR';$('endText').textContent=swingCount<2?'Catch a building early. Hold through the bottom of the arc, then release as you rise.':'Hold WEB for assisted chaining. Push up to gain speed and height. Manual controls are in Pause.';tone(80,22,.45,.13);haptic(45)}
+ flowStep(dt);if(input.web&&!P.rope&&!P.wall&&settings.swingMode!=='FLOW'){targetTimer-=dt;if(targetTimer<=0){attach();targetTimer=.10}}if(Math.abs(P.p[0])>TILE*24||Math.abs(P.p[2])>TILE*24)rebase();ensureCity();}
+function rebase(){let ix=Math.floor(P.p[0]/TILE),iz=Math.floor(P.p[2]/TILE),shift=[ix*TILE,0,iz*TILE];origin[0]+=ix;origin[1]+=iz;P.p=sub(P.p,shift);P.prev=sub(P.prev,shift);drawP=sub(drawP,shift);cam=sub(cam,shift);camLook=sub(camLook,shift);if(P.rope)P.rope.a=sub(P.rope.a,shift);if(P.wall){P.wall.b.x-=shift[0];P.wall.b.z-=shift[2];P.wall.face-=shift[P.wall.axis];}if(navigation.lastAnchor)navigation.lastAnchor=sub(navigation.lastAnchor,shift);if(tapControl.feedback?.p)tapControl.feedback.p=sub(tapControl.feedback.p,shift);cancelSceneTap();if(target)target.p=sub(target.p,shift);for(let c of cars){c.from=sub(c.from,shift);c.to=sub(c.to,shift);if(c.turn){for(const k of['a','b','c','d','p'])c.turn[k]=sub(c.turn[k],shift);c.turn.street-=shift[c.turn.axis===2?0:2]}c.street-=c.axis===2?shift[0]:shift[2];c.pos-=shift[c.axis]}for(let w of walkers){w.street-=w.axis===2?shift[0]:shift[2];w.pos-=shift[w.axis];w.prevPos-=shift[w.axis]}for(let b of cyclists){b.street-=shift[b.axis===2?0:2];b.pos-=shift[b.axis];if(b.prevPos!==undefined)b.prevPos-=shift[b.axis]}blocks.clear();farBlocks.clear();centerKey='';ensureCity(true);target=null;}
+function hitGround(){if(state!=='playing')return;state='dead';P.p[1]=RADIUS;P.rope=null;P.wall=null;clearInput();$('hud').hidden=true;$('over').hidden=false;settings.best=Math.max(settings.best,Math.floor(distance));save();$('endDistance').textContent=Math.floor(distance).toLocaleString()+' m';$('endScore').textContent=Math.floor(score).toLocaleString();$('endSpeed').textContent=Math.round(maxSpeed*3.6);$('endBest').textContent=settings.best.toLocaleString()+' m';$('endTime').textContent=Math.floor(elapsed/60)+':'+String(Math.floor(elapsed%60)).padStart(2,'0')+' IN THE AIR';$('endText').textContent=swingCount<2?'Catch a building early. Hold through the bottom of the arc, then release as you rise.':'Hold WEB for assisted chaining. Push up to gain speed and height. Manual controls are in Pause.';tone(80,22,.45,.13);haptic(45)}
 
 /* Original swept-surface character. Continuous limbs, no joint spheres. */
 function makeSuitAtlas(){
@@ -617,45 +767,34 @@ function audioScene(dt){
 }
 
 function render(dt,alpha=1){renderAlpha=clamp(alpha,0,1);drawP=state==='playing'?lerp(P.prev,P.p,alpha):[...P.p];lighting();let sp=len(P.v),yawTarget=P.yaw;cameraYaw+=clamp(angleDelta(cameraYaw,yawTarget),-1.2,1.2)*(1-Math.exp(-dt*4.2));let f=[Math.sin(cameraYaw),0,Math.cos(cameraYaw)],back=settings.motion?7.6+clamp((sp-40)*.018,0,.9):8.2,desired=add(drawP,add(mul(f,-back),[0,1.55,0])),focus=add(drawP,add(mul(f,5.0),[0,.18+clamp(P.v[1]*.010,-.25,.25),0]));
+ if(P.wall){desired=add(desired,mul(P.wall.n,.65));focus=add(focus,mul(P.wall.n,.2));}
  // Sweep the camera arm so the viewpoint does not travel through nearby facades.
- let start=add(drawP,[0,.35,0]),arm=sub(desired,start),l=len(arm),dir=mul(arm,1/l);for(let b of buildings){let hit=rayBox(start,dir,b,l,.25);if(hit&&hit.t>.05)l=Math.min(l,Math.max(.8,hit.t-.25))}desired=add(start,mul(dir,l));if(state==='menu'){desired=add(drawP,[7,3.4,-11]);focus=add(drawP,[0,.2,1])}cam=dt>0?smooth(cam,desired,dt*16):desired;camLook=dt>0?smooth(camLook,focus,dt*13):focus;cam[1]=Math.max(1,cam[1]);let view=look(cam,camLook),fov=(width<height?66:64)+(settings.motion?clamp((sp-38)*.17,0,7):0),projection=perspective(fov*Math.PI/180,width/height,.12,1000);VP=mm(projection,view);let vf=unit(sub(camLook,cam)),vr=unit(cross(vf,[0,1,0])),vu=cross(vr,vf);heroGeometry();agentGeometry();atmosphereGeometry(vr,vu);
+ let start=add(drawP,[0,.35,0]),arm=sub(desired,start),l=len(arm),dir=mul(arm,1/l);for(let b of buildings){let hit=rayBox(start,dir,b,l,.25);if(hit&&hit.t>.05)l=Math.min(l,Math.max(.8,hit.t-.25))}desired=add(start,mul(dir,l));if(state==='menu'){desired=add(drawP,[7,3.4,-11]);focus=add(drawP,[0,.2,1])}cam=dt>0?smooth(cam,desired,dt*16):desired;camLook=dt>0?smooth(camLook,focus,dt*13):focus;cam[1]=Math.max(1,cam[1]);let view=look(cam,camLook),fov=(width<height?66:64)+(settings.motion?clamp((sp-38)*.17,0,7):0),projection=perspective(fov*Math.PI/180,width/height,.12,1000);VP=mm(projection,view);let vf=unit(sub(camLook,cam)),vr=unit(cross(vf,[0,1,0])),vu=cross(vr,vf);Object.assign(viewRay,{eye:[...cam],f:vf,r:vr,u:vu,tan:Math.tan(fov*Math.PI/360),aspect:width/height,ready:true});heroGeometry();agentGeometry();atmosphereGeometry(vr,vu);
  let lightTarget=add(drawP,mul(f,26)),lightEye=add(lightTarget,mul(sun,280));lightVP=mm(ortho(-110,110,-110,110,1,620),look(lightEye,lightTarget));let shadows=shadowOK&&settings.quality!=='LOW';if(shadows&&day>.04){gl.bindFramebuffer(gl.FRAMEBUFFER,shadowFB);gl.viewport(0,0,1024,1024);gl.clear(gl.DEPTH_BUFFER_BIT);gl.useProgram(depthProgram);gl.uniformMatrix4fv(D.uVP,false,lightVP);gl.colorMask(false,false,false,false);city.draw();props.draw();hero.draw();gl.colorMask(true,true,true,true);gl.bindFramebuffer(gl.FRAMEBUFFER,null)}gl.viewport(0,0,canvas.width,canvas.height);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.disable(gl.DEPTH_TEST);gl.depthMask(false);gl.useProgram(skyProgram);gl.bindVertexArray(null);gl.uniform3fv(K.uForward,vf);gl.uniform3fv(K.uRight,vr);gl.uniform3fv(K.uUp,vu);gl.uniform3fv(K.uSun,sun);gl.uniform3fv(K.uFog,fog);gl.uniform1f(K.uTan,Math.tan(fov*Math.PI/360));gl.uniform1f(K.uAspect,width/height);gl.uniform1f(K.uDay,day);gl.uniform1f(K.uTime,simTime);gl.drawArrays(gl.TRIANGLES,0,3);gl.enable(gl.DEPTH_TEST);gl.depthMask(true);gl.useProgram(mainProgram);gl.uniformMatrix4fv(U.uVP,false,VP);gl.uniformMatrix4fv(U.uShadow,false,lightVP);gl.uniform3fv(U.uEye,cam);gl.uniform3fv(U.uSun,sun);gl.uniform3fv(U.uFog,fog);gl.uniform1f(U.uDay,day);gl.uniform1f(U.uNight,night);gl.uniform1f(U.uTime,simTime);gl.uniform1i(U.uShadows,shadows?1:0);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,depthTex);gl.uniform1i(U.uDepth,0);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,atlas);gl.uniform1i(U.uAtlas,1);gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,suitAtlas);gl.uniform1i(U.uSuit,2);city.draw();props.draw();foliage.draw();hero.draw();eyes.draw();webs.draw();gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(false);mist.draw();gl.depthMask(true);gl.disable(gl.BLEND);overlay(dt);frame++;}
-
-function drawAimPreview(){
- let intent=aimIntent(),a=target,q=a&&project(a.p),fallback=project(add(drawP,add(mul(intent.dir,35),[0,26-intent.y*21,0])));
- let raw=q||fallback||[width*.5,height*.24],margin=56,top=width<height?156:118,bottom=height-(width<height?215:112),px=clamp(raw[0],margin,width-margin),py=clamp(raw[1],top,Math.max(top+20,bottom));
- const off=!q||Math.abs(raw[0]-px)>1||Math.abs(raw[1]-py)>1;
- $('aimTarget').hidden=false;$('aimTarget').style.left=px+'px';$('aimTarget').style.top=py+'px';$('aimTarget').classList.toggle('empty',!a);$('aimTarget').classList.toggle('edge',off);
- $('aimArrow').style.transform=`rotate(${Math.atan2(raw[1]-py,raw[0]-px)+Math.PI/2}rad)`;
- $('aimText').textContent=a?(P.rope?'NEXT WEB':'WEB TARGET'):'NO ANCHOR';
- // Dotted preview has no physical effect and never replaces the live white rope.
- let from=project(add(drawP,[0,.38,0]));if(a&&from&&(intent.active||P.rope)){
-  ctx.save();ctx.strokeStyle='rgba(123,225,246,.42)';ctx.lineWidth=1.1;ctx.setLineDash([3,6]);ctx.beginPath();ctx.moveTo(from[0],from[1]);ctx.lineTo(px,py);ctx.stroke();ctx.restore();
- }
-}
 
 let hudTimer=0;
 function overlay(dt){ctx.clearRect(0,0,width,height);if(state!=='playing'){$('danger').style.opacity=0;return}let sp=len(P.v),risk=clamp((9-P.p[1])/8,0,1);$('danger').style.opacity=risk*.7;notice-=dt;$('toast').style.opacity=clamp(notice/.22,0,1);if(settings.motion&&sp>38){ctx.strokeStyle=`rgba(222,236,244,${clamp((sp-38)*.003,0,.14)})`;ctx.lineWidth=.8;for(let i=0;i<14;i++){let a=hash(i+22)*TAU,r=.5+mod(hash(i+4)+simTime*.8,.7),x=Math.cos(a)*width*r,y=Math.sin(a)*height*r;ctx.beginPath();ctx.moveTo(width*.5+x,height*.42+y);ctx.lineTo(width*.5+x*1.08,height*.42+y*1.08);ctx.stroke()}}
- drawAimPreview();let p=P.rope?P.rope.a:null,q=p&&project(p),show=q&&q[0]>14&&q[0]<width-14&&q[1]>22&&q[1]<height-130;$('target').hidden=!show;if(show){$('target').style.left=q[0]+'px';$('target').style.top=q[1]+'px';$('target').classList.toggle('lock',!!P.rope)}let rising=P.rope&&P.v[1]>4;$('web').classList.toggle('held',!!P.rope);$('web').classList.toggle('rise',!!rising);$('webLabel').textContent=settings.swingMode==='FLOW'&&input.web?'FLOW':P.rope?'RELEASE':'WEB';$('webSub').textContent=settings.swingMode==='FLOW'&&input.web?(flow.boost>.15?'POWER SWING':'HOLD TO CHAIN'):rising?'RISING · LET GO':P.rope?'AIM THE NEXT WEB':target?'HOLD TO CATCH':'AIM WITH LEFT STICK';$('powerHint').style.opacity=P.rope&&flow.boost>.12?'1':'0';$('powerHint').textContent='↑ POWER SWING '+Math.round(flow.boost*100)+'%';$('pad').classList.toggle('powered',!!P.rope&&flow.boost>.12);$('trick').disabled=!!P.flip;$('trick').textContent=flow.trickQueued>0?'↻ QUEUED':'↻ TRICK';$('zip').disabled=energy<30||zipCool>0;$('dive').classList.toggle('on',input.dive);hudTimer+=dt;if(hudTimer>.1||dt===0){hudTimer=0;$('distance').textContent=Math.floor(distance).toLocaleString();$('speed').textContent=Math.round(sp*3.6);$('height').textContent=Math.max(0,Math.floor(P.p[1]-RADIUS));$('score').textContent=Math.floor(score).toLocaleString();$('chain').textContent=trickBank?'+'+trickBank+' PENDING':'FLOW ×'+chain;$('energy').style.width=energy+'%';let mins=Math.floor(dayTime/600*1440);$('clock').textContent=String(Math.floor(mins/60)).padStart(2,'0')+':'+String(mins%60).padStart(2,'0');let district=['MIDTOWN','CHELSEA','FLATIRON','SOHO','LOWER EAST SIDE'][mod(Math.floor((P.p[2]+origin[1]*TILE)/864),5)],heading=mod(Math.round(P.yaw/(Math.PI/2)),4);$('district').textContent=district+' · '+['NORTHBOUND','WESTBOUND','SOUTHBOUND','EASTBOUND'][heading];$('hint').textContent=risk>.4?'LOW ALTITUDE — CATCH A WEB, THEN ZIP':settings.swingMode==='FLOW'&&input.web?'Keep WEB held. Left / right aims; push up to accelerate and climb.':rising?'Release now. Let the arc carry you into the next swing.':P.rope?'Aim the next cyan target. Push up to power through the arc.':trickBank?'Catch the next web to bank your trick.':elapsed<14?'Hold WEB to chain swings. Aim left/right; push up for power.':'Left / right aims. Up powers the swing. ZIP gives a stronger pull.'}}
-function clearInput(){input.x=input.y=input.reel=0;aimControl.active=false;aimControl.refresh=0;input.web=input.dive=false;keys.clear();for(let id of['pad','web','dive']){let el=$(id),pid=pointers[id];pointers[id]=null;if(pid!==null)try{el.releasePointerCapture(pid)}catch(e){}}$('knob').style.transform='';}
-function reset(){clearInput();resetFlow();resetRig();resetLife();state='playing';elapsed=simTime=distance=score=maxSpeed=0;energy=100;chain=1;swingCount=trickBank=0;zipCool=wallCool=notice=0;origin=[0,0];P.p=[0,42,48];P.prev=[...P.p];P.v=[0,-5,46];P.rope=P.flip=null;P.yaw=0;P.acc=[0,0,0];P.pose={lean:0,leanV:0,lag:0,lagV:0,up:[0,1,0],prevUp:[0,1,0]};dayTime=400;cameraYaw=0;cam=[0,43.6,40.4];camLook=[0,42.2,53];target=null;targetTimer=0;aimControl.active=false;aimControl.refresh=0;aimControl.failed=0;lastSide=-1;blocks.clear();farBlocks.clear();centerKey='';ensureCity(true);populate();$('welcome').hidden=$('over').hidden=$('paused').hidden=true;$('hud').hidden=false;$('toast').style.opacity=0;accumulator=0;lastTime=performance.now();audioInit();refreshTarget();say('FIND YOUR FLOW','HOLD WEB · AIM LEFT / RIGHT · PUSH UP FOR POWER');}
-function pause(){if(state!=='playing')return;state='paused';clearInput();$('paused').hidden=false;syncSettings();if(windGain&&audio)windGain.gain.setTargetAtTime(0,audio.currentTime,.08);audioScene(0)}
+ drawAimPreview();let p=P.rope?P.rope.a:null,q=p&&project(p),show=q&&q[0]>14&&q[0]<width-14&&q[1]>22&&q[1]<height-130;$('target').hidden=!show;if(show){$('target').style.left=q[0]+'px';$('target').style.top=q[1]+'px';$('target').classList.toggle('lock',!!P.rope)}let rising=P.rope&&P.v[1]>4;$('web').classList.toggle('held',!!P.rope);$('web').classList.toggle('rise',!!rising);$('webLabel').textContent=P.wall?'LEAP':settings.swingMode==='FLOW'&&input.web?'FLOW':P.rope?'RELEASE':'WEB';$('webSub').textContent=P.wall?'JUMP & CATCH':P.rope?.source==='tap'?'TAP SWING':settings.swingMode==='FLOW'&&input.web?(flow.boost>.15?'POWER SWING':'HOLD TO CHAIN'):rising?'RISING · LET GO':P.rope?'RIDE THE ARC':target?'HOLD TO CATCH':'AUTO CATCH';$('powerHint').style.opacity=(P.rope||P.wall)&&flow.boost>.12?'1':'0';$('powerHint').textContent=(P.wall?'↑ WALL CLIMB ':'↑ POWER SWING ')+Math.round(flow.boost*100)+'%';$('pad').classList.toggle('powered',!!(P.rope||P.wall)&&flow.boost>.12);$('trick').disabled=!!P.flip;$('trick').textContent=flow.trickQueued>0?'↻ QUEUED':'↻ TRICK';$('zip').disabled=energy<30||zipCool>0;$('dive').classList.toggle('on',input.dive);hudTimer+=dt;if(hudTimer>.1||dt===0){hudTimer=0;$('distance').textContent=Math.floor(distance).toLocaleString();$('speed').textContent=Math.round(sp*3.6);$('height').textContent=Math.max(0,Math.floor(P.p[1]-RADIUS));$('score').textContent=Math.floor(score).toLocaleString();$('chain').textContent=trickBank?'+'+trickBank+' PENDING':'FLOW ×'+chain;$('energy').style.width=energy+'%';let mins=Math.floor(dayTime/600*1440);$('clock').textContent=String(Math.floor(mins/60)).padStart(2,'0')+':'+String(mins%60).padStart(2,'0');let district=['MIDTOWN','CHELSEA','FLATIRON','SOHO','LOWER EAST SIDE'][mod(Math.floor((P.p[2]+origin[1]*TILE)/864),5)],heading=mod(Math.round(P.yaw/(Math.PI/2)),4);$('district').textContent=district+' · '+['NORTHBOUND','WESTBOUND','SOUTHBOUND','EASTBOUND'][heading];$('hint').textContent=P.wall?'Wall running. Push up to climb; steer away or tap to leave.':risk>.4?'LOW ALTITUDE — CATCH A WEB, THEN ZIP':settings.swingMode==='FLOW'&&input.web?'Auto web is on. Steer left / right; push up for power.':rising?'Release now. Let the arc carry you into the next swing.':P.rope?'Push up for power. Tap a building to choose a specific catch.':trickBank?'Catch the next web to bank your trick.':elapsed<14?'Hold WEB for auto swings. Tap a building for one targeted swing.':'Steer and power with the stick. Tap a building to swing there.'}}
+function clearInput(){cancelSceneTap();input.x=input.y=input.reel=0;aimControl.active=false;aimControl.refresh=0;input.web=input.dive=false;keys.clear();for(let id of['pad','web','dive']){let el=$(id),pid=pointers[id];pointers[id]=null;if(pid!==null)try{el.releasePointerCapture(pid)}catch(e){}}$('knob').style.transform='';}
+function reset(){clearInput();resetTraversal();resetFlow();resetRig();resetLife();state='playing';elapsed=simTime=distance=score=maxSpeed=0;energy=100;chain=1;swingCount=trickBank=0;zipCool=wallCool=notice=0;origin=[0,0];P.p=[0,42,48];P.prev=[...P.p];P.v=[0,-5,46];P.rope=P.flip=null;P.yaw=0;P.acc=[0,0,0];P.pose={lean:0,leanV:0,lag:0,lagV:0,up:[0,1,0],prevUp:[0,1,0]};dayTime=400;cameraYaw=0;cam=[0,43.6,40.4];camLook=[0,42.2,53];target=null;targetTimer=0;aimControl.active=false;aimControl.refresh=0;aimControl.failed=0;lastSide=-1;blocks.clear();farBlocks.clear();centerKey='';ensureCity(true);populate();$('welcome').hidden=$('over').hidden=$('paused').hidden=true;$('hud').hidden=false;$('toast').style.opacity=0;accumulator=0;lastTime=performance.now();audioInit();refreshTarget();say('FIND YOUR FLOW','HOLD WEB · STEER & POWER · TAP A BUILDING');}
+function pause(){if(state!=='playing')return;navigation.resumeWeb=input.web;state='paused';clearInput();$('paused').hidden=false;syncSettings();if(windGain&&audio)windGain.gain.setTargetAtTime(0,audio.currentTime,.08);audioScene(0)}
 // A paused rope is preserved. Resume does not silently detach a finger that was cancelled by the OS.
-function resume(){if(state!=='paused')return;state='playing';$('paused').hidden=true;input.web=!!P.rope;accumulator=0;lastTime=performance.now();audioInit()}
+function resume(){if(state!=='paused')return;state='playing';$('paused').hidden=true;input.web=!!navigation.resumeWeb;accumulator=0;lastTime=performance.now();audioInit()}
 function syncSettings(){$('swingModeLabel').textContent=settings.swingMode==='FLOW'?'FLOW · ASSISTED':'MANUAL';$('modeBadge').textContent=settings.swingMode==='FLOW'?'FLOW ASSIST':'MANUAL';$('qualityLabel').textContent=settings.quality;$('audioLabel').textContent=settings.sound?'ON':'OFF';$('motionLabel').textContent=settings.motion?'CINEMATIC':'REDUCED';$('sound').textContent=settings.sound?'♪':'♪̸'}
 function toggleSound(){settings.sound=!settings.sound;audioInit();if(master&&audio)master.gain.setTargetAtTime(settings.sound?.45:0,audio.currentTime,.05);save();syncSettings()}
 const pointers={pad:null,web:null,dive:null};function capture(el,e){e.preventDefault();try{el.setPointerCapture(e.pointerId)}catch(err){}}
-function padMove(e){if(e.pointerId!==pointers.pad)return;let r=$('pad').getBoundingClientRect(),x=(e.clientX-r.left-r.width/2)/(r.width*.39),y=(e.clientY-r.top-r.height/2)/(r.height*.39),l=Math.hypot(x,y);if(l>1){x/=l;y/=l}input.x=Math.abs(x)<.055?0:x;input.y=Math.abs(y)<.055?0:y;refreshTarget();if(input.web&&!P.rope&&(settings.swingMode!=='FLOW'||flow.air>.16))attach();$('knob').style.transform=`translate(${x*r.width*.28}px,${y*r.height*.28}px)`}
+function padMove(e){if(e.pointerId!==pointers.pad)return;let r=$('pad').getBoundingClientRect(),x=(e.clientX-r.left-r.width/2)/(r.width*.39),y=(e.clientY-r.top-r.height/2)/(r.height*.39),l=Math.hypot(x,y);if(l>1){x/=l;y/=l}input.x=Math.abs(x)<.055?0:x;input.y=Math.abs(y)<.055?0:y;$('knob').style.transform=`translate(${x*r.width*.28}px,${y*r.height*.28}px)`}
 $('pad').onpointerdown=e=>{if(state!=='playing'||pointers.pad!==null)return;pointers.pad=e.pointerId;capture($('pad'),e);padMove(e)};$('pad').onpointermove=padMove;
-function padUp(e){if(e.pointerId!==pointers.pad)return;pointers.pad=null;input.x=input.y=0;aimControl.active=false;refreshTarget();$('knob').style.transform=''}for(let name of['pointerup','pointercancel','lostpointercapture'])$('pad').addEventListener(name,padUp);
-$('web').onpointerdown=e=>{if(state!=='playing'||pointers.web!==null)return;pointers.web=e.pointerId;capture($('web'),e);input.web=true;flow.air=.6;flow.manualRelease=0;if(!P.rope&&!attach())say('NO ANCHOR THERE','MOVE THE LEFT STICK · KEEP WEB HELD')};function webUp(e){if(e.pointerId!==pointers.web)return;pointers.web=null;input.web=false;release()}for(let name of['pointerup','pointercancel','lostpointercapture'])$('web').addEventListener(name,webUp);
+function padUp(e){if(e.pointerId!==pointers.pad)return;pointers.pad=null;input.x=input.y=0;aimControl.active=false;$('knob').style.transform=''}for(let name of['pointerup','pointercancel','lostpointercapture'])$('pad').addEventListener(name,padUp);
+$('web').onpointerdown=e=>{if(state!=='playing'||pointers.web!==null)return;pointers.web=e.pointerId;capture($('web'),e);input.web=true;flow.air=.6;flow.manualRelease=0;if(P.wall)exitWall('jump',true);if(!P.rope&&!attach())say('LOOKING FOR A CATCH','KEEP MOVING · HOLD WEB')};function webUp(e){if(e.pointerId!==pointers.web)return;pointers.web=null;input.web=false;release()}for(let name of['pointerup','pointercancel','lostpointercapture'])$('web').addEventListener(name,webUp);
 $('dive').onpointerdown=e=>{if(state!=='playing'||pointers.dive!==null)return;pointers.dive=e.pointerId;capture($('dive'),e);input.dive=true};function diveUp(e){if(e.pointerId!==pointers.dive)return;pointers.dive=null;input.dive=false}for(let name of['pointerup','pointercancel','lostpointercapture'])$('dive').addEventListener(name,diveUp);
 $('swingMode').onclick=()=>setSwingMode(settings.swingMode==='FLOW'?'MANUAL':'FLOW');$('start').onclick=reset;$('again').onclick=reset;$('restart').onclick=reset;$('pause').onclick=pause;$('resume').onclick=resume;$('sound').onclick=toggleSound;$('audioSetting').onclick=toggleSound;$('trick').onclick=doTrick;$('zip').onclick=doZip;$('quality').onclick=()=>{settings.quality=['AUTO','HIGH','LOW'][(['AUTO','HIGH','LOW'].indexOf(settings.quality)+1)%3];resize();save();syncSettings()};$('motion').onclick=()=>{settings.motion=!settings.motion;save();syncSettings()};
-addEventListener('keydown',e=>{if(state==='playing'&&['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','ShiftLeft','ShiftRight'].includes(e.code))e.preventDefault();if(e.repeat)return;if(e.code==='Escape'||e.code==='KeyP'){state==='paused'?resume():pause();return}if(state!=='playing')return;keys.add(e.code);if(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))refreshTarget();if(e.code==='Space'){input.web=true;flow.air=.6;flow.manualRelease=0;attach()}if(e.code==='KeyF')doTrick();if(e.code==='KeyE')doZip()});addEventListener('keyup',e=>{keys.delete(e.code);if(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)&&state==='playing')refreshTarget();if(e.code==='Space'){input.web=false;release()}});document.addEventListener('visibilitychange',()=>{if(document.hidden)pause()});addEventListener('contextmenu',e=>e.preventDefault());
+addEventListener('keydown',e=>{if(state==='playing'&&['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','ShiftLeft','ShiftRight'].includes(e.code))e.preventDefault();if(e.repeat)return;if(e.code==='Escape'||e.code==='KeyP'){state==='paused'?resume():pause();return}if(state!=='playing')return;keys.add(e.code);if(e.code==='Space'){input.web=true;flow.air=.6;flow.manualRelease=0;if(P.wall)exitWall('jump',true);attach()}if(e.code==='KeyF')doTrick();if(e.code==='KeyE')doZip()});addEventListener('keyup',e=>{keys.delete(e.code);if(e.code==='Space'){input.web=false;release()}});document.addEventListener('visibilitychange',()=>{if(document.hidden)pause()});addEventListener('contextmenu',e=>e.preventDefault());
+setupSceneTaps();
 let fpsTime=0,fpsFrames=0,previewTimer=0;function tick(dt){accumulator+=Math.min(dt,.25);let steps=0;while(accumulator+1e-10>=STEP&&steps<30){physics(STEP);agents(STEP);accumulator-=STEP;steps++;if(state!=='playing'){accumulator=0;break}}}
 function loop(now){let raw=Math.max(0,(now-lastTime)/1000);lastTime=now;let dt=Math.min(raw,.25);if(!fatal&&!manual){audioScene(dt);if(state==='playing'){tick(raw);if(windGain&&audio){windGain.gain.setTargetAtTime(Math.min(.7,len(P.v)/65),audio.currentTime,.12);windFilter.frequency.setTargetAtTime(250+len(P.v)*35,audio.currentTime,.12)}}else if(state==='menu'){simTime+=dt;agents(dt)}else if(windGain&&audio)windGain.gain.setTargetAtTime(0,audio.currentTime,.1);if(state!=='paused')render(dt,state==='playing'?accumulator/STEP:1);fpsTime+=raw;fpsFrames++;if(fpsTime>3){let fps=fpsFrames/fpsTime;if(settings.quality==='AUTO'&&state==='playing'){let next=clamp(renderScale+(fps<25?-.25:fps<42?-.12:fps>57?.04:0),.65,1.5);if(Math.abs(next-renderScale)>.01){renderScale=next;resize()}}fpsTime=fpsFrames=0}}requestAnimationFrame(loop)}
 ensureCity(true);populate();syncSettings();$('bestIntro').textContent='BEST · '+settings.best.toLocaleString()+' m';
-if(TEST)window.__webswing={P,input,settings,character:characterTelemetry,flow,rig,life,setSwingMode,powerValue,constants:{STEP,G,TILE,RADIUS},get state(){return state},get stats(){return{elapsed,distance,score,energy,swingCount,trickBank,dayTime,day,night,origin:[...origin],buildings:buildings.length,chunks:blocks.size,distantChunks:farBlocks.size,cars:cars.length,pedestrians:walkers.length,cyclists:cyclists.length,turns:life.turns,busStops:life.busStops,reactions:life.reactions,instances:city.n,overflows:city.overflows+props.overflows+foliage.overflows+hero.overflows+webs.overflows+mist.overflows,glError:gl.getError()}},get aim(){return{intent:aimIntent(),target:target?{p:[...target.p],side:target.side,x:target.x,y:target.y}:null}},refreshTarget,reelValue,project,get camera(){return{p:cam,look:camLook}},get agents(){return{cars,walkers,cyclists}},get buildings(){return buildings},start:reset,pause,resume,attach,release,trick:doTrick,zip:doZip,rebase,anchor:chooseAnchor,solveRope,rayBox,signal,manual(v=true){manual=v},step(n=1){for(let i=0;i<n;i++){physics(STEP);agents(STEP)}},tick,render(dt=0,alpha=1){render(dt,alpha)},setDay(t){dayTime=mod(t,600);lighting();render(0,1)},clearWorld(){buildings=[]},rebuild(){ensureCity(true)},setTime(t){simTime=t},setPosition(p,v=[0,0,30]){P.p=[...p];P.prev=[...p];P.v=[...v];target=null;aimControl.refresh=0;ensureCity(true)}};
+if(TEST)window.__webswing={P,input,settings,character:characterTelemetry,flow,rig,life,navigation,wallControl,tapControl,pickScreen,fireTap,surfaceAnchorValid,predictAnchor,nearestRunningWall,enterWall,exitWall,setSwingMode,powerValue,constants:{STEP,G,TILE,RADIUS},get state(){return state},get stats(){return{elapsed,distance,score,energy,swingCount,trickBank,dayTime,day,night,origin:[...origin],buildings:buildings.length,chunks:blocks.size,distantChunks:farBlocks.size,cars:cars.length,pedestrians:walkers.length,cyclists:cyclists.length,turns:life.turns,busStops:life.busStops,reactions:life.reactions,instances:city.n,overflows:city.overflows+props.overflows+foliage.overflows+hero.overflows+webs.overflows+mist.overflows,glError:gl.getError()}},get aim(){return{intent:aimIntent(),target:target?{p:[...target.p],side:target.side,x:target.x,y:target.y}:null}},refreshTarget,reelValue,project,get camera(){return{p:cam,look:camLook}},get agents(){return{cars,walkers,cyclists}},get buildings(){return buildings},start:reset,pause,resume,attach,release,trick:doTrick,zip:doZip,rebase,anchor:chooseAnchor,solveRope,rayBox,signal,manual(v=true){manual=v},step(n=1){for(let i=0;i<n;i++){physics(STEP);agents(STEP)}},tick,render(dt=0,alpha=1){render(dt,alpha)},setDay(t){dayTime=mod(t,600);lighting();render(0,1)},clearWorld(){buildings=[]},rebuild(){ensureCity(true)},setTime(t){simTime=t},setPosition(p,v=[0,0,30]){P.wall=null;P.p=[...p];P.prev=[...p];P.v=[...v];target=null;aimControl.refresh=0;ensureCity(true)}};
 requestAnimationFrame(loop);
 })();
 </script>
