@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#b4d6e2">
+<meta name="downhill-build" content="touch-start-3">
 <meta name="description" content="Endless downhill skiing with deformable snow, physical carving, big air and instant restarts.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -15,8 +16,8 @@
 html,body { margin:0; width:100%; height:100%; overflow:hidden; overscroll-behavior:none; background:#eaf3f5; }
 body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:var(--ink); touch-action:none; user-select:none; -webkit-user-select:none; }
 #game { position:fixed; inset:0; width:100%; height:100%; height:100dvh; overflow:hidden; isolation:isolate; }
-#snowMesh { position:absolute; inset:0; pointer-events:none; }
-#slope { position:absolute; inset:0; }
+#snowMesh { position:absolute; inset:0; z-index:0; pointer-events:none; }
+#slope { position:absolute; inset:0; z-index:1; }
 canvas { display:block; width:100%; height:100%; touch-action:none; outline:none; }
 .hud { position:absolute; z-index:2; inset:0 0 auto; padding:calc(env(safe-area-inset-top,0px) + 23px) 25px 0; display:flex; justify-content:space-between; pointer-events:none; transition:opacity .3s; font-variant-numeric:tabular-nums; }
 .hud.is-idle { opacity:.42; }
@@ -29,11 +30,14 @@ canvas { display:block; width:100%; height:100%; touch-action:none; outline:none
 .flow-track { width:45px; height:3px; border-radius:2px; background:rgba(44,85,99,.12); overflow:hidden; }
 #flowFill { display:block; height:100%; width:0; background:var(--accent); border-radius:2px; transition:width .15s linear; }
 #intro { pointer-events:none; position:absolute; z-index:3; top:30%; left:0; width:100%; text-align:center; transition:opacity .24s,transform .35s; }
-#intro.hidden { opacity:0; transform:translateY(-12px); }
+#intro.hidden { opacity:0; transform:translateY(-12px); visibility:hidden; }
 .eyebrow { font-size:9px; font-weight:750; letter-spacing:3px; margin:0 0 13px; opacity:.64; }
 h1 { margin:0; font-size:clamp(45px,14.8vw,78px); line-height:.98; letter-spacing:-3.9px; font-weight:900; }
 .title-dot { color:var(--accent); }
 .instruction { margin:23px 0 0; font-size:16px; font-weight:550; letter-spacing:.15px; }
+#start { appearance:none; -webkit-appearance:none; display:inline-block; pointer-events:auto; touch-action:manipulation; cursor:pointer; min-height:52px; padding:12px 24px; border:1px solid rgba(25,61,74,.14); border-radius:28px; background:rgba(255,255,255,.7); color:var(--ink); font-family:inherit; }
+#start:active { background:#fff; transform:scale(.97); }
+#start:focus-visible { outline:3px solid var(--accent); outline-offset:4px; }
 .gesture { display:block; width:66px; height:28px; margin:12px auto 0; overflow:visible; }
 .gesture circle { animation:carve 2.7s ease-in-out infinite; }
 @keyframes carve { 0%,100% { transform:translateX(-20px); } 50% { transform:translateX(20px); } }
@@ -74,7 +78,7 @@ h2 { font-size:45px; line-height:1.0; font-weight:850; letter-spacing:-2px; marg
 <div><div class="label">DISTANCE</div><div class="value"><span id="distance">0</span><span class="unit" id="distanceUnit">m</span></div></div>
 <div class="scorebox"><div class="label">SCORE</div><div class="value" id="score">0</div><div class="flow"><div class="flow-track"><i id="flowFill"></i></div><span id="multiplier">×1</span></div></div>
 </div>
-<div id="intro"><p class="eyebrow">THE MOUNTAIN NEVER ENDS</p><h1>DOWNHILL<span class="title-dot">.</span></h1><p class="instruction">Drag to carve</p><svg class="gesture" viewBox="0 0 66 28" aria-hidden="true"><path d="M7 17 Q33 -1 59 17" fill="none" stroke="#8baab2" stroke-width="1.5" stroke-linecap="round"/><circle cx="33" cy="14" r="4" fill="#e66c43"/></svg></div>
+<div id="intro"><p class="eyebrow">THE MOUNTAIN NEVER ENDS</p><h1>DOWNHILL<span class="title-dot">.</span></h1><button id="start" class="instruction" type="button" aria-label="Start skiing. Drag left or right to carve.">Tap or drag to ski</button><svg class="gesture" viewBox="0 0 66 28" aria-hidden="true"><path d="M7 17 Q33 -1 59 17" fill="none" stroke="#8baab2" stroke-width="1.5" stroke-linecap="round"/><circle cx="33" cy="14" r="4" fill="#e66c43"/></svg></div>
 <div id="desktopHint">DRAG TO CARVE &nbsp; / &nbsp; A D &nbsp; OR &nbsp; ← →</div>
 <section id="crash" aria-label="Run results" aria-hidden="true">
 <div class="result"><p class="eyebrow" id="crashEyebrow">A LITTLE TOO CLOSE</p><h2>One more run.</h2><div class="stats"><div class="stat"><strong id="finalDistance">0 m</strong><span>DISTANCE</span></div><div class="stat"><strong id="finalScore">0</strong><span>SCORE</span></div></div><button id="again" type="button"><span>Again</span><span class="again-arrow" aria-hidden="true">↗</span></button><p id="crashDetail">Fresh snow. A fresh line.</p></div>
@@ -83,6 +87,8 @@ h2 { font-size:45px; line-height:1.0; font-weight:850; letter-spacing:-2px; marg
 <script>
 (() => {
 'use strict';
+const stage = document.getElementById('game');
+const startButton = document.getElementById('start');
 const canvas = document.getElementById('slope');
 const ctx = canvas.getContext('2d', { alpha:true, desynchronized:true });
 const ui = Object.fromEntries(['hud','intro','desktopHint','distance','distanceUnit','score','multiplier','flowFill','crash','again','finalDistance','finalScore','crashEyebrow','crashDetail'].map(id => [id,document.getElementById(id)]));
@@ -103,6 +109,8 @@ let objects=[], route=[], clearings=[], tracks=[], particles=[], popups=[];
 let prevPlayerX=0, prevWorldZ=0;
 let player, stats;
 const input={pointer:null,screenX:0,targetX:0,active:false,keys:new Set()};
+let touchId=null,lastTouchAt=-1000,frameHandle=0,frameErrorReported=false,meshFailure=null;
+let meshInitQueued=false;
 const moods = [
 {snow:[239,247,249],pine:.35,rock:.85,powder:.20,ice:.06},
 {snow:[229,242,244],pine:1.8,rock:.28,powder:.30,ice:.02},
@@ -226,15 +234,18 @@ trackClock=0; sprayClock=0; fastClock=0; turnClock=0; hudClock=0;
 Snow.reset();camLift=naturalHeight(0,0);camBank=0;snowClock=0;carveSide=0;carveTravel=0;carveStartX=0;chainClock=0;
 player={x:0,angle:0,speed:13.2,airY:0,boost:0,snowDrag:0,air:0,vy:0,airTime:0,flight:0,trick:null,jumpKind:null,groundLift:0,landSquash:0,ice:false,powder:0,crashRotation:0,crashVX:0};
 stats={generated:0,jumps:0,landings:0,tricks:0,nearMisses:0,crashes:0,carves:0,links:0,maxCombo:1,rebases:0,peakObjects:0,peakParticles:0};
-input.pointer=null; input.active=false; input.targetX=0; input.keys.clear();
+input.pointer=null; input.active=false; input.targetX=0; input.keys.clear(); touchId=null;
+paused=false; frameErrorReported=false;
 accumulator=0; lastFrame=0;
 ui.intro.classList.toggle('hidden',start); ui.desktopHint.classList.toggle('hidden',start);
 ui.hud.classList.toggle('is-idle',!start); ui.crash.classList.remove('visible'); ui.crash.setAttribute('aria-hidden','true');
 generate(); updateHud(true);
 }
 function begin() {
+if(state==='crashed') return;
+paused=false; ensureFrame();
 if(state!=='idle') return;
-state='playing'; ui.intro.classList.add('hidden'); ui.desktopHint.classList.add('hidden'); ui.hud.classList.remove('is-idle');
+lastFrame=0; accumulator=0; state='playing'; ui.intro.classList.add('hidden'); ui.desktopHint.classList.add('hidden'); ui.hud.classList.remove('is-idle');
 }
 function updateHud(force=false) {
 if(!force&&hudClock<.09) return; hudClock=0;
@@ -545,6 +556,10 @@ function makeSnowRenderer() {
 const el=document.getElementById('snowMesh');
 const gl=el.getContext('webgl',{alpha:false,antialias:false,depth:true,powerPreference:'high-performance'});
 if(!gl)return null;
+// A missing GPU feature must never prevent the run from starting.
+if(gl.getParameter(gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS)<1)return null;
+const precision=gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER,gl.HIGH_FLOAT);
+if(!precision||precision.precision===0)return null;
 let lost=false;
 const vertex=`precision highp float;
 attribute vec2 position;
@@ -634,7 +649,7 @@ float fog=smoothstep(30.,240.,world.z);
 col=mix(col,vec3(.79,.875,.91),fog*.91);
 gl_FragColor=vec4(col,1.);
 }`;
-const skyVertex=`attribute vec2 position;varying vec2 uv;void main(){uv=position*.5+.5;gl_Position=vec4(position,0.,1.);}`;
+const skyVertex=`precision mediump float;attribute vec2 position;varying vec2 uv;void main(){uv=position*.5+.5;gl_Position=vec4(position,0.,1.);}`;
 const skyFragment=`precision mediump float;varying vec2 uv;uniform float aspect;uniform float drift;uniform float warmth;
 float ridge(float x,float k,float p){return (1.-abs(fract(x*k*.28+p)*2.-1.))*.075+(1.-abs(fract(x*k*.51+p*.7)*2.-1.))*.022;}
 void main(){
@@ -661,9 +676,9 @@ const loc={},sloc={};for(const k of ['camera','view','phases','fieldRange','effe
 for(const k of ['aspect','drift','warmth'])sloc[k]=gl.getUniformLocation(sky,k);
 const xs=[-95,-70,-50,-38,-30],zs=[];
 for(let x=-29.5;x<-14.5;x+=.5)xs.push(x);
-for(let x=-14.5;x<=14.501;x+=.16)xs.push(x);
+for(let x=-14.5;x<=14.501;x+=.22)xs.push(x);
 for(let x=14.8;x<=30;x+=.5)xs.push(x);xs.push(38,50,70,95);
-for(let z=-18;z<9;z+=.2)zs.push(z);for(let z=9;z<40;z+=.85)zs.push(z);for(let z=40;z<100;z+=2.5)zs.push(z);for(let z=100;z<=268;z+=6)zs.push(z);
+for(let z=-18;z<9;z+=.28)zs.push(z);for(let z=9;z<40;z+=.85)zs.push(z);for(let z=40;z<100;z+=2.5)zs.push(z);for(let z=100;z<=268;z+=6)zs.push(z);
 const verts=new Float32Array(xs.length*zs.length*2),idx=new Uint16Array((xs.length-1)*(zs.length-1)*6);
 let at=0;for(const z of zs)for(const x of xs){verts[at++]=x;verts[at++]=z;}
 at=0;for(let j=0;j<zs.length-1;j++)for(let i=0;i<xs.length-1;i++){const a=j*xs.length+i,b=a+1,c=a+xs.length,d=c+1;idx.set([a,c,b,b,c,d],at);at+=6;}
@@ -674,7 +689,7 @@ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri
 const ramps=new Float32Array(24),depths=new Float32Array(24);let uploaded=-1;
 function attrib(prog,b){gl.bindBuffer(gl.ARRAY_BUFFER,b);const a=prog===p?pa:sa;gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,2,gl.FLOAT,false,0,0);}
 el.onwebglcontextlost=e=>{e.preventDefault();lost=true;el.style.opacity=0;};
-el.onwebglcontextrestored=()=>{lost=false;snowRenderer=makeSnowRenderer();snowRenderer.resize();el.style.opacity=1;};
+el.onwebglcontextrestored=()=>{snowRenderer=null;queueSnowRenderer();};
 return {resize(){const ratio=Math.min(DPR,1.5);el.width=Math.round(W*ratio);el.height=Math.round(H*ratio);gl.viewport(0,0,el.width,el.height);},
 get alive(){return !lost;},
 render(){
@@ -922,7 +937,9 @@ ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+side*phase*6,y+12+phase*22); ctx.
 }
 function render() {
 scale=baseScale*(1-clamp((player.speed-15)/24,0,.06));camHeight=(playerY-horizon)/scale;
+try {
 if(snowRenderer?.alive)snowRenderer.render();
+} catch(error) { disableSnowRenderer(error); }
 ctx.setTransform(DPR,0,0,DPR,0,0);ctx.clearRect(0,0,W,H);
 ctx.save();
 if(shake>.05&&!reducedMotion) ctx.translate(Math.sin(ambientClock*67)*shake,Math.cos(ambientClock*81)*shake*.65);
@@ -941,43 +958,104 @@ if(o.type==='tree') drawTree(o); else if(o.type==='rock') drawRock(o); else if(o
 if(!drawn) drawSkier();
 drawParticles(); drawSpeed(); drawPopups(); ctx.restore();
 }
+// Schedule the next frame before drawing: a GPU error cannot kill input or the run.
+function ensureFrame() { if(!frameHandle)frameHandle=requestAnimationFrame(frame); }
+function disableSnowRenderer(error) {
+meshFailure=String(error?.message||error||'Snow renderer unavailable');
+snowRenderer=null; document.getElementById('snowMesh').style.opacity='0';
+console.warn('Snow renderer disabled; continuing with canvas terrain.',meshFailure);
+}
+function queueSnowRenderer() {
+if(meshInitQueued)return;
+meshInitQueued=true;
+// Let the start screen paint and register input before compiling optional graphics.
+requestAnimationFrame(()=>setTimeout(()=>{
+meshInitQueued=false;
+try {
+snowRenderer=makeSnowRenderer();
+if(snowRenderer) { snowRenderer.resize(); document.getElementById('snowMesh').style.opacity='1'; }
+} catch(error) { disableSnowRenderer(error); }
+},0));
+}
 function frame(stamp) {
+frameHandle=0; ensureFrame();
 const dt=lastFrame?Math.min((stamp-lastFrame)/1000,.075):0; lastFrame=stamp;
-if(!paused) {
-ambientClock+=dt;
-accumulator+=dt;
+if(paused)return;
+try {
+ambientClock+=dt; accumulator+=dt;
 let iterations=0;
 while(accumulator>=STEP&&iterations<10) { update(STEP); accumulator-=STEP; iterations++; }
 render();
+} catch(error) {
+if(!frameErrorReported) {console.error('Downhill frame recovered:',error);frameErrorReported=true;}
+disableSnowRenderer(error);
+// Reset the 2D drawing stack as well, without resetting the player's progress.
+canvas.width=canvas.width;
 }
-requestAnimationFrame(frame);
 }
-function aim(x) { input.screenX=x; input.targetX=clamp(camX+(x-W*.5)/scale,-HALF,HALF); }
-canvas.addEventListener('pointerdown',e=>{
-if(state==='crashed'||input.pointer!==null||e.button>0) return;
-e.preventDefault(); begin(); input.pointer=e.pointerId; input.active=true; aim(e.clientX);
-try { canvas.setPointerCapture(e.pointerId); } catch {}
-});
-canvas.addEventListener('pointermove',e=>{ if(e.pointerId!==input.pointer) return; e.preventDefault(); aim(e.clientX); });
-function release(e) { if(e.pointerId!==input.pointer) return; input.pointer=null; input.active=false; }
-canvas.addEventListener('pointerup',release); canvas.addEventListener('pointercancel',release); canvas.addEventListener('lostpointercapture',release);
+function aim(x) {
+const localX=x-stage.getBoundingClientRect().left;
+input.screenX=localX; input.targetX=clamp(camX+(localX-W*.5)/scale,-HALF,HALF);
+}
+function clearInput() {input.pointer=null;input.active=false;input.keys.clear();touchId=null;}
+function isRestartTarget(target) {return target instanceof Element&&!!target.closest('#again');}
+function claimPointer(e) {
+if(state==='crashed'||isRestartTarget(e.target)||input.pointer!==null)return;
+if(e.pointerType==='mouse'&&(e.button!==0||performance.now()-lastTouchAt<650))return;
+if(e.cancelable)e.preventDefault();
+begin(); input.pointer=e.pointerId;input.active=true;aim(e.clientX);
+try {stage.setPointerCapture(e.pointerId);} catch {}
+}
+// The entire stage receives input, including a tap on the instruction itself.
+stage.addEventListener('pointerdown',claimPointer,{passive:false,capture:true});
+window.addEventListener('pointermove',e=>{
+if(e.pointerId!==input.pointer)return;
+if(e.cancelable)e.preventDefault();aim(e.clientX);
+},{passive:false});
+function releasePointer(e) {if(e.pointerId!==input.pointer)return;input.pointer=null;input.active=false;}
+window.addEventListener('pointerup',releasePointer);
+window.addEventListener('pointercancel',releasePointer);
+stage.addEventListener('lostpointercapture',releasePointer);
+// Native Touch Events are not conditional on PointerEvent feature detection.
+// Some embedded browsers expose PointerEvent but do not deliver touch pointers.
+// On browsers firing both, the first native touch takes over the same gesture.
+stage.addEventListener('touchstart',e=>{
+if(state==='crashed'||isRestartTarget(e.target)||touchId!==null)return;
+const t=e.changedTouches[0];if(!t)return;
+if(e.cancelable)e.preventDefault();lastTouchAt=performance.now();
+touchId=t.identifier;input.pointer='touch:'+touchId;input.active=true;begin();aim(t.clientX);
+},{passive:false,capture:true});
+window.addEventListener('touchmove',e=>{
+if(touchId===null)return;
+const t=Array.from(e.touches).find(t=>t.identifier===touchId);if(!t)return;
+if(e.cancelable)e.preventDefault();aim(t.clientX);
+},{passive:false});
+function releaseTouch(e) {
+if(touchId===null||!Array.from(e.changedTouches).some(t=>t.identifier===touchId))return;
+lastTouchAt=performance.now();touchId=null;input.pointer=null;input.active=false;
+}
+window.addEventListener('touchend',releaseTouch);
+window.addEventListener('touchcancel',releaseTouch);
+// Native click works for assistive activation and browser tap-only event paths.
+stage.addEventListener('click',e=>{if(state==='idle'&&!isRestartTarget(e.target))begin();});
+startButton.addEventListener('click',e=>{e.preventDefault();begin();});
 window.addEventListener('keydown',e=>{
 const key=e.key.length===1?e.key.toLowerCase():e.key;
 if(['ArrowLeft','ArrowRight','a','d',' ','Enter'].includes(key)) {
 e.preventDefault();
-if(state==='crashed') { if((key===' '||key==='Enter')&&resultShown) reset(); return; }
-begin(); if(key!==' '&&key!=='Enter') input.keys.add(key);
+if(state==='crashed') {if((key===' '||key==='Enter')&&resultShown){reset();ensureFrame();}return;}
+begin();if(key!==' '&&key!=='Enter')input.keys.add(key);
 }
 });
 window.addEventListener('keyup',e=>input.keys.delete(e.key.length===1?e.key.toLowerCase():e.key));
-window.addEventListener('blur',()=>{input.keys.clear();input.active=false;input.pointer=null;});
-ui.again.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();reset();canvas.focus({preventScroll:true});});
-document.addEventListener('visibilitychange',()=>{paused=document.hidden;lastFrame=0;accumulator=0;input.active=false;input.pointer=null;input.keys.clear();});
+window.addEventListener('blur',clearInput);
+ui.again.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();reset();ensureFrame();canvas.focus({preventScroll:true});});
+document.addEventListener('visibilitychange',()=>{paused=document.hidden;lastFrame=0;accumulator=0;clearInput();if(!paused)ensureFrame();});
+window.addEventListener('pageshow',()=>{paused=false;lastFrame=0;accumulator=0;clearInput();ensureFrame();});
 window.addEventListener('resize',resize);
-if(window.visualViewport) window.visualViewport.addEventListener('resize',resize);
+if(window.visualViewport)window.visualViewport.addEventListener('resize',resize);
 window.addEventListener('contextmenu',e=>e.preventDefault());
-try {snowRenderer=makeSnowRenderer();}catch(e){console.warn('Snow mesh fallback:',e);}
-resize(); reset(freshSeed(),false); requestAnimationFrame(frame);
+resize();reset(freshSeed(),false);ensureFrame();queueSnowRenderer();
 if(new URLSearchParams(location.search).has('test')) {
 window.__downhill={
 start:s=>reset(s===undefined?freshSeed():s,true),
@@ -989,7 +1067,8 @@ for(let i=0;i<maxSeconds/STEP&&distance<target&&state==='playing';i++) { input.a
 input.active=false;render();return window.__downhill.snapshot();
 },
 pathAt, corridorAt,
-snow:()=>({...Snow.inspect(),renderer:snowRenderer?.inspect()}),
+snow:()=>({...Snow.inspect(),renderer:snowRenderer?.inspect(),failure:meshFailure}),
+inputStatus:()=>({touchId,frameHandle,paused}),
 snowSample:(x,z)=>Snow.sample(x,z),
 snowCut:(x,z,a,p)=>Snow.cut(x,z,a,p,.8),
 snowImpact:(x,z,p)=>Snow.impact(x,z,p),
