@@ -110,6 +110,8 @@ with sync_playwright() as playwright:
                 small.goto(URL, wait_until='load')
                 small.wait_for_function('Boolean(window.__webswing)')
                 small.evaluate('window.__webswing.manual(true)')
+                bounds = small.evaluate('''()=>{const e=document.querySelector('#welcome h1 span'),r=document.createRange();r.selectNodeContents(e);const title=r.getBoundingClientRect(),button=document.getElementById('start').getBoundingClientRect(),eyebrow=document.querySelector('#welcome .eyebrow').getBoundingClientRect();return {left:title.left,right:title.right,top:eyebrow.top,bottom:button.bottom,width:innerWidth,height:innerHeight}}''')
+                check(name, f'welcome title and start button fit {width}x{height} without scrolling', bounds['left']>=0 and bounds['right']<=bounds['width'] and bounds['top']>=0 and bounds['bottom']<=bounds['height'], bounds)
                 small.screenshot(path=str(OUT / f'{name}-welcome-{width}.png'))
                 small.locator('#start').tap()
                 check(name, f'actual touch starts from {width}x{height} welcome layout', small.evaluate('window.__webswing.state') == 'playing')
