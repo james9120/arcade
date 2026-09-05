@@ -25,3 +25,4 @@ rep("P.v=[0,-1,32]","P.v=[0,-3,36]",'reset launch')
 rep("const P={p:[0,48,55],v:[0,-1,32]","const P={p:[0,48,55],v:[0,-3,36]",'initial launch')
 p.write_text(s)
 print('HEAVY_PASS_OK')
+# trigger-v2
