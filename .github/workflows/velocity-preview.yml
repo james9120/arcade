@@ -1,0 +1,38 @@
+name: Velocity preview
+on:
+  push:
+    branches: [fix/web-swing-pace-and-character]
+    paths:
+      - tests/velocity_*.py
+      - .github/workflows/velocity-preview.yml
+permissions:
+  contents: read
+concurrency:
+  group: velocity-preview
+  cancel-in-progress: true
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      LIBGL_ALWAYS_SOFTWARE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare single-file candidate and checks
+        run: |
+          python tests/velocity_preview.py
+          python tests/velocity_checks.py
+          python -c "from pathlib import Path; s=Path('games/web-swing/index.html').read_text(); Path('/tmp/game.js').write_text(s.split('<script>')[1].split('</script>')[0])"
+          node --check /tmp/game.js
+      - run: pip install playwright==1.55.0
+      - run: playwright install --with-deps chromium webkit
+      - run: python tests/web_swing_browser.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: velocity-preview-results
+          path: test-results/
+          retention-days: 7
