@@ -2,6 +2,8 @@
 
 ## Read this first
 
+**Implementation update, 5 September 2026:** see [MOVEMENT_REVIEW.md](MOVEMENT_REVIEW.md) for the branch's momentum redesign, changed test contracts, reference observations, rendered-motion evidence, measured performance and remaining limitations. The baseline/history below is preserved as handoff context.
+
 The owner has asked to move this project from ChatGPT development to Codex. This document is the self-contained handoff; do not assume the original ChatGPT conversation is available to your task.
 
 **The current game is not accepted.** The latest player feedback was: "this is pretty awful lol do some research on the PS2 spiderman game. That's exactly what I'm looking for". Earlier changes passed automated tests, but the player continued to reject the movement, aiming, animation and overall feel. Do not use a large passing-test count or a long automatic survival run as evidence that those problems are solved.
