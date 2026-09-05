@@ -1,0 +1,28 @@
+name: Apply Spider-Man Character Motion Overhaul
+on:
+  push:
+    branches: [main]
+    paths:
+      - games/web-swing/motion_overhaul.py
+      - .github/workflows/apply-character-overhaul.yml
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Apply character overhaul
+        run: python3 games/web-swing/motion_overhaul.py
+      - name: Remove temporary files
+        run: rm games/web-swing/motion_overhaul.py .github/workflows/apply-character-overhaul.yml
+      - name: Commit generated game
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "Overhaul Spider-Man character motion"
+          git push origin HEAD:main
