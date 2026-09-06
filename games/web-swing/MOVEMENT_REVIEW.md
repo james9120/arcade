@@ -1,0 +1,105 @@
+# Historical second pass: direct controls and Normal swinging
+
+**Superseded by [REFERENCE_REVIEW.md](REFERENCE_REVIEW.md).** The owner has now confirmed Spider-Man 2 (2004). The observations and measurements below describe the rejected `1533549` build, not the latest implementation.
+
+**Still unaccepted.** The owner rejected the first pass: steering/power remained weak, and it did not feel like the PS2 game. The owner now requests a 1:1 match. Spider-Man 2 (2004) is still a working assumption; a question confirming the title is pending. This update is not a claim of reference parity. Ground contact still ends the run.
+
+## Verified reference and deliberate adaptations
+
+The [PS2 instruction booklet, mirrored on Scribd](https://www.scribd.com/document/786519166/Spider-Man-2), pages 8–9 and 14, distinguishes Easy hold/release from Normal tap-to-attach swinging. Normal uses a separately charged jump, air steering, and a boost most effective at the bottom. That is a materially different loop from default automatic chaining. The booklet is a control reference, not exact physics constants or animation data.
+
+This branch now defaults to Normal: tap WEB/Space to latch a real automatically selected surface, hold JUMP/X to charge, release to launch. A valid second WEB tap replaces the line without changing position or velocity; an invalid one retains it. Precise scene taps also latch in Normal. Easy hold/release and optional FLOW automatic chaining remain in Pause. Mobile up-stick combines power and progressive reeling; this mapping and the constants below are original adaptations, not a reproduced PS2 implementation. Two-web braking, original ground traversal, controller mapping, map and animation assets are not reproduced.
+
+## Direct movement changes
+
+- Steering rotates momentum immediately: 1.9 rad/s in the air and 2.4 rad/s within a taut rope's tangent plane. A 90-degree air turn now takes approximately 0.83 seconds. Neutral retains that heading; steering alone adds no speed.
+- Up adds stronger acceleration weighted toward the bottom, with work tapering near 78 m/s total speed. Up also adds forward drive in the air while gravity remains active. With identical 0.83-second air-turn inputs, the previous build turns 28.74 degrees and this build turns 90.72 degrees. In a half-second free-air test, horizontal speed goes from 30 to 41.85 m/s with up, versus 29.90 without. Stamina falls by 4.56 points. Continuous upward air thrust was tested and discarded.
+- JUMP reaches full charge in 0.85 seconds. A full release adds 24 m/s upward and 10.08 m/s along the current horizontal heading; a quick tap adds approximately 6 and 2.52. It works while descending and independently of up-stick. One air jump is available per catch. Pointer cancellation, lost capture and pause clear charge without launching.
+- Easy/FLOW retain the optional up + WEB-release launch, now capped at 14 m/s added velocity. Passive/automatic release still preserves momentum.
+- The camera follows actual heading more quickly and sits closer. Obstruction checks now run after camera smoothing so interpolation cannot carry it through a facade. Roof collision uses full-body vertical clearance instead of the old 0.4 m torso radius, which visibly buried the legs. Charging tucks the legs, flight has stronger asymmetry/forward pitch, and turns visibly bank the body.
+
+## Validation contracts
+
+The quarter-turn timing test changed to the new deliberate response target; the powered-release work bound changed from 7 to 14 m/s. New checks cover Normal latching, invalid replacement behavior, independent jump charge, descending launch, one-air-jump limit, real touch and keyboard controls, cancellation ownership, no steering energy, forward air power without upward thrust, frame-rate invariance, final camera obstruction and full-body roof clearance at 100 m/s downward speed.
+
+**188/188 local checks passed** in Chromium 140 and desktop WebKit 26.0, Playwright 1.55.0. Tested raw working-file Git blob: `963b8872af28b19903a2bb4bc58b76e400a627fd`. Native RTX 5090/D3D11 browser playtest: 4.2/8.3 ms median/p95 RAF cadence, 8.000 simulated seconds in approximately 8.00 wall seconds; 1,747 samples, 390×844 CSS viewport and 581×1258 drawing buffer. This measures frame cadence, not GPU work duration. This native sample preceded the final camera/roof fixes. A final separate software Chromium/SwiftShader run measured 133.3/316.7 ms median/p95 over 46 frames, 5.242 simulated seconds in 6.062 wall seconds (0.865 ratio); the existing 250 ms frame cap drops simulation time during stalls. No physical phone was tested.
+
+The distant-tap-to-FLOW test now asserts the actual resumption transition (which occurs around 2.3 seconds), instead of ten seconds of subsequent hands-off survival. The changed camera projects its fixed screen point onto a different valid surface, and that path later hits a wall and dies around 7.4 seconds. This is recorded as a remaining movement problem, not reported as a fixed route. Other collision, long-tap slack, input, resource, clock, rebase and layout checks remain.
+
+## Rendered review and limitations
+
+Eight reproducible clips are generated by `tests/web_swing_motion.py`. Normal shows three deliberate catches/jumps over eight seconds, but the last late catch loses horizontal speed against a facade. The four-second quarter-turn clip makes the new response obvious, then still contacts a wall. Low recovery climbs substantially and remains airborne for eight seconds. Neutral FLOW and optional-tap routes also remain airborne for eight seconds. The old powered-FLOW script dies at 6.58 seconds; oversteering dies at 4.04 seconds. A Normal wall-run/charged-push-off sequence makes two catches before a later wall contact and ground failure at 7.35 seconds. The earlier fixed wall-exit script was replaced with the new JUMP control and a shorter steering pulse; the original prolonged input oversteered and failed at 1.82 seconds.
+
+The character is more readable, but its procedural poses and wall gait do not match the original animation. Close-wall views can still be cramped. Original PS2 tuning has not been measured directly; neither a short successful clip nor passing tests establishes a 1:1 match. Native desktop and software-browser measurements are separate from physical-phone performance, which has not been tested.
+
+The previous pass's notes below are retained as history, not current validation or player acceptance.
+
+---
+# Movement takeover — 5 September 2026
+
+This is a playable movement milestone on `codex/web-swing-ps2-handoff`, not player acceptance or a deployment. Spider-Man 2 (2004) remains the working reference; the owner has not confirmed the exact PS2 title. Ground contact still ends the run.
+
+## Reference and design decisions
+
+Jamie Fristrom's [constraint-based swinging article](https://code.tutsplus.com/swinging-physics-for-player-movement-as-seen-in-spider-man-2-and-energy-hook--gamedev-8782t) documents a physics-based approach that preserves momentum through transitions. It describes implementation principles, not the precise PS2 tuning. The [GDC postmortem page](https://www.gdcvault.com/play/1025725/Classic-Game-Design-Postmortem-Swinging) was opened; the talk was not watched.
+
+The browser review also inspected [Gamerizz's PS2-labelled gameplay recording](https://www.youtube.com/watch?v=zYdQQQVbuJY), including the facade catch at approximately 12:39 and the following descent/ground transition. The recording does not establish the selected swing mode or physical controller input. These are limited observations, not a claim to have inspected the complete game or verified an exact button mapping.
+
+| Aspect | Evidence and application |
+| --- | --- |
+| Catch selection | Recording shows a strand leading toward building geometry. Retain real visible facade selection, exact optional tap hits, and no catch teleport. |
+| Swing duration | Physics article supports a continuous constraint rather than canned motion. Our timing is an original tuning choice: sustain an arc before a rising release, with a longer window while powering. |
+| Bottom-of-arc power | Inference/design: concentrating player work near the low point makes the descent/rise rhythm legible. Power is tangential, speed tapered, and distinct from neutral assistance. |
+| Release versus launch | Momentum continuity follows the article. Our up + WEB-release charge interaction is an original mobile adaptation, not a claimed PS2 mapping. Passive, automatic, and cancelled releases preserve velocity. |
+| Steering | Design: direction follows velocity at arbitrary headings. Removed street-axis locking and the street-centering acceleration. |
+| Wall transitions | Existing glancing-contact run, stamina and push-off are retained. Gait phase now follows distance travelled. No claim that the inspected recording demonstrated this wall-run implementation. |
+| Silhouette | Recording distinguishes hanging reach from compact ground recovery. Our swing feet and torso respond to load/rise while the fixed-clock IK blend preserves bone lengths. Ground recovery was not copied because ground failure remains required. |
+| Camera | Recording uses a following third-person view with changing pitch. Existing following camera and facade sweep are retained; camera behavior is not presented as a PS2 reproduction. |
+
+## What changed
+
+- Neutral stick no longer reels toward a target altitude or pulls the player toward a street center. FLOW still provides bounded tangential assistance and automatic chaining; it does not promise hands-off survival.
+- Stronger lateral authority on-web and in the air. Power pumps through the bottom, progressively reels at 6 m/s, and tapers its added acceleration at high speed.
+- Up while swinging earns charge; releasing WEB while still pushing up and rising spends charge for a bounded launch. A visible hint identifies the launch window. Pointer cancellation and lost capture never launch.
+- Automatic facade ranking prefers higher catches and predicts 1.5 seconds rather than 0.9 seconds, covering the bottom of the first arc. Bad taps leave the current rope intact.
+- More asymmetric loaded/rising leg poses, velocity-dependent swing pitch, and distance-driven wall gait.
+
+No new runtime assets, libraries, build step, deployment changes, or changes to other games.
+
+## Validation contracts
+
+The original baseline passed 148/148 checks. This did not establish satisfactory movement.
+
+Three obsolete tests required 45–180 seconds of automatic survival, including powered and varied inputs. Those depended on the removed centering/altitude controller. They are explicitly replaced with sustained-arc timing, a quarter turn with no neutral heading correction, progressive power, charged versus passive release, and rendered launch/recatch checks. The city activity test now advances three minutes independently of player survival. The tap-to-FLOW test checks the actual resumption transition rather than demanding fifteen seconds of subsequent survival.
+
+Swept collision, unilateral rope/energy behavior, no catch teleport, precise taps, multitouch ownership, pause/cancel/reset, bone lengths, bounded city/mesh resources, day/night, floating origin, portrait/landscape and 320px layout checks remain.
+
+Final result: **156/156 checks passed** in Chromium 140 and desktop WebKit 26.0 on Windows with Playwright 1.55.0. The tested raw HTML SHA-1 blob is `7f17a2f2a0fb21af71a90f69190ef169429a0724` (raw Windows working-file bytes, not a commit SHA). Rendered scenarios reported no WebGL errors.
+
+Measured performance is environment-specific:
+
+| Environment | Sample | Median / p95 frame interval | Simulation / wall time |
+| --- | --- | --- | --- |
+| In-app Chromium, RTX 5090 / D3D11, portrait iframe 390×844, drawing buffer 519×1123 | 1,717 parent RAF intervals during actual gameplay | 4.2 / 8.3 ms | 7.983 / 8.01 seconds (~1.00) |
+| Headless Chromium 140, ANGLE SwiftShader, 390×844, separate live run with no captures | 41 RAF intervals | 133.3 / 416.7 ms | 5.333 / 6.22 seconds (~0.86) |
+
+The first measures browser frame cadence alongside live simulation, not GPU render duration. The second is slow software rendering and exposes the existing 250 ms frame cap dropping simulation time under long stalls. Neither is evidence of physical-iPhone performance. Offline WebM clips are not used as FPS evidence.
+
+Run the pinned dependency workflow in CODEX_HANDOFF.md, then:
+
+```sh
+python tests/web_swing_browser.py
+# In another terminal, serve the repository:
+python -m http.server 8000 --bind 127.0.0.1
+python tests/web_swing_motion.py
+```
+
+The motion runner produces JPEG sequences and trajectories under `test-results/movement/`. Optionally set `FFMPEG_EXECUTABLE` to a local ffmpeg with MJPEG input and VP8/WebM output to encode clips. `MOTION_SCENARIOS=turn,power` reruns specific clips. Frames are offline 12 fps; the separate live sample in `performance.json` measures actual wall time. Captures are deliberately excluded from commits.
+
+Set `PERFORMANCE_ONLY=1` to rerun the live software-browser measurement without captures.
+
+## Visible limitations and next work
+
+The eight-second neutral, powered-launch, wall-push-off and tap routes remain airborne. A deliberate intersection turn is demonstrated over four seconds with a real catch afterward. A poorly timed held turn collides with facades and ends at roughly 6.28 seconds. A low catch recovers but later loses nearly all speed at a facade. These outcomes are included in the capture set, not hidden by an invulnerability mode.
+
+The character remains procedural and small in portrait view. Wall gait can look skittery at high speed, and close-wall camera framing can fill much of the view with a facade. Long neutral or all-up routes are not guaranteed; automatic selection still needs work after sustained wall contact. Next: player review of the swing/launch feel, improve wall-exit catch options without reintroducing automatic street steering, and test on a physical phone before making mobile-performance claims.
