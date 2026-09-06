@@ -2,7 +2,7 @@
 
 ## Read this first
 
-**Implementation update, 5 September 2026:** see [MOVEMENT_REVIEW.md](MOVEMENT_REVIEW.md) for the branch's momentum redesign, changed test contracts, reference observations, rendered-motion evidence, measured performance and remaining limitations. The baseline/history below is preserved as handoff context.
+**Implementation update, 5 September 2026:** see [MOVEMENT_REVIEW.md](MOVEMENT_REVIEW.md) for the unaccepted first pass and subsequent Normal swing-jump/direct-steering rebuild, changed test contracts, reference observations, rendered-motion evidence, measured performance and remaining limitations. The owner now requests a 1:1 PS2 match; this has not been achieved or claimed. The baseline/history below is preserved as handoff context.
 
 The owner has asked to move this project from ChatGPT development to Codex. This document is the self-contained handoff; do not assume the original ChatGPT conversation is available to your task.
 
