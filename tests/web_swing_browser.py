@@ -180,6 +180,10 @@ with sync_playwright() as playwright:
                 small.locator('#start').tap()
                 check(name, f'actual touch starts from {width}x{height} welcome layout', small.evaluate('window.__webswing.state') == 'playing')
                 small.close()
+            page.goto(URL + '&practice', wait_until='load')
+            page.wait_for_function('Boolean(window.__webswing)')
+            practice = page.evaluate('''()=>{const g=__webswing;g.start();g.manual(true);g.setSwingMode('NORMAL');g.step(30);const grounded=g.P.grounded&&g.state==='playing';g.input.y=-1;g.jumpDown();g.step(108);const run=g.stats.distance;g.jumpUp();const first=g.P.v[1],airAvailable=!g.jumpControl.airUsed;g.step(40);const y=g.P.p[1];g.webPress();g.step(50);const caught=!!g.P.rope;g.jumpDown();g.step(60);g.jumpUp();const second=g.P.v[1];g.jumpDown();g.jumpUp();const noThird=g.P.v[1]===second;g.setPosition([0,1.08,48],[0,-20,0]);g.step(30);g.render();return{grounded,run,first,y,caught,airAvailable,noThird,landed:g.P.grounded&&g.state==='playing',label:document.querySelector('#welcome .eyebrow').textContent,gl:g.stats.glError}}''')
+            check(name, 'isolated city practice supports run, charged takeoff, one air jump and landing', practice['grounded'] and practice['run']>5 and practice['first']>23 and practice['y']>7 and practice['caught'] and practice['airAvailable'] and practice['noThird'] and practice['landed'] and 'PRACTICE' in practice['label'] and practice['gl']==0, practice)
             check(name, 'no uncaught JavaScript or WebGL errors', not errors and page.evaluate('window.__webswing.stats.glError') == 0, errors)
         except Exception as error:
             results.append({'browser': name, 'name': 'browser execution', 'pass': False, 'error': str(error), 'trace': traceback.format_exc()})

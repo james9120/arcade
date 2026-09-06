@@ -4,7 +4,7 @@ Scope: this directory. For Web Swing tasks, also read `games/web-swing/CODEX_HAN
 
 ## Product direction
 
-The current game is an unaccepted prototype. The owner wants the feeling of the PS2 Spider-Man game, provisionally Spider-Man 2 (2004), not merely an automated controller that stays airborne. The exact title was not confirmed. Prioritize a controllable, satisfying swing/launch rhythm, clear movement, camera framing and strong animated poses before adding spectacle.
+The current game is an unaccepted prototype. The owner wants the feeling of the PS2 Spider-Man game, Spider-Man 2 (2004), not merely an automated controller that stays airborne. The owner explicitly confirmed Spider-Man 2 (2004) in the latest feedback and requested footage-led replication. Prioritize a controllable, satisfying swing/launch rhythm, clear movement, camera framing and strong animated poses before adding spectacle.
 
 The latest approved interaction direction is movement-only left stick with useful up-stick power, natural automatic web selection, optional tap-to-swing, and close-pass wall running. Do not reintroduce a separate thumb-controlled anchor cursor. The original ground-contact failure rule remains in force until the owner approves changing it; landing/free-roam alternatives are proposals, not approved replacements.
 

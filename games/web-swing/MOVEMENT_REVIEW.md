@@ -1,4 +1,6 @@
-# Direct controls and Normal swinging — second pass
+# Historical second pass: direct controls and Normal swinging
+
+**Superseded by [REFERENCE_REVIEW.md](REFERENCE_REVIEW.md).** The owner has now confirmed Spider-Man 2 (2004). The observations and measurements below describe the rejected `1533549` build, not the latest implementation.
 
 **Still unaccepted.** The owner rejected the first pass: steering/power remained weak, and it did not feel like the PS2 game. The owner now requests a 1:1 match. Spider-Man 2 (2004) is still a working assumption; a question confirming the title is pending. This update is not a claim of reference parity. Ground contact still ends the run.
 

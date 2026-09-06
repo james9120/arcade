@@ -2,7 +2,7 @@
 
 ## Read this first
 
-**Implementation update, 5 September 2026:** see [MOVEMENT_REVIEW.md](MOVEMENT_REVIEW.md) for the unaccepted first pass and subsequent Normal swing-jump/direct-steering rebuild, changed test contracts, reference observations, rendered-motion evidence, measured performance and remaining limitations. The owner now requests a 1:1 PS2 match; this has not been achieved or claimed. The baseline/history below is preserved as handoff context.
+**Latest implementation, 5 September 2026:** see [REFERENCE_REVIEW.md](REFERENCE_REVIEW.md) for the confirmed Spider-Man 2 (2004) footage comparison, direction selection, wider camera, arc-driven poses, rooftop support and isolated `?practice` landing experiment. [MOVEMENT_REVIEW.md](MOVEMENT_REVIEW.md) preserves the rejected earlier passes. The owner requests a 1:1 PS2 match; this has not been achieved or claimed. The baseline/history below is preserved as handoff context.
 
 The owner has asked to move this project from ChatGPT development to Codex. This document is the self-contained handoff; do not assume the original ChatGPT conversation is available to your task.
 
@@ -41,7 +41,7 @@ Latest control intent supersedes the earlier thumb-aim design:
 
 ### Unresolved decisions — do not misrepresent them as approved
 
-1. The owner said "the PS2 spiderman game". The previous assistant took **Spider-Man 2 (2004), the open-world PS2 game**, as the likely reference, then asked whether it was instead the first movie game. The owner did not answer that distinction; they asked for the Codex transfer. Use Spider-Man 2 as an explicit working assumption, not a confirmed exact title. Do useful reference work without making this a blocker.
+1. **Confirmed reference: Spider-Man 2 (2004), PS2.** The owner explicitly named it in the latest feedback and asked to watch footage and replicate it. Earlier ambiguity with Spider-Man (2002) is resolved.
 2. The previous assistant proposed normal street/roof landings with ground-death moved into a challenge mode. **The owner has not approved changing the ground-death rule.** Preserve the existing default until clarified; any landing experiment should be isolated and clearly labeled.
 3. A distinct charged swing-jump/launch is a proposed design direction from the previous assistant, not an already approved control mapping. Prototype and explain the interaction, keeping mobile controls uncluttered.
 4. "AAA" is the owner's ambition, not a status the current assets or tests establish. Do not promise a production-quality clone, bug-free completion, or physical-phone frame rates that were never measured.
