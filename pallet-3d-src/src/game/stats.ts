@@ -47,7 +47,8 @@ export function spawnWild(slot: WildSlot, rng: () => number = Math.random): Comb
 }
 
 /**
- * Basic damage. `variance` is a multiplier around 1 (this prototype uses 0.9–1.1).
+ * Generation 3 damage, without critical hits. `variance` is applied after the
+ * base (this prototype folds same-type bonus and type matchup into it).
  * Always at least 1.
  */
 export function computeDamage(
@@ -56,7 +57,8 @@ export function computeDamage(
   power: number,
   variance: number,
 ): number {
-  const pressure = attacker.attack + attacker.level;
-  const raw = Math.floor((pressure * power) / Math.max(1, defender.defense));
-  return Math.max(1, Math.floor(raw * variance));
+  const levelTerm = Math.floor((2 * attacker.level) / 5) + 2;
+  const swung = Math.floor((levelTerm * power * attacker.attack) / Math.max(1, defender.defense));
+  const base = Math.floor(swung / 50) + 2;
+  return Math.max(1, Math.floor(base * variance));
 }

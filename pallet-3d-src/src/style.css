@@ -195,7 +195,19 @@ h1 {
 
 .starter span { color: #516056; font-size: 12px; text-align: center; }
 
-.hud-actions { display: flex; gap: 8px; }
+.hud-actions { display: flex; gap: 8px; align-items: center; }
+
+#hud #to-title,
+#hud #rain {
+  background: rgba(246, 241, 230, 0.94);
+  padding: 8px 14px;
+}
+
+#hud #rain[aria-pressed="true"] {
+  background: #35586e;
+  color: #f4f7fb;
+  box-shadow: none;
+}
 
 .arcade-back { margin-top: 14px; }
 

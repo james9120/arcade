@@ -89,11 +89,16 @@ export function createScene(canvas: HTMLCanvasElement, town: TownMap): SceneCont
 
   const romMaterials = new Map<string, THREE.Material>();
   const sideMaterials = new Map<string, THREE.Material>();
+  const trunk = track(geometries, new THREE.CylinderGeometry(0.09, 0.12, 0.85, 6));
+  const canopy = track(geometries, new THREE.PlaneGeometry(1.15, 1.15));
+  const trunkMaterial = track(materials, new THREE.MeshLambertMaterial({ color: "#5c4632" }));
 
   for (let y = 0; y < town.height; y++) {
     for (let x = 0; x < town.width; x++) {
       const cell = town.cells[y * town.width + x];
-      if (cell.kind === "tree" || cell.kind === "fence" || cell.kind === "sign") {
+      if (cell.kind === "tree") {
+        addTree(scene, cell, x, y, materials, textures, romMaterials, trunk, trunkMaterial, canopy);
+      } else if (cell.kind === "sign") {
         addBillboard(scene, cell, x, y, materials, textures, romMaterials);
       } else if (cell.kind === "structure" || cell.kind === "ledge") {
         addVolume(scene, cell, x, y, geometries, materials, textures, romMaterials, sideMaterials);
@@ -105,6 +110,13 @@ export function createScene(canvas: HTMLCanvasElement, town: TownMap): SceneCont
     textureFromPixels(pixels, town.hero?.width ?? 16, town.hero?.height ?? 32, textures),
   );
   const player = buildHero(heroFrames[0] ?? null, materials);
+  const shadow = new THREE.Mesh(
+    track(geometries, new THREE.CircleGeometry(0.32, 16)),
+    track(materials, new THREE.MeshBasicMaterial({ color: "#1b2418", transparent: true, opacity: 0.28, depthWrite: false })),
+  );
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.position.y = 0.03;
+  scene.add(shadow);
   scene.add(player);
 
   const rain = buildRain(town, geometries, materials);
@@ -136,6 +148,8 @@ export function createScene(canvas: HTMLCanvasElement, town: TownMap): SceneCont
       facing += delta * (1 - Math.exp(-dt * 12));
       const bob = view.moving ? Math.abs(Math.sin(clock * 10)) * 0.06 : 0;
       player.position.set(view.x, bob, view.y);
+      shadow.position.set(view.x, 0.03, view.y);
+      shadow.scale.set(view.moving ? 0.85 : 1, 1, view.moving ? 0.7 : 0.82);
       const frame = pickHeroFrame(heroFrames, view.dir, view.moving, clock);
       if (frame) {
         const material = player.material as THREE.SpriteMaterial;
@@ -191,7 +205,12 @@ function paintGround(town: TownMap): HTMLCanvasElement {
       const cell = town.cells[y * town.width + x];
       const left = x * 16;
       const top = y * 16;
-      if (cell.pixels && chipContext) {
+      if (cell.kind === "tree") {
+        context.fillStyle = "#6f9444";
+        context.fillRect(left, top, 16, 16);
+        context.fillStyle = "#5c4632";
+        context.fillRect(left + 6, top + 6, 4, 4);
+      } else if (cell.pixels && chipContext) {
         chipContext.putImageData(new ImageData(new Uint8ClampedArray(cell.pixels), 16, 16), 0, 0);
         context.drawImage(chip, left, top);
       } else {
@@ -201,6 +220,31 @@ function paintGround(town: TownMap): HTMLCanvasElement {
     }
   }
   return canvas;
+}
+
+function addTree(
+  scene: THREE.Scene,
+  cell: Cell,
+  x: number,
+  y: number,
+  materials: THREE.Material[],
+  textures: THREE.Texture[],
+  cache: Map<string, THREE.Material>,
+  trunk: THREE.BufferGeometry,
+  trunkMaterial: THREE.Material,
+  canopyGeometry: THREE.BufferGeometry,
+): void {
+  const stem = new THREE.Mesh(trunk, trunkMaterial);
+  stem.position.set(x, 0.42, y);
+  stem.castShadow = true;
+  scene.add(stem);
+  if (!cell.pixels || !cell.textureKey) return;
+  const leaves = new THREE.Mesh(canopyGeometry, topMaterial(cell, materials, textures, cache, 0.2));
+  leaves.rotation.x = -Math.PI / 2;
+  leaves.position.set(x, 0.95, y);
+  leaves.castShadow = true;
+  leaves.receiveShadow = true;
+  scene.add(leaves);
 }
 
 function addBillboard(
@@ -215,9 +259,7 @@ function addBillboard(
   if (!cell.pixels || !cell.textureKey) return;
   const material = spriteMaterial(cell.textureKey, cell.pixels, 16, 16, materials, textures, cache);
   const sprite = new THREE.Sprite(material);
-  const height = cell.kind === "tree" ? 1.7 : cell.kind === "fence" ? 0.62 : 0.8;
-  const width = cell.kind === "tree" ? 1.15 : 0.7;
-  sprite.scale.set(width, height, 1);
+  sprite.scale.set(0.55, 0.7, 1);
   sprite.position.set(x, 0.02, y);
   sprite.center.set(0.5, 0);
   scene.add(sprite);
@@ -238,7 +280,7 @@ function addVolume(
   const top = topMaterial(cell, materials, textures, tops);
   const side = sideMaterial(cell, materials, sides);
   const mesh = new THREE.Mesh(
-    track(geometries, new THREE.BoxGeometry(0.98, height, 0.98)),
+    track(geometries, new THREE.BoxGeometry(1, height, 1)),
     [side, side, top, side, side, side],
   );
   mesh.position.set(x, height / 2, y);
@@ -333,21 +375,26 @@ function topMaterial(
   materials: THREE.Material[],
   textures: THREE.Texture[],
   cache: Map<string, THREE.Material>,
+  alphaTest = 0,
 ): THREE.Material {
-  const key = cell.textureKey ?? cell.visual;
+  const key = `${cell.textureKey ?? cell.visual}:${alphaTest}`;
   const cached = cache.get(key);
   if (cached) return cached;
   const texture = cell.pixels ? textureFromPixels(cell.pixels, 16, 16, textures) : null;
   const material = track(
     materials,
-    new THREE.MeshLambertMaterial(texture ? { map: texture } : { color: "#c8b59a" }),
+    new THREE.MeshLambertMaterial(
+      texture
+        ? { map: texture, alphaTest, transparent: alphaTest > 0, depthWrite: alphaTest === 0 }
+        : { color: "#c8b59a" },
+    ),
   );
   cache.set(key, material);
   return material;
 }
 
 function sideMaterial(cell: Cell, materials: THREE.Material[], cache: Map<string, THREE.Material>): THREE.Material {
-  const color = shade(averageColor(cell.pixels), 0.55);
+  const color = shade(averageColor(cell.pixels), 0.68);
   const cached = cache.get(color);
   if (cached) return cached;
   const material = track(materials, new THREE.MeshLambertMaterial({ color }));

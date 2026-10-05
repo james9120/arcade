@@ -305,11 +305,11 @@ function cellFromEntry(
     } else if (sample.red > 0.28) {
       visual = "roof";
       kind = "structure";
-      height = 0.5;
+      height = 0.38;
     } else {
       visual = "wall";
       kind = "structure";
-      height = 0.85;
+      height = 0.5;
     }
   }
 

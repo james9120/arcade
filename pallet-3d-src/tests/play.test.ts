@@ -80,7 +80,7 @@ describe("walker", () => {
 describe("battle math", () => {
   it("scales stats and keeps damage at least 1", () => {
     expect(statsFromBase(48, 55, 50, 60, 5)).toEqual({ hp: 19, attack: 10, defense: 10, speed: 11 });
-    expect(computeDamage({ attack: 10, level: 5 }, { defense: 8 }, 4, 1)).toBe(7);
+    expect(computeDamage({ attack: 10, level: 5 }, { defense: 8 }, 4, 1)).toBe(2);
     expect(computeDamage({ attack: 0, level: 0 }, { defense: 99 }, 1, 0.1)).toBe(1);
   });
 
@@ -91,7 +91,7 @@ describe("battle math", () => {
     const first = fight.fight();
     expect(first[0]).toMatchObject({ kind: "hit", defender: "wild" });
     let guard = 0;
-    while (!fight.over && guard < 8) {
+    while (!fight.over && guard < 20) {
       fight.fight();
       guard += 1;
     }

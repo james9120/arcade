@@ -152,7 +152,7 @@ function showStarters(loaded: TownMap): void {
     const name = document.createElement("strong");
     name.textContent = starter.name;
     const meta = document.createElement("span");
-    meta.textContent = `Lv. ${starter.level} · ${starter.typeNames.filter(Boolean).join(" / ") || "—"}`;
+    meta.textContent = `Lv. ${starter.level} · ${typeLabel(starter.typeNames) || "—"}`;
     button.append(picture, name, meta);
     button.addEventListener("click", () => startTown(loaded, starter));
     row.append(button);
@@ -311,7 +311,7 @@ function paintCombatant(side: "player" | "wild", mon: Combatant, facing: "front"
   const portrait = must<HTMLElement>(`${side}-portrait`);
   portrait.replaceChildren(spriteElement(facing === "back" ? mon.back ?? mon.front : mon.front ?? mon.back, mon.name));
   must<HTMLElement>(`${side}-name`).textContent = mon.name;
-  const types = mon.typeNames.filter(Boolean).join(" / ");
+  const types = typeLabel(mon.typeNames);
   must<HTMLElement>(`${side}-level`).textContent = types
     ? `Lv. ${mon.level} · ${types} · ${mon.moveName}`
     : `Lv. ${mon.level} · ${mon.moveName}`;
@@ -340,6 +340,10 @@ function spriteElement(sprite: DecodedSprite | null, label: string): HTMLElement
     image.src = canvas.toDataURL();
   }
   return image;
+}
+
+function typeLabel(names: readonly string[]): string {
+  return names.filter((name, index) => Boolean(name) && name !== names[index - 1]).join(" / ");
 }
 
 function setCommands(disabled: boolean): void {
