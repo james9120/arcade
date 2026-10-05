@@ -15,33 +15,61 @@ export type TileVisual =
   | "flower"
   | "ledge";
 
-export type Portrait = "bramblo" | "pebblit" | "blob";
+/** How the 3D scene should lift this metatile off the ground plane. */
+export type PropKind = "ground" | "grass" | "water" | "ledge" | "tree" | "fence" | "sign" | "structure";
 
 export type WildSource = "none" | "local" | "north";
 
+export interface DecodedSprite {
+  width: number;
+  height: number;
+  /** RGBA, row-major. Index 0 of the source palette is already transparent. */
+  pixels: Uint8ClampedArray;
+}
+
+export interface LearnedMove {
+  name: string;
+  power: number;
+  typeId: number;
+  typeName: string;
+}
+
+export interface HeroSprite {
+  width: number;
+  height: number;
+  /** On-foot frames. 0 south, 1 north, 2 west; later frames are the walk cycle. */
+  frames: Uint8ClampedArray[];
+}
+
 export interface Cell {
   visual: TileVisual;
+  kind: PropKind;
   blocked: boolean;
   encounter: boolean;
   /** Directions from which this tile refuses entry (ledges, one-way edges). */
   blockEnter?: Direction[];
   height: number;
   wild: WildSource;
-  /** 16×16 RGBA, present when the picture came from a ROM tileset. */
+  /** 16×16 RGBA from the metatile, when the picture came from a ROM tileset. */
   pixels?: Uint8ClampedArray;
   textureKey?: string;
 }
 
 export interface SpeciesTemplate {
   name: string;
+  species: number;
   baseHp: number;
   baseAttack: number;
   baseDefense: number;
   baseSpeed: number;
+  typeIds: number[];
+  typeNames: string[];
   moveName: string;
   movePower: number;
-  accent: string;
-  portrait: Portrait;
+  moveTypeId: number;
+  moveTypeName: string;
+  front: DecodedSprite | null;
+  back: DecodedSprite | null;
 }
 
 export interface PartyMember extends SpeciesTemplate {
@@ -63,13 +91,17 @@ export interface Combatant {
   speed: number;
   moveName: string;
   movePower: number;
-  accent: string;
-  portrait: Portrait;
+  moveTypeId: number;
+  moveTypeName: string;
+  typeIds: number[];
+  typeNames: string[];
+  front: DecodedSprite | null;
+  back: DecodedSprite | null;
 }
 
 export interface TownMap {
   title: string;
-  mode: "demo" | "rom";
+  mode: "rom";
   modeDetail: string;
   width: number;
   height: number;
@@ -77,8 +109,12 @@ export interface TownMap {
   spawnX: number;
   spawnY: number;
   player: PartyMember;
+  starters: PartyMember[];
   wildLocal: WildSlot[];
   wildNorth: WildSlot[];
+  hero: HeroSprite | null;
+  /** Flat atk, def, multiplier triples from the ROM. Empty in synthetic fixtures. */
+  chart: number[];
 }
 
 export function cellAt(town: TownMap, x: number, y: number): Cell | undefined {

@@ -31,8 +31,12 @@ export function toCombatant(member: PartyMember): Combatant {
     speed: stats.speed,
     moveName: member.moveName,
     movePower: member.movePower,
-    accent: member.accent,
-    portrait: member.portrait,
+    moveTypeId: member.moveTypeId,
+    moveTypeName: member.moveTypeName,
+    typeIds: member.typeIds,
+    typeNames: member.typeNames,
+    front: member.front,
+    back: member.back,
   };
 }
 

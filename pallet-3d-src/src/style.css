@@ -163,6 +163,40 @@ h1 {
 
 .fine { color: #516056; font-size: 13px; margin: 0; }
 
+.starters { margin: 8px 0 14px; }
+
+.starter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.starter {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: 148px;
+  padding: 10px 8px 12px;
+  border-radius: 16px;
+  background: white;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 2px var(--line);
+}
+
+.starter img {
+  width: 84px;
+  height: 84px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.starter strong { font-size: 14px; }
+
+.starter span { color: #516056; font-size: 12px; text-align: center; }
+
+.hud-actions { display: flex; gap: 8px; }
+
 .arcade-back { margin-top: 14px; }
 
 .arcade-back a {
@@ -295,7 +329,14 @@ h1 {
 .mon.wild { order: 2; }
 .mon.player { order: 1; }
 
-.portrait svg { width: 92px; height: 92px; display: block; }
+.portrait img {
+  width: 92px;
+  height: 92px;
+  display: block;
+  object-fit: contain;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
 
 .mon h2 {
   font-family: Georgia, Palatino, serif;

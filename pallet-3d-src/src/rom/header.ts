@@ -35,8 +35,8 @@ export function readHeader(rom: Uint8Array): RomHeader {
     const shown = code.replace(/[^\x20-\x7e]/g, "").trim();
     throw new RomError(
       shown
-        ? `This ROM's game code is "${shown}", not FireRed US (BPRE). Choose a FireRed USA v1.0 file, or play the demo.`
-        : "This file doesn't have a FireRed header. Choose a .gba ROM, or play the demo.",
+        ? `This ROM's game code is "${shown}", not FireRed US (BPRE). Choose a FireRed USA v1.0 file.`
+        : "This file doesn't have a FireRed header. Choose a .gba ROM.",
     );
   }
   if (fixed !== 0x96) {

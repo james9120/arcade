@@ -119,6 +119,9 @@ describe("synthetic town", () => {
     expect(FIRERED_US_V10.speciesInfoStride).toBe(28);
     expect(FIRERED_US_V10.palletGroup).toBe(3);
     expect(FIRERED_US_V10.palletMap).toBe(0);
+    expect(FIRERED_US_V10.frontPicTable).toBe(0x082350ac);
+    expect(FIRERED_US_V10.levelUpLearnsets).toBe(0x0825d7b4);
+    expect(FIRERED_US_V10.battleMoves).toBe(0x08250c04);
   });
 });
 
@@ -224,6 +227,18 @@ function buildFixture(northOffset: number): { rom: Uint8Array; table: FireredTab
     wildMonHeaders: pointer(wildHeaders),
     speciesCount: 8,
     wildHeaderCount: 4,
+    starterB: 0,
+    starterC: 0,
+    frontPicTable: 0,
+    backPicTable: 0,
+    monPalettes: 0,
+    levelUpLearnsets: 0,
+    battleMoves: 0,
+    moveNames: 0,
+    typeNames: 0,
+    typeChart: 0,
+    objectGraphics: 0,
+    objectPalettes: 0,
   };
   return { rom, table };
 }

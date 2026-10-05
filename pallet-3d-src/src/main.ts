@@ -1,12 +1,18 @@
 import { Battle, type BattleEvent } from "./game/battle";
-import { buildDemoTown } from "./game/demoTown";
 import { spawnWild, toCombatant } from "./game/stats";
-import { cellAt, type Combatant, type Direction, type TownMap, type WildSlot } from "./game/types";
+import {
+  cellAt,
+  type Combatant,
+  type DecodedSprite,
+  type Direction,
+  type PartyMember,
+  type TownMap,
+  type WildSlot,
+} from "./game/types";
 import { Walker } from "./game/walker";
 import { createScene, type SceneController } from "./render/scene";
 import { RomError } from "./rom/error";
 import { loadFireRedTown } from "./rom/map";
-import { portraitSvg } from "./ui/portraits";
 
 type Mode = "title" | "world" | "battle";
 
@@ -17,12 +23,13 @@ const dpad = must<HTMLElement>("dpad");
 const battleEl = must<HTMLElement>("battle");
 const flash = must<HTMLElement>("flash");
 const loadButton = must<HTMLButtonElement>("load-rom");
-const demoButton = must<HTMLButtonElement>("play-demo");
 const fileInput = must<HTMLInputElement>("rom-file");
 const titleError = must<HTMLParagraphElement>("title-error");
+const startersEl = must<HTMLElement>("starters");
 const modePill = must<HTMLElement>("mode-pill");
 const status = must<HTMLParagraphElement>("status");
 const toTitle = must<HTMLButtonElement>("to-title");
+const rainButton = must<HTMLButtonElement>("rain");
 const fightButton = must<HTMLButtonElement>("fight");
 const runButton = must<HTMLButtonElement>("run");
 const battleMode = must<HTMLElement>("battle-mode");
@@ -30,17 +37,18 @@ const battleLog = must<HTMLParagraphElement>("battle-log");
 
 let mode: Mode = "title";
 let town: TownMap | null = null;
+let pending: TownMap | null = null;
 let walker: Walker | null = null;
 let scene: SceneController | null = null;
 let battle: Battle | null = null;
 let busy = false;
 let chain = 0;
 let calm = 0;
+let raining = false;
 const keys = new Set<Direction>();
 let pad: Direction | null = null;
 let last = performance.now();
 
-demoButton.addEventListener("click", () => startTown(buildDemoTown()));
 loadButton.addEventListener("click", () => fileInput.click());
 fileInput.addEventListener("change", () => {
   const chosen = fileInput.files?.[0];
@@ -54,6 +62,12 @@ title.addEventListener("drop", (event) => {
   if (chosen) void readRom(chosen);
 });
 toTitle.addEventListener("click", showTitle);
+rainButton.addEventListener("click", () => {
+  raining = !raining;
+  rainButton.textContent = raining ? "Rain on" : "Rain";
+  rainButton.setAttribute("aria-pressed", raining ? "true" : "false");
+  scene?.setRain(raining);
+});
 fightButton.addEventListener("click", () => void onFight());
 runButton.addEventListener("click", () => void onRun());
 
@@ -105,11 +119,14 @@ async function readRom(file: File): Promise<void> {
   loadButton.disabled = true;
   loadButton.textContent = "Reading ROM…";
   titleError.hidden = true;
+  startersEl.hidden = true;
+  startersEl.replaceChildren();
   try {
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const loaded = loadFireRedTown(bytes);
-    startTown(loaded);
+    pending = loadFireRedTown(bytes);
+    showStarters(pending);
   } catch (error) {
+    pending = null;
     titleError.textContent =
       error instanceof RomError ? error.message : "That file couldn't be read as a FireRed ROM.";
     titleError.hidden = false;
@@ -119,11 +136,37 @@ async function readRom(file: File): Promise<void> {
   }
 }
 
-function startTown(next: TownMap): void {
+function showStarters(loaded: TownMap): void {
+  startersEl.replaceChildren();
+  const label = document.createElement("p");
+  label.className = "fine";
+  label.textContent = "Choose a partner. Their name, stats, and sprite come from this ROM.";
+  startersEl.append(label);
+  const row = document.createElement("div");
+  row.className = "starter-row";
+  for (const starter of loaded.starters) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "starter";
+    const picture = spriteElement(starter.front ?? starter.back, `${starter.name}`);
+    const name = document.createElement("strong");
+    name.textContent = starter.name;
+    const meta = document.createElement("span");
+    meta.textContent = `Lv. ${starter.level} · ${starter.typeNames.filter(Boolean).join(" / ") || "—"}`;
+    button.append(picture, name, meta);
+    button.addEventListener("click", () => startTown(loaded, starter));
+    row.append(button);
+  }
+  startersEl.append(row);
+  startersEl.hidden = false;
+}
+
+function startTown(loaded: TownMap, starter: PartyMember): void {
   teardown();
-  town = next;
-  walker = new Walker(next, next.spawnX, next.spawnY);
-  scene = createScene(view, next);
+  town = { ...loaded, player: starter };
+  walker = new Walker(town, town.spawnX, town.spawnY);
+  scene = createScene(view, town);
+  scene.setRain(raining);
   mode = "world";
   chain = 0;
   calm = 0;
@@ -131,22 +174,21 @@ function startTown(next: TownMap): void {
   hud.hidden = false;
   dpad.hidden = false;
   battleEl.hidden = true;
-  modePill.textContent = next.modeDetail;
-  modePill.classList.toggle("rom", next.mode === "rom");
-  status.textContent =
-    next.mode === "demo"
-      ? "Original art. Walk north into the tall grass for a battle."
-      : "ROM parsed in this tab. Walk north into the tall grass.";
-  scene.sync({ x: next.spawnX, y: next.spawnY, dir: "n", moving: false }, 0);
+  modePill.textContent = town.modeDetail;
+  status.textContent = `${starter.name} is with you. Walk north through Route 1's tall grass.`;
+  scene.sync({ x: town.spawnX, y: town.spawnY, dir: "n", moving: false }, 0);
 }
 
 function showTitle(): void {
   teardown();
+  pending = null;
   mode = "title";
   title.hidden = false;
   hud.hidden = true;
   dpad.hidden = true;
   battleEl.hidden = true;
+  startersEl.hidden = true;
+  startersEl.replaceChildren();
 }
 
 function teardown(): void {
@@ -211,11 +253,10 @@ async function startBattle(table: WildSlot[]): Promise<void> {
   flash.classList.add("on");
   const player = toCombatant(town.player);
   const wild = spawnWild(table[Math.floor(Math.random() * table.length)]);
-  battle = new Battle(player, wild);
-  paintCombatant("player", player);
-  paintCombatant("wild", wild);
+  battle = new Battle(player, wild, Math.random, town.chart);
+  paintCombatant("player", player, "back");
+  paintCombatant("wild", wild, "front");
   battleMode.textContent = town.modeDetail;
-  battleMode.classList.toggle("rom", town.mode === "rom");
   battleLog.textContent = `A wild ${wild.name} steps out of the grass.`;
   battleEl.hidden = false;
   setCommands(false);
@@ -266,10 +307,14 @@ async function finishBattle(): Promise<void> {
   walker?.hold(desiredDirection());
 }
 
-function paintCombatant(side: "player" | "wild", mon: Combatant): void {
-  must<HTMLElement>(`${side}-portrait`).innerHTML = portraitSvg(mon.portrait, mon.accent);
+function paintCombatant(side: "player" | "wild", mon: Combatant, facing: "front" | "back"): void {
+  const portrait = must<HTMLElement>(`${side}-portrait`);
+  portrait.replaceChildren(spriteElement(facing === "back" ? mon.back ?? mon.front : mon.front ?? mon.back, mon.name));
   must<HTMLElement>(`${side}-name`).textContent = mon.name;
-  must<HTMLElement>(`${side}-level`).textContent = `Lv. ${mon.level}`;
+  const types = mon.typeNames.filter(Boolean).join(" / ");
+  must<HTMLElement>(`${side}-level`).textContent = types
+    ? `Lv. ${mon.level} · ${types} · ${mon.moveName}`
+    : `Lv. ${mon.level} · ${mon.moveName}`;
   paintHp(side, mon);
 }
 
@@ -280,6 +325,21 @@ function paintHp(side: "player" | "wild", mon: Combatant): void {
   fill.classList.toggle("low", ratio <= 0.25);
   fill.classList.toggle("mid", ratio > 0.25 && ratio <= 0.5);
   must<HTMLElement>(`${side}-hp-label`).textContent = `${mon.hp} / ${mon.maxHp}`;
+}
+
+function spriteElement(sprite: DecodedSprite | null, label: string): HTMLElement {
+  const image = document.createElement("img");
+  image.alt = label;
+  if (!sprite) return image;
+  const canvas = document.createElement("canvas");
+  canvas.width = sprite.width;
+  canvas.height = sprite.height;
+  const context = canvas.getContext("2d");
+  if (context) {
+    context.putImageData(new ImageData(new Uint8ClampedArray(sprite.pixels), sprite.width, sprite.height), 0, 0);
+    image.src = canvas.toDataURL();
+  }
+  return image;
 }
 
 function setCommands(disabled: boolean): void {
