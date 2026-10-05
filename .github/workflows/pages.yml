@@ -22,11 +22,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: pallet-3d-src/package-lock.json
+      - name: Test and build Pallet Town
+        working-directory: pallet-3d-src
+        run: |
+          npm ci
+          npm test
+          npm run build
+          grep -q '/arcade/pallet-3d/assets/' dist/index.html
       - name: Prepare site
         run: |
-          mkdir -p _site/games
+          mkdir -p _site/games _site/pallet-3d
           cp index.html _site/
           if [ -d games ]; then cp -R games/. _site/games/; fi
+          cp -R pallet-3d-src/dist/. _site/pallet-3d/
       - uses: actions/configure-pages@v5
         with:
           enablement: true

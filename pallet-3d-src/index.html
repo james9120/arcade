@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pallet Town walk</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <canvas id="view"></canvas>
+    <div id="flash" aria-hidden="true"></div>
+
+    <section id="title" class="title">
+      <div class="skyline" aria-hidden="true">
+        <span class="roof"></span>
+        <span class="roof"></span>
+        <span class="roof wide"></span>
+        <span class="roof"></span>
+        <span class="tree"></span>
+      </div>
+      <div class="card">
+        <p class="eyebrow">Bring-your-own-ROM field prototype</p>
+        <h1>Pallet Town</h1>
+        <p class="lede">
+          A low-poly walk around the first town, plus one grass battle. Load a FireRed ROM you already
+          own and the map is parsed in this browser, or play the demo — original blocks and a made-up creature.
+        </p>
+        <div class="actions">
+          <button id="load-rom" class="primary" type="button">Load your FireRed ROM</button>
+          <button id="play-demo" class="secondary" type="button">Play demo (no ROM)</button>
+        </div>
+        <p id="title-error" class="error" role="alert" hidden></p>
+        <p class="fine">
+          US FireRed v1.0 only (header game code BPRE, revision 0). The file stays in this tab and is never
+          uploaded. This page includes no Nintendo artwork, names, music, or data.
+        </p>
+        <p class="fine arcade-back"><a href="../">← Arcade</a></p>
+        <input id="rom-file" type="file" accept=".gba,application/octet-stream" hidden />
+      </div>
+    </section>
+
+    <header id="hud" class="hud" hidden>
+      <div>
+        <span id="mode-pill" class="pill"></span>
+        <p id="status">Walk north into the tall grass.</p>
+      </div>
+      <button id="to-title" type="button">Title</button>
+    </header>
+
+    <nav id="dpad" class="dpad" hidden aria-label="Move">
+      <button type="button" data-dir="n" aria-label="Walk north">N</button>
+      <button type="button" data-dir="w" aria-label="Walk west">W</button>
+      <button type="button" data-dir="e" aria-label="Walk east">E</button>
+      <button type="button" data-dir="s" aria-label="Walk south">S</button>
+    </nav>
+
+    <section id="battle" class="battle" hidden>
+      <div class="battle-card">
+        <div class="battle-top">
+          <span id="battle-mode" class="pill"></span>
+          <p id="battle-log" class="log">The grass opens.</p>
+        </div>
+        <div class="sides">
+          <article class="mon wild">
+            <div id="wild-portrait" class="portrait"></div>
+            <div>
+              <h2 id="wild-name"></h2>
+              <p id="wild-level" class="level"></p>
+              <div class="hp-row">
+                <span id="wild-hp-label"></span>
+                <div class="hp-track"><div id="wild-hp" class="hp-fill"></div></div>
+              </div>
+            </div>
+          </article>
+          <article class="mon player">
+            <div id="player-portrait" class="portrait"></div>
+            <div>
+              <h2 id="player-name"></h2>
+              <p id="player-level" class="level"></p>
+              <div class="hp-row">
+                <span id="player-hp-label"></span>
+                <div class="hp-track"><div id="player-hp" class="hp-fill"></div></div>
+              </div>
+            </div>
+          </article>
+        </div>
+        <div class="commands">
+          <button id="fight" type="button">Fight</button>
+          <button id="run" class="ghost" type="button">Run</button>
+        </div>
+        <p class="fine battle-hint">Fight or Run. Keyboard: F and R.</p>
+      </div>
+    </section>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
