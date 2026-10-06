@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import type { Cell, Direction, TownMap } from "../game/types";
 import { addStructures, applyWetness, type WetSurface } from "./buildings";
+import { readGraphicsMode, type GraphicsMode } from "./quality";
+import { createTraceLook, type TraceLook } from "./tracelook";
 import {
   approachWetness,
   blendWeather,
@@ -31,20 +33,32 @@ export interface SceneView {
 
 export interface SceneController {
   sync(view: SceneView, dt: number): WeatherSample;
+  setQuality(mode: GraphicsMode): void;
+  quality(): GraphicsMode;
   dispose(): void;
 }
 
-export function createScene(canvas: HTMLCanvasElement, town: TownMap): SceneController {
+export function createScene(
+  canvas: HTMLCanvasElement,
+  town: TownMap,
+  initialQuality: GraphicsMode = readGraphicsMode("", true),
+): SceneController {
+  let quality = initialQuality;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+  const pixelRatio = () => Math.min(window.devicePixelRatio || 1, quality === "high" ? 1.5 : 1.75);
+  renderer.setPixelRatio(pixelRatio());
   renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.shadowMap.type = quality === "high" ? THREE.VSMShadowMap : THREE.PCFShadowMap;
 
   const skyClear = new THREE.Color("#9fd0ea");
-  const skyRain = new THREE.Color("#5d7284");
+  const skyRain = new THREE.Color("#8a8680");
   const skyNow = skyClear.clone();
+  const hemiSkyClear = new THREE.Color("#e7f6ff");
+  const hemiSkyRain = new THREE.Color("#c4bfb4");
+  const hemiGroundClear = new THREE.Color("#6d8a48");
+  const hemiGroundRain = new THREE.Color("#3e4a28");
   const scene = new THREE.Scene();
   scene.background = skyNow;
   const fog = new THREE.Fog(skyNow, 18, 48);
@@ -63,17 +77,19 @@ export function createScene(canvas: HTMLCanvasElement, town: TownMap): SceneCont
   sun.position.set(-10, 16, 8);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
-  sun.shadow.bias = -0.0004;
-  sun.shadow.normalBias = 0.02;
+  sun.shadow.bias = -0.00025;
+  sun.shadow.normalBias = 0.03;
+  sun.shadow.radius = quality === "high" ? 5 : 1;
+  sun.shadow.blurSamples = quality === "high" ? 10 : 8;
   sun.shadow.camera.near = 2;
-  sun.shadow.camera.far = 56;
-  sun.shadow.camera.left = -18;
-  sun.shadow.camera.right = 18;
-  sun.shadow.camera.top = 18;
-  sun.shadow.camera.bottom = -18;
+  sun.shadow.camera.far = 64;
+  sun.shadow.camera.left = -22;
+  sun.shadow.camera.right = 22;
+  sun.shadow.camera.top = 22;
+  sun.shadow.camera.bottom = -22;
   scene.add(sun);
   scene.add(sun.target);
-  const fill = new THREE.DirectionalLight("#c9d8ee", 0.28);
+  const fill = new THREE.DirectionalLight("#e6d8c4", 0.28);
   fill.position.set(8, 6, -6);
   scene.add(fill);
 
@@ -107,8 +123,8 @@ export function createScene(canvas: HTMLCanvasElement, town: TownMap): SceneCont
 
   const romMaterials = new Map<string, THREE.Material>();
   const sideMaterials = new Map<string, THREE.Material>();
-  const trunk = track(geometries, new THREE.CylinderGeometry(0.1, 0.14, 0.72, 6));
-  const crown = track(geometries, new THREE.SphereGeometry(0.56, 7, 5));
+  const trunk = track(geometries, new THREE.CylinderGeometry(0.12, 0.16, 1.1, 6));
+  const crown = track(geometries, new THREE.SphereGeometry(0.62, 8, 6));
   const trunkMaterial = track(materials, new THREE.MeshLambertMaterial({ color: "#5c4632" }));
   const wetSurfaces: WetSurface[] = addStructures(scene, town, geometries, materials, textures);
 
@@ -146,7 +162,7 @@ export function createScene(canvas: HTMLCanvasElement, town: TownMap): SceneCont
     color: "#9eb0be",
   });
   materials.push(mirrorMaterial);
-  const mirror = new THREE.Mesh(track(geometries, new THREE.PlaneGeometry(0.72, 1.15)), mirrorMaterial);
+  const mirror = new THREE.Mesh(track(geometries, new THREE.PlaneGeometry(1, 2)), mirrorMaterial);
   mirror.rotation.x = -Math.PI / 2;
   mirror.layers.set(2);
   mirror.visible = false;
@@ -157,6 +173,7 @@ export function createScene(canvas: HTMLCanvasElement, town: TownMap): SceneCont
   const forced = readWeatherOverride(window.location.search);
   const reflect = buildReflection(renderer, town, geometries, materials);
   scene.add(reflect.overlay);
+  let trace: TraceLook | null = null;
 
   let facing = 0;
   let snapped = false;
@@ -169,7 +186,17 @@ export function createScene(canvas: HTMLCanvasElement, town: TownMap): SceneCont
     const height = canvas.clientHeight || 1;
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
+    renderer.setPixelRatio(pixelRatio());
     renderer.setSize(width, height, false);
+  };
+  const applyQuality = (mode: GraphicsMode) => {
+    quality = mode;
+    const soft = mode === "high";
+    renderer.shadowMap.type = soft ? THREE.VSMShadowMap : THREE.PCFShadowMap;
+    sun.shadow.radius = soft ? 5 : 1;
+    sun.shadow.blurSamples = soft ? 10 : 8;
+    renderer.shadowMap.needsUpdate = true;
+    resize();
   };
   resize();
   const observer = new ResizeObserver(resize);
@@ -217,32 +244,53 @@ export function createScene(canvas: HTMLCanvasElement, town: TownMap): SceneCont
       wetness = approachWetness(wetness, forecast.rain, dt);
       const overcast = Math.max(forecast.cloud, forecast.rain);
       skyNow.copy(skyClear).lerp(skyRain, overcast);
-      fog.near = 18 - overcast * 10;
-      fog.far = 48 - overcast * 26;
-      sun.intensity = 1.35 - overcast * 0.97;
-      hemi.intensity = 0.72 - overcast * 0.28;
-      fill.intensity = 0.28 - overcast * 0.1;
-      groundMaterial.color.setRGB(1 - wetness * 0.42, 1 - wetness * 0.36, 1 - wetness * 0.28);
-      groundMaterial.shininess = wetness * 70;
-      groundMaterial.specular.setRGB(wetness * 0.28, wetness * 0.34, wetness * 0.4);
+      hemi.color.copy(hemiSkyClear).lerp(hemiSkyRain, overcast);
+      hemi.groundColor.copy(hemiGroundClear).lerp(hemiGroundRain, overcast);
+      fog.near = 20 - overcast * 4;
+      fog.far = 56 - overcast * 14;
+      sun.intensity = 1.35 - overcast * 0.5;
+      hemi.intensity = 0.72 - overcast * 0.12;
+      fill.intensity = 0.28 - overcast * 0.06;
+      groundMaterial.color.setRGB(
+        Math.min(1, (1 - wetness * 0.45) * 1.02),
+        1 - wetness * 0.4,
+        1 - wetness * 0.52,
+      );
+      groundMaterial.shininess = 8 + wetness * 90;
+      groundMaterial.specular.setRGB(wetness * 0.18, wetness * 0.17, wetness * 0.15);
       applyWetness(wetSurfaces, wetness);
       const skirtMaterial = skirt.material as THREE.MeshLambertMaterial;
-      skirtMaterial.color.setRGB(0.43 - wetness * 0.12, 0.56 - wetness * 0.14, 0.3 - wetness * 0.08);
-      mirror.visible = wetness > 0.05;
-      mirrorMaterial.opacity = wetness * 0.55;
-      (shadow.material as THREE.MeshBasicMaterial).opacity = 0.28 * (1 - wetness * 0.65);
+      skirtMaterial.color.setRGB(0.32 - wetness * 0.08, 0.4 - wetness * 0.05, 0.16 - wetness * 0.05);
+      const high = quality === "high";
+      mirror.visible = !high && wetness > 0.05;
+      mirrorMaterial.opacity = wetness * 0.5;
+      (shadow.material as THREE.MeshBasicMaterial).opacity = 0.28 * (1 - wetness * 0.45);
       weatherFx.step(dt, view.x, view.y, forecast.rain, wetness, clock);
       reflectFrame += 1;
-      if (reflect.enabled(canvas) && wetness > 0.08 && reflectFrame % 3 === 0) {
+      const planar = !high && reflect.enabled(canvas);
+      if (planar && wetness > 0.08 && reflectFrame % 3 === 0) {
         reflect.capture(scene, camera);
       }
-      reflect.strength(reflect.enabled(canvas) ? wetness : 0);
-      renderer.render(scene, camera);
+      reflect.strength(planar ? wetness : 0);
+      if (high) {
+        trace ??= createTraceLook();
+        trace.render(renderer, scene, camera, wetness, skyNow);
+      } else {
+        renderer.setRenderTarget(null);
+        renderer.render(scene, camera);
+      }
       return forecast;
+    },
+    setQuality(mode) {
+      applyQuality(mode);
+    },
+    quality() {
+      return quality;
     },
     dispose() {
       observer.disconnect();
       reflect.dispose();
+      trace?.dispose();
       for (const geometry of geometries) geometry.dispose();
       for (const material of materials) material.dispose();
       for (const texture of textures) texture.dispose();
@@ -353,7 +401,7 @@ function addTree(
   surfaces: WetSurface[],
 ): void {
   const stem = new THREE.Mesh(trunk, trunkMaterial);
-  stem.position.set(x, 0.36, y);
+  stem.position.set(x, 0.55, y);
   stem.castShadow = true;
   stem.receiveShadow = true;
   stem.layers.set(1);
@@ -362,8 +410,8 @@ function addTree(
   const leaves = new THREE.Mesh(crown, leafMaterial(cell, materials, textures, cache, surfaces));
   const turn = hash01(x, y) * Math.PI * 2;
   leaves.rotation.y = turn;
-  leaves.scale.set(1.05 + (hash01(x + 3, y) - 0.5) * 0.18, 0.86, 1.05 + (hash01(x, y + 5) - 0.5) * 0.18);
-  leaves.position.set(x, 1.02, y);
+  leaves.scale.set(1.05 + (hash01(x + 3, y) - 0.5) * 0.18, 0.92, 1.05 + (hash01(x, y + 5) - 0.5) * 0.18);
+  leaves.position.set(x, 1.72, y);
   leaves.castShadow = true;
   leaves.receiveShadow = true;
   leaves.layers.set(1);
@@ -416,7 +464,7 @@ function buildHero(texture: THREE.Texture | null, materials: THREE.Material[]): 
   const material = new THREE.SpriteMaterial({ map: texture ?? undefined, transparent: true, alphaTest: 0.35 });
   materials.push(material);
   const sprite = new THREE.Sprite(material);
-  sprite.scale.set(0.78, 1.56, 1);
+  sprite.scale.set(1, 2, 1);
   sprite.center.set(0.5, 0);
   return sprite;
 }
@@ -477,8 +525,8 @@ function buildRain(
       materials,
       new THREE.PointsMaterial({
         map: rainStreak(textures),
-        color: "#e7f2fb",
-        size: 0.55,
+        color: "#c5c8c4",
+        size: 0.72,
         transparent: true,
         opacity: 0.8,
         depthWrite: false,
@@ -497,7 +545,7 @@ function buildRain(
       geometry.setDrawRange(0, active);
       points.visible = active > 6;
       const material = points.material as THREE.PointsMaterial;
-      material.opacity = 0.35 + amount * 0.55;
+      material.opacity = 0.22 + amount * 0.28;
       if (active === 0) {
         dry = true;
         return;
@@ -507,8 +555,10 @@ function buildRain(
         dry = false;
       }
       let hits = 0;
-      const fall = 12 + amount * 16;
+      const fall = 32 + amount * 40;
+      const drift = 6 + amount * 4;
       for (let index = 0; index < active; index++) {
+        positions[index * 3] += dt * drift;
         positions[index * 3 + 1] -= dt * fall;
         if (positions[index * 3 + 1] > 0) continue;
         const hitX = positions[index * 3];
@@ -532,15 +582,16 @@ function resetDrop(positions: Float32Array, index: number, x: number, z: number,
 
 function rainStreak(textures: THREE.Texture[]): THREE.Texture {
   const canvas = document.createElement("canvas");
-  canvas.width = 8;
+  canvas.width = 16;
   canvas.height = 32;
   const context = canvas.getContext("2d");
   if (context) {
-    const fade = context.createLinearGradient(0, 0, 0, 32);
-    fade.addColorStop(0, "rgba(255,255,255,0)");
-    fade.addColorStop(1, "rgba(236,244,255,0.95)");
-    context.fillStyle = fade;
-    context.fillRect(3, 0, 2, 32);
+    context.strokeStyle = "rgba(150, 152, 148, 0.5)";
+    context.lineWidth = 1;
+    context.beginPath();
+    context.moveTo(5.5, 1);
+    context.lineTo(10.5, 31);
+    context.stroke();
   }
   return textureFromCanvas(canvas, textures);
 }
@@ -614,8 +665,8 @@ function puddleMaterial(): THREE.ShaderMaterial {
         float r = length(vUv - 0.5) * 2.0;
         float disc = smoothstep(1.0, 0.62, r);
         float ring = smoothstep(0.07, 0.0, abs(fract(r * 2.6 - time * 0.85) - 0.12));
-        float alpha = disc * wetness * (0.34 + ring * 0.28);
-        gl_FragColor = vec4(0.1, 0.18, 0.24, alpha);
+        float alpha = disc * wetness * (0.48 + ring * 0.16);
+        gl_FragColor = vec4(0.045, 0.055, 0.048, alpha);
       }
     `,
   });
@@ -634,7 +685,7 @@ function buildSplashes(
     geometry,
     track(
       materials,
-      new THREE.PointsMaterial({ color: "#f4fbff", size: 0.16, transparent: true, opacity: 0.9, depthWrite: false }),
+      new THREE.PointsMaterial({ color: "#c8ccc8", size: 0.12, transparent: true, opacity: 0.7, depthWrite: false }),
     ),
   );
   points.layers.set(2);
@@ -651,7 +702,7 @@ function buildSplashes(
       ringGeometry,
       track(
         materials,
-        new THREE.MeshBasicMaterial({ color: "#d7e9f6", transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }),
+        new THREE.MeshBasicMaterial({ color: "#b7b8b0", transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }),
       ),
     );
     mesh.rotation.x = -Math.PI / 2;
@@ -748,7 +799,7 @@ function buildReflection(
         varying vec4 vUv;
         void main() {
           vec4 refl = texture2DProj(tReflect, vUv);
-          gl_FragColor = vec4(refl.rgb * vec3(0.72, 0.8, 0.88), wetness * 0.62);
+          gl_FragColor = vec4(refl.rgb * vec3(0.62, 0.64, 0.6), wetness * 0.72);
         }
       `,
     }),
@@ -910,6 +961,8 @@ function textureFromCanvas(canvas: HTMLCanvasElement, textures: THREE.Texture[])
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.magFilter = THREE.NearestFilter;
   texture.minFilter = THREE.NearestFilter;
+  texture.generateMipmaps = false;
+  texture.anisotropy = 1;
   textures.push(texture);
   return texture;
 }

@@ -121,6 +121,43 @@ export function roofRowCount(block: Block): number {
   return split;
 }
 
+/**
+ * Bottom rows of a roof tile that read as the eave rather than shingles.
+ * Stops once the row matches the top of the tile, and never eats more than
+ * about half the tile so a noisy row cannot swallow the shingles.
+ */
+export function eaveRowCount(pixels: Uint8ClampedArray, width: number, height: number): number {
+  if (width <= 0 || height < 4) return 0;
+  const top = rowMean(pixels, width, 0);
+  const cap = Math.max(1, Math.floor(height * 0.55));
+  let count = 0;
+  for (let row = height - 1; row >= height - cap; row--) {
+    const color = rowMean(pixels, width, row);
+    const delta = Math.hypot(color[0] - top[0], color[1] - top[1], color[2] - top[2]);
+    if (delta < 28) break;
+    count += 1;
+  }
+  return count;
+}
+
+function rowMean(pixels: Uint8ClampedArray, width: number, row: number): [number, number, number] {
+  let red = 0;
+  let green = 0;
+  let blue = 0;
+  let count = 0;
+  const start = row * width * 4;
+  for (let x = 0; x < width; x++) {
+    const index = start + x * 4;
+    if (pixels[index + 3] < 128) continue;
+    red += pixels[index];
+    green += pixels[index + 1];
+    blue += pixels[index + 2];
+    count += 1;
+  }
+  if (count === 0) return [0, 0, 0];
+  return [red / count, green / count, blue / count];
+}
+
 export function findOpenings(pixels: Uint8ClampedArray, width: number, height: number): Opening[] {
   const glass = components(pixels, width, height, (r, g, b) => b > 145 && b - r > 40 && b - g > 12).filter(
     (rect) => rect.n >= 12 && rect.w >= 4 && rect.h >= 2,

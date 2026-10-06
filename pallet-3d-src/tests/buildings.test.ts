@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Cell, TileVisual, PropKind } from "../src/game/types";
-import { findOpenings, groupBlocks, roofRowCount } from "../src/render/footprints";
+import { eaveRowCount, findOpenings, groupBlocks, roofRowCount } from "../src/render/footprints";
+import { readGraphicsMode } from "../src/render/quality";
 
 function paint(color: [number, number, number]): Uint8ClampedArray {
   const pixels = new Uint8ClampedArray(16 * 16 * 4);
@@ -68,6 +69,35 @@ describe("building footprints", () => {
     expect(openings.some((opening) => opening.kind === "door")).toBe(true);
     const door = openings.find((opening) => opening.kind === "door");
     expect(door && door.y + door.h).toBeGreaterThan(height - 4);
+  });
+
+  it("keeps the eave to the bottom rows of a roof tile", () => {
+    const width = 32;
+    const height = 16;
+    const pixels = new Uint8ClampedArray(width * height * 4);
+    for (let y = 0; y < height; y++) {
+      const eave = y >= 8;
+      for (let x = 0; x < width; x++) {
+        const index = (y * width + x) * 4;
+        pixels[index] = eave ? 148 : 230;
+        pixels[index + 1] = eave ? 165 : 120;
+        pixels[index + 2] = eave ? 181 : 96;
+        pixels[index + 3] = 255;
+      }
+    }
+    expect(eaveRowCount(pixels, width, height)).toBe(8);
+    pixels.fill(200);
+    for (let index = 3; index < pixels.length; index += 4) pixels[index] = 255;
+    expect(eaveRowCount(pixels, width, height)).toBe(0);
+  });
+});
+
+describe("graphics mode", () => {
+  it("defaults high on desktop and honors an explicit override", () => {
+    expect(readGraphicsMode("", true)).toBe("high");
+    expect(readGraphicsMode("", false)).toBe("low");
+    expect(readGraphicsMode("?gfx=low", true)).toBe("low");
+    expect(readGraphicsMode("?quality=high", false)).toBe("high");
   });
 });
 

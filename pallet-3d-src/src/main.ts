@@ -10,6 +10,7 @@ import {
   type WildSlot,
 } from "./game/types";
 import { Walker } from "./game/walker";
+import { readGraphicsMode, type GraphicsMode } from "./render/quality";
 import { createScene, type SceneController } from "./render/scene";
 import type { WeatherSample } from "./render/weather";
 import { RomError } from "./rom/error";
@@ -32,11 +33,15 @@ const status = must<HTMLParagraphElement>("status");
 const toTitle = must<HTMLButtonElement>("to-title");
 const weatherEl = must<HTMLElement>("weather");
 const weatherLabel = must<HTMLElement>("weather-label");
+const gfxButton = must<HTMLButtonElement>("gfx");
 const fightButton = must<HTMLButtonElement>("fight");
 const runButton = must<HTMLButtonElement>("run");
 const battleMode = must<HTMLElement>("battle-mode");
 const battleLog = must<HTMLParagraphElement>("battle-log");
 
+const desktopGraphics =
+  window.matchMedia("(pointer: fine)").matches && Math.min(window.innerWidth, window.screen?.width || window.innerWidth) >= 900;
+let graphics: GraphicsMode = readGraphicsMode(window.location.search, desktopGraphics);
 let mode: Mode = "title";
 let town: TownMap | null = null;
 let pending: TownMap | null = null;
@@ -63,6 +68,12 @@ title.addEventListener("drop", (event) => {
   if (chosen) void readRom(chosen);
 });
 toTitle.addEventListener("click", showTitle);
+gfxButton.addEventListener("click", () => {
+  graphics = graphics === "high" ? "low" : "high";
+  scene?.setQuality(graphics);
+  paintGfx(graphics);
+});
+paintGfx(graphics);
 fightButton.addEventListener("click", () => void onFight());
 runButton.addEventListener("click", () => void onRun());
 
@@ -160,7 +171,8 @@ function startTown(loaded: TownMap, starter: PartyMember): void {
   teardown();
   town = { ...loaded, player: starter };
   walker = new Walker(town, town.spawnX, town.spawnY);
-  scene = createScene(view, town);
+  scene = createScene(view, town, graphics);
+  paintGfx(graphics);
   mode = "world";
   chain = 0;
   calm = 0;
@@ -338,6 +350,13 @@ function spriteElement(sprite: DecodedSprite | null, label: string): HTMLElement
 
 function typeLabel(names: readonly string[]): string {
   return names.filter((name, index) => Boolean(name) && name !== names[index - 1]).join(" / ");
+}
+
+function paintGfx(mode: GraphicsMode): void {
+  const high = mode === "high";
+  gfxButton.textContent = high ? "High" : "Low";
+  gfxButton.setAttribute("aria-pressed", high ? "true" : "false");
+  gfxButton.setAttribute("aria-label", high ? "Graphics high" : "Graphics low");
 }
 
 function paintWeather(sample: WeatherSample): void {

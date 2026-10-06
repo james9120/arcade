@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { TownMap } from "../game/types";
-import { findOpenings, groupBlocks, roofRowCount, type Block, type Opening } from "./footprints";
+import { eaveRowCount, findOpenings, groupBlocks, roofRowCount, type Block, type Opening } from "./footprints";
 
 export interface WetSurface {
   material: THREE.MeshPhongMaterial;
@@ -8,19 +8,33 @@ export interface WetSurface {
   base: [number, number, number];
 }
 
-const WALL_HEIGHT = 1.22;
-const ROOF_RISE = 0.7;
-const OVERHANG = 0.34;
+const OVERHANG = 0.375;
 const ROOF_THICKNESS = 0.1;
+const PITCH = (40 * Math.PI) / 180;
 
 export function applyWetness(surfaces: WetSurface[], wetness: number): void {
+  const wet = Math.min(1, Math.max(0, wetness));
   for (const surface of surfaces) {
-    const gain = surface.kind === "roof" ? 1 : surface.kind === "leaf" ? 0.4 : 0.62;
-    const gloss = wetness * gain;
-    const tint = 1 - gloss * (surface.kind === "roof" ? 0.34 : 0.2);
-    surface.material.color.setRGB(surface.base[0] * tint, surface.base[1] * tint, surface.base[2] * tint);
-    surface.material.shininess = gloss * 78;
-    surface.material.specular.setRGB(gloss * 0.42, gloss * 0.48, gloss * 0.55);
+    if (surface.kind === "roof") {
+      const tint = 1 - wet * 0.12;
+      surface.material.color.setRGB(surface.base[0] * tint, surface.base[1] * tint, surface.base[2] * tint);
+      surface.material.shininess = wet * 22;
+      surface.material.specular.setRGB(wet * 0.06, wet * 0.055, wet * 0.04);
+    } else if (surface.kind === "leaf") {
+      const dark = 1 - wet * 0.18;
+      surface.material.color.setRGB(
+        surface.base[0] * dark * (1 - wet * 0.08),
+        Math.min(1, surface.base[1] * dark * (1 + wet * 0.05)),
+        surface.base[2] * dark * (1 - wet * 0.1),
+      );
+      surface.material.shininess = wet * 2;
+      surface.material.specular.setRGB(wet * 0.01, wet * 0.015, wet * 0.008);
+    } else {
+      const tint = 1 - wet * 0.1;
+      surface.material.color.setRGB(surface.base[0] * tint, surface.base[1] * tint, surface.base[2] * tint);
+      surface.material.shininess = wet * 8;
+      surface.material.specular.setRGB(wet * 0.03, wet * 0.028, wet * 0.02);
+    }
   }
 }
 
@@ -62,28 +76,57 @@ function addBuilding(
   scene.add(group);
 
   const openings = findOpenings(facade.pixels, facade.width, facade.height);
-  const wallPixels = wallStrip(facade.pixels, facade.width, facade.height, openings);
-  const wallTint = averageColor(wallPixels);
+  const tile = wallTile(facade.pixels, facade.width, facade.height, openings);
+  const wallH = width >= 7 ? 2.6 : 2.0;
+  const front = frontFace(punchOpenings(facade.pixels, facade.width, facade.height, openings), facade.width, facade.height, tile, wallH);
+  const wallTint = averageColor(tile);
   const roofTint = averageColor(roofSouth.pixels);
-  const punched = punchOpenings(facade.pixels, facade.width, facade.height, openings);
+  const ridgeZ = roofRows;
+  const southRun = depth + OVERHANG - ridgeZ;
+  const northRun = ridgeZ + OVERHANG;
+  const rise = Math.tan(PITCH) * Math.max(0.5, southRun);
+  const southLen = Math.hypot(Math.max(0.2, southRun), rise);
+  const northLen = Math.hypot(Math.max(0.2, northRun), rise);
+  const slopeWidth = width + OVERHANG * 2;
+  const shingles = shingleTile(roofNorth.pixels, roofNorth.width, roofNorth.height);
 
-  const facadeMaterial = mappedMaterial(punched, facade.width, facade.height, textures, materials, surfaces, "wall", 1, 1, true);
-  const wallMaterial = mappedMaterial(wallPixels, 16, wallPixels.length / 4 / 16, textures, materials, surfaces, "wall", width, 1, false);
-  const sideMaterial = mappedMaterial(wallPixels, 16, wallPixels.length / 4 / 16, textures, materials, surfaces, "wall", depth, 1, false);
-  const southRoof = mappedMaterial(roofSouth.pixels, roofSouth.width, roofSouth.height, textures, materials, surfaces, "roof", 1, 1, false);
-  const northRoof = mappedMaterial(roofNorth.pixels, roofNorth.width, roofNorth.height, textures, materials, surfaces, "roof", 1, 1, false);
-  const trim = solidMaterial(scaleColor(roofTint, 0.62), materials, surfaces, "roof");
-  const jamb = solidMaterial(scaleColor(wallTint, 0.38), materials, surfaces, "wall");
-  const sill = solidMaterial(scaleColor(wallTint, 0.82), materials, surfaces, "wall");
+  const facadeMaterial = mappedMaterial(front.pixels, front.width, front.height, textures, materials, surfaces, "wall", 1, 1, true);
+  const wallMaterial = mappedMaterial(tile, 16, 16, textures, materials, surfaces, "wall", width, wallH, false);
+  const sideMaterial = mappedMaterial(tile, 16, 16, textures, materials, surfaces, "wall", depth, wallH, false);
+  const southRoof = mappedMaterial(shingles, 16, 16, textures, materials, surfaces, "roof", slopeWidth, southLen, false);
+  const northRoof = mappedMaterial(shingles, 16, 16, textures, materials, surfaces, "roof", slopeWidth, northLen, false);
+  const trim = solidMaterial(scaleColor(roofTint, 0.72), materials, surfaces, "roof");
+  const jamb = solidMaterial(scaleColor(wallTint, 0.28), materials, surfaces, "wall");
+  const sill = solidMaterial(scaleColor(wallTint, 0.9), materials, surfaces, "wall");
+  const eavePx = eaveRowCount(roofSouth.pixels, roofSouth.width, roofSouth.height);
+  const eave =
+    eavePx >= 2
+      ? mappedMaterial(
+          cropRows(roofSouth.pixels, roofSouth.width, roofSouth.height, roofSouth.height - eavePx, eavePx),
+          roofSouth.width,
+          eavePx,
+          textures,
+          materials,
+          surfaces,
+          "roof",
+          slopeWidth / Math.max(1, width),
+          1,
+          false,
+        )
+      : null;
 
-  const ridgeZ = (roofRows / Math.max(1, depth)) * depth;
-  group.add(roofMesh(geometries, southRoof, northRoof, trim, width, depth, ridgeZ));
-  group.add(wallMesh(geometries, facadeMaterial, "south", width, depth));
-  group.add(wallMesh(geometries, wallMaterial, "north", width, depth));
-  group.add(wallMesh(geometries, sideMaterial, "west", width, depth));
-  group.add(wallMesh(geometries, sideMaterial, "east", width, depth));
-  group.add(gableMesh(geometries, sideMaterial, depth, ridgeZ, 0));
-  group.add(gableMesh(geometries, sideMaterial, depth, ridgeZ, width));
+  group.add(roofMesh(geometries, southRoof, northRoof, trim, eave, width, depth, ridgeZ, wallH, rise, eavePx, southLen));
+  for (const accent of accentTiles(roofSouth.pixels, roofSouth.width, roofSouth.height, eavePx)) {
+    const stamp = mappedMaterial(accent.pixels, 16, accent.height, textures, materials, surfaces, "roof", 1, 1, false);
+    const quad = stampQuad(geometries, stamp, accent.index, accent.height / 16, width, depth, ridgeZ, wallH, rise, southLen);
+    if (quad) group.add(quad);
+  }
+  group.add(wallMesh(geometries, facadeMaterial, "south", width, depth, wallH));
+  group.add(wallMesh(geometries, wallMaterial, "north", width, depth, wallH));
+  group.add(wallMesh(geometries, sideMaterial, "west", width, depth, wallH));
+  group.add(wallMesh(geometries, sideMaterial, "east", width, depth, wallH));
+  group.add(gableMesh(geometries, sideMaterial, depth, ridgeZ, 0, wallH, rise));
+  group.add(gableMesh(geometries, sideMaterial, depth, ridgeZ, width, wallH, rise));
 
   for (const opening of openings) {
     addOpening(group, opening, facade, width, depth, geometries, materials, textures, surfaces, jamb, sill);
@@ -106,11 +149,12 @@ function addOpening(
 ): void {
   const crop = cropImage(facade.pixels, facade.width, facade.height, opening);
   const material = mappedMaterial(crop.pixels, crop.width, crop.height, textures, materials, surfaces, "wall", 1, 1, false);
+  const facadeWorld = facade.height / 16;
   const ow = (opening.w / facade.width) * width;
-  const oh = (opening.h / facade.height) * WALL_HEIGHT;
+  const oh = (opening.h / facade.height) * facadeWorld;
   const cx = ((opening.x + opening.w / 2) / facade.width) * width;
-  const cy = WALL_HEIGHT - ((opening.y + opening.h / 2) / facade.height) * WALL_HEIGHT;
-  const inset = opening.kind === "door" ? 0.16 : 0.1;
+  const cy = facadeWorld * (1 - (opening.y + opening.h / 2) / facade.height);
+  const inset = opening.kind === "door" ? 0.42 : 0.32;
   const panel = new THREE.Mesh(track(geometries, new THREE.PlaneGeometry(ow, oh)), material);
   panel.position.set(cx, cy, depth - inset);
   panel.castShadow = true;
@@ -119,13 +163,14 @@ function addOpening(
 
   const backZ = panel.position.z;
   const faceZ = backZ + inset;
-  addJamb(group, geometries, jamb, cx - ow / 2, cy, (backZ + faceZ) / 2, 0.05, oh, inset + 0.01);
-  addJamb(group, geometries, jamb, cx + ow / 2, cy, (backZ + faceZ) / 2, 0.05, oh, inset + 0.01);
-  addJamb(group, geometries, jamb, cx, cy + oh / 2, (backZ + faceZ) / 2, ow, 0.05, inset + 0.01);
+  const thick = 0.09;
+  addJamb(group, geometries, jamb, cx - ow / 2, cy, (backZ + faceZ) / 2, thick, oh, inset + 0.02);
+  addJamb(group, geometries, jamb, cx + ow / 2, cy, (backZ + faceZ) / 2, thick, oh, inset + 0.02);
+  addJamb(group, geometries, jamb, cx, cy + oh / 2, (backZ + faceZ) / 2, ow, thick, inset + 0.02);
   if (opening.kind === "window") {
-    addJamb(group, geometries, jamb, cx, cy - oh / 2, (backZ + faceZ) / 2, ow, 0.05, inset + 0.01);
-    const lip = new THREE.Mesh(track(geometries, new THREE.BoxGeometry(ow * 1.04, 0.035, 0.08)), sill);
-    lip.position.set(cx, cy - oh / 2, faceZ + 0.03);
+    addJamb(group, geometries, jamb, cx, cy - oh / 2, (backZ + faceZ) / 2, ow, thick, inset + 0.02);
+    const lip = new THREE.Mesh(track(geometries, new THREE.BoxGeometry(ow * 1.08, 0.06, 0.12)), sill);
+    lip.position.set(cx, cy - oh / 2, faceZ + 0.02);
     lip.castShadow = true;
     lip.receiveShadow = true;
     group.add(lip);
@@ -156,21 +201,22 @@ function wallMesh(
   side: "south" | "north" | "west" | "east",
   width: number,
   depth: number,
+  wallH: number,
 ): THREE.Mesh {
-  const geometry = track(geometries, new THREE.PlaneGeometry(side === "west" || side === "east" ? depth : width, WALL_HEIGHT));
+  const geometry = track(geometries, new THREE.PlaneGeometry(side === "west" || side === "east" ? depth : width, wallH));
   const mesh = new THREE.Mesh(geometry, material);
   mesh.name = `${side}-wall`;
-  if (side === "south") mesh.position.set(width / 2, WALL_HEIGHT / 2, depth);
+  if (side === "south") mesh.position.set(width / 2, wallH / 2, depth);
   if (side === "north") {
-    mesh.position.set(width / 2, WALL_HEIGHT / 2, 0);
+    mesh.position.set(width / 2, wallH / 2, 0);
     mesh.rotation.y = Math.PI;
   }
   if (side === "west") {
-    mesh.position.set(0, WALL_HEIGHT / 2, depth / 2);
+    mesh.position.set(0, wallH / 2, depth / 2);
     mesh.rotation.y = Math.PI / 2;
   }
   if (side === "east") {
-    mesh.position.set(width, WALL_HEIGHT / 2, depth / 2);
+    mesh.position.set(width, wallH / 2, depth / 2);
     mesh.rotation.y = -Math.PI / 2;
   }
   mesh.castShadow = true;
@@ -184,16 +230,19 @@ function gableMesh(
   depth: number,
   ridgeZ: number,
   x: number,
+  wallH: number,
+  rise: number,
 ): THREE.Mesh {
   const positions = [
-    x, WALL_HEIGHT, 0,
-    x, WALL_HEIGHT, depth,
-    x, WALL_HEIGHT + ROOF_RISE - 0.02, ridgeZ,
+    x, wallH, 0,
+    x, wallH, depth,
+    x, wallH + rise - 0.02, ridgeZ,
   ];
   const geometry = track(geometries, new THREE.BufferGeometry());
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   const peak = ridgeZ / Math.max(depth, 0.001);
-  geometry.setAttribute("uv", new THREE.Float32BufferAttribute([0, 0, 1, 0, peak, 1], 2));
+  const span = rise / Math.max(wallH, 0.001);
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute([0, 0, 1, 0, peak, span], 2));
   geometry.computeVertexNormals();
   const mesh = new THREE.Mesh(geometry, material);
   mesh.castShadow = true;
@@ -206,15 +255,20 @@ function roofMesh(
   southMaterial: THREE.Material,
   northMaterial: THREE.Material,
   trim: THREE.Material,
+  eave: THREE.Material | null,
   width: number,
   depth: number,
   ridgeZ: number,
+  wallH: number,
+  rise: number,
+  eavePx: number,
+  southLen: number,
 ): THREE.Group {
   const roof = new THREE.Group();
   const x0 = -OVERHANG;
   const x1 = width + OVERHANG;
-  const yEave = WALL_HEIGHT;
-  const yRidge = WALL_HEIGHT + ROOF_RISE;
+  const yEave = wallH;
+  const yRidge = wallH + rise;
   const south = slopeGeometry(
     geometries,
     [
@@ -255,7 +309,65 @@ function roofMesh(
   roof.add(edgeFascia(geometries, trim, x0, yEave, yRidge, depth + OVERHANG, ridgeZ));
   roof.add(edgeFascia(geometries, trim, x1, yEave, yRidge, -OVERHANG, ridgeZ));
   roof.add(edgeFascia(geometries, trim, x0, yEave, yRidge, -OVERHANG, ridgeZ));
+  if (eave && eavePx >= 2) {
+    const tEnd = Math.min(0.42, eavePx / 16 / Math.max(0.2, southLen));
+    const normal = new THREE.Vector3(0, Math.max(0.2, depth + OVERHANG - ridgeZ), rise).normalize();
+    const zEave = depth + OVERHANG;
+    const lift = 0.03;
+    const quad = slopeGeometry(geometries, [
+      offsetPoint(x0, 0, wallH, rise, zEave, ridgeZ, normal, lift),
+      offsetPoint(x1, 0, wallH, rise, zEave, ridgeZ, normal, lift),
+      offsetPoint(x1, tEnd, wallH, rise, zEave, ridgeZ, normal, lift),
+      offsetPoint(x0, tEnd, wallH, rise, zEave, ridgeZ, normal, lift),
+    ]);
+    roof.add(shaded(quad, eave));
+  }
   return roof;
+}
+
+function offsetPoint(
+  x: number,
+  t: number,
+  wallH: number,
+  rise: number,
+  zEave: number,
+  ridgeZ: number,
+  normal: THREE.Vector3,
+  lift: number,
+): [number, number, number] {
+  return [
+    x + normal.x * lift,
+    wallH + rise * t + normal.y * lift,
+    zEave + (ridgeZ - zEave) * t + normal.z * lift,
+  ];
+}
+
+function stampQuad(
+  geometries: THREE.BufferGeometry[],
+  material: THREE.Material,
+  column: number,
+  stampLen: number,
+  width: number,
+  depth: number,
+  ridgeZ: number,
+  wallH: number,
+  rise: number,
+  southLen: number,
+): THREE.Mesh | null {
+  if (column < 0 || column >= width) return null;
+  const tSpan = Math.min(0.5, stampLen / Math.max(0.2, southLen));
+  const t0 = Math.max(0.2, 1 - tSpan - 0.05);
+  const zEave = depth + OVERHANG;
+  const normal = new THREE.Vector3(0, Math.max(0.2, zEave - ridgeZ), rise).normalize();
+  const x0 = column;
+  const x1 = column + 1;
+  const quad = slopeGeometry(geometries, [
+    offsetPoint(x0, t0, wallH, rise, zEave, ridgeZ, normal, 0.045),
+    offsetPoint(x1, t0, wallH, rise, zEave, ridgeZ, normal, 0.045),
+    offsetPoint(x1, t0 + tSpan, wallH, rise, zEave, ridgeZ, normal, 0.045),
+    offsetPoint(x0, t0 + tSpan, wallH, rise, zEave, ridgeZ, normal, 0.045),
+  ]);
+  return shaded(quad, material);
 }
 
 function slopeGeometry(
@@ -387,7 +499,7 @@ function contactAo(
   materials: THREE.Material[],
   textures: THREE.Texture[],
 ): THREE.Mesh {
-  const pad = 0.62;
+  const pad = 0.55;
   const scale = 28;
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(8, Math.ceil((width + pad * 2) * scale));
@@ -411,12 +523,12 @@ function contactAo(
         const innerY = y >= top && y <= bottom ? Math.min(y - top, bottom - y) : fade;
         const inside = Math.min(innerX, innerY);
         let alpha = 0;
-        if (outside > 0 && outside < fade) alpha = (1 - outside / fade) * 150;
-        else if (outside === 0 && inside < fade * 0.35) alpha = (1 - inside / (fade * 0.35)) * 110;
+        if (outside > 0 && outside < fade) alpha = (1 - outside / fade) * 220;
+        else if (outside === 0 && inside < fade * 0.5) alpha = (1 - inside / (fade * 0.5)) * 150;
         const index = (y * canvas.width + x) * 4;
-        image.data[index] = 18;
-        image.data[index + 1] = 22;
-        image.data[index + 2] = 16;
+        image.data[index] = 8;
+        image.data[index + 1] = 10;
+        image.data[index + 2] = 8;
         image.data[index + 3] = Math.round(alpha);
       }
     }
@@ -431,7 +543,7 @@ function contactAo(
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.set(width / 2, 0.03, depth / 2);
   mesh.layers.set(2);
-  mesh.renderOrder = 1;
+  mesh.renderOrder = 4;
   return mesh;
 }
 
@@ -502,57 +614,218 @@ function cropImage(pixels: Uint8ClampedArray, width: number, height: number, ope
   return { pixels: cropped, width: cropW, height: cropH };
 }
 
-function wallStrip(pixels: Uint8ClampedArray, width: number, height: number, openings: Opening[]): Uint8ClampedArray {
+function wallTile(pixels: Uint8ClampedArray, width: number, height: number, openings: Opening[]): Uint8ClampedArray {
   const covered = (x: number, y: number) =>
     openings.some((opening) => x >= opening.x && x < opening.x + opening.w && y >= opening.y && y < opening.y + opening.h);
   let bestX = 0;
+  let bestY = 0;
   let bestScore = Number.POSITIVE_INFINITY;
-  const column = 8;
-  for (let x = 0; x + column <= width; x += 4) {
-    let count = 0;
-    let blocked = 0;
-    const sum = [0, 0, 0];
-    const sumSq = [0, 0, 0];
-    for (let y = 0; y < height; y++) {
-      for (let dx = 0; dx < column; dx++) {
-        if (covered(x + dx, y)) {
-          blocked += 1;
-          continue;
+  const span = 16;
+  for (let y = 0; y + span <= height; y += 4) {
+    for (let x = 0; x + span <= width; x += 4) {
+      let count = 0;
+      let blocked = 0;
+      const sum = [0, 0, 0];
+      const sumSq = [0, 0, 0];
+      for (let dy = 0; dy < span; dy++) {
+        for (let dx = 0; dx < span; dx++) {
+          if (covered(x + dx, y + dy)) {
+            blocked += 1;
+            continue;
+          }
+          const index = ((y + dy) * width + x + dx) * 4;
+          for (let channel = 0; channel < 3; channel++) {
+            const value = pixels[index + channel];
+            sum[channel] += value;
+            sumSq[channel] += value * value;
+          }
+          count += 1;
         }
-        const index = (y * width + x + dx) * 4;
-        for (let channel = 0; channel < 3; channel++) {
-          const value = pixels[index + channel];
-          sum[channel] += value;
-          sumSq[channel] += value * value;
-        }
-        count += 1;
+      }
+      if (count < span * 8) continue;
+      let variance = 0;
+      for (let channel = 0; channel < 3; channel++) {
+        const mean = sum[channel] / count;
+        variance += sumSq[channel] / count - mean * mean;
+      }
+      const score = variance + blocked * 12;
+      if (score < bestScore) {
+        bestScore = score;
+        bestX = x;
+        bestY = y;
       }
     }
-    if (count < height) continue;
-    let variance = 0;
-    for (let channel = 0; channel < 3; channel++) {
-      const mean = sum[channel] / count;
-      variance += sumSq[channel] / count - mean * mean;
-    }
-    const score = variance + blocked * 8;
-    if (score < bestScore) {
-      bestScore = score;
-      bestX = x;
+  }
+  return cropRows(pixels, width, height, bestY, span, bestX, span);
+}
+
+function frontFace(
+  facade: Uint8ClampedArray,
+  facadeW: number,
+  facadeH: number,
+  tile: Uint8ClampedArray,
+  wallH: number,
+): ImageBuffer {
+  const texH = Math.max(facadeH, Math.round(wallH * 16));
+  const pixels = new Uint8ClampedArray(facadeW * texH * 4);
+  for (let y = 0; y < texH; y++) {
+    for (let x = 0; x < facadeW; x++) {
+      const from = ((y % 16) * 16 + (x % 16)) * 4;
+      const to = (y * facadeW + x) * 4;
+      pixels[to] = tile[from];
+      pixels[to + 1] = tile[from + 1];
+      pixels[to + 2] = tile[from + 2];
+      pixels[to + 3] = 255;
     }
   }
-  const strip = new Uint8ClampedArray(16 * height * 4);
-  for (let y = 0; y < height; y++) {
+  blitImage(pixels, facadeW, facade, facadeW, facadeH, 0, texH - facadeH);
+  return { pixels, width: facadeW, height: texH };
+}
+
+function shingleTile(pixels: Uint8ClampedArray, width: number, height: number): Uint8ClampedArray {
+  const cols = Math.max(1, Math.floor(width / 16));
+  const tileH = Math.min(16, height);
+  const colors: Array<[number, number, number]> = [];
+  for (let column = 0; column < cols; column++) {
+    colors.push(regionMean(pixels, width, column * 16, 0, 16, tileH));
+  }
+  const median = medianColor(colors);
+  let best = 0;
+  let bestDelta = Number.POSITIVE_INFINITY;
+  for (let column = 0; column < cols; column++) {
+    const delta = colorDelta(colors[column], median);
+    if (delta < bestDelta) {
+      bestDelta = delta;
+      best = column;
+    }
+  }
+  const tile = cropRows(pixels, width, height, 0, tileH, best * 16, 16);
+  if (tileH === 16) return tile;
+  const square = new Uint8ClampedArray(16 * 16 * 4);
+  for (let y = 0; y < 16; y++) {
     for (let x = 0; x < 16; x++) {
-      const sx = Math.min(width - 1, bestX + (x % column));
-      const from = (y * width + sx) * 4;
+      const from = ((y % tileH) * 16 + x) * 4;
       const to = (y * 16 + x) * 4;
-      strip[to] = pixels[from];
-      strip[to + 1] = pixels[from + 1];
-      strip[to + 2] = pixels[from + 2];
-      strip[to + 3] = 255;
+      square[to] = tile[from];
+      square[to + 1] = tile[from + 1];
+      square[to + 2] = tile[from + 2];
+      square[to + 3] = 255;
     }
   }
-  return strip;
+  return square;
+}
+
+function accentTiles(
+  pixels: Uint8ClampedArray,
+  width: number,
+  height: number,
+  eavePx: number,
+): Array<{ index: number; pixels: Uint8ClampedArray; height: number }> {
+  const usable = Math.max(1, height - Math.max(0, eavePx));
+  const cols = Math.max(1, Math.floor(width / 16));
+  const colors: Array<[number, number, number]> = [];
+  for (let column = 0; column < cols; column++) {
+    colors.push(regionMean(pixels, width, column * 16, 0, 16, usable));
+  }
+  const median = medianColor(colors);
+  const found: Array<{ index: number; pixels: Uint8ClampedArray; height: number }> = [];
+  const stampH = Math.min(16, usable);
+  for (let column = 0; column < cols; column++) {
+    if (colorDelta(colors[column], median) <= 90) continue;
+    found.push({
+      index: column,
+      height: stampH,
+      pixels: cropRows(pixels, width, height, 0, stampH, column * 16, 16),
+    });
+  }
+  return found;
+}
+
+function cropRows(
+  pixels: Uint8ClampedArray,
+  width: number,
+  height: number,
+  top: number,
+  rows: number,
+  left = 0,
+  cropWidth = width,
+): Uint8ClampedArray {
+  const safeTop = Math.max(0, Math.min(height - 1, top));
+  const safeRows = Math.max(1, Math.min(rows, height - safeTop));
+  const safeLeft = Math.max(0, Math.min(width - 1, left));
+  const safeWidth = Math.max(1, Math.min(cropWidth, width - safeLeft));
+  const cropped = new Uint8ClampedArray(safeWidth * safeRows * 4);
+  for (let y = 0; y < safeRows; y++) {
+    for (let x = 0; x < safeWidth; x++) {
+      const from = ((safeTop + y) * width + safeLeft + x) * 4;
+      const to = (y * safeWidth + x) * 4;
+      cropped[to] = pixels[from];
+      cropped[to + 1] = pixels[from + 1];
+      cropped[to + 2] = pixels[from + 2];
+      cropped[to + 3] = pixels[from + 3] || 255;
+    }
+  }
+  return cropped;
+}
+
+function blitImage(
+  target: Uint8ClampedArray,
+  targetWidth: number,
+  source: Uint8ClampedArray,
+  sourceWidth: number,
+  sourceHeight: number,
+  left: number,
+  top: number,
+): void {
+  for (let y = 0; y < sourceHeight; y++) {
+    for (let x = 0; x < sourceWidth; x++) {
+      const from = (y * sourceWidth + x) * 4;
+      const to = ((top + y) * targetWidth + left + x) * 4;
+      if (to < 0 || to + 3 >= target.length) continue;
+      target[to] = source[from];
+      target[to + 1] = source[from + 1];
+      target[to + 2] = source[from + 2];
+      target[to + 3] = source[from + 3];
+    }
+  }
+}
+
+function regionMean(
+  pixels: Uint8ClampedArray,
+  width: number,
+  left: number,
+  top: number,
+  spanX: number,
+  spanY: number,
+): [number, number, number] {
+  let red = 0;
+  let green = 0;
+  let blue = 0;
+  let count = 0;
+  for (let y = top; y < top + spanY; y++) {
+    for (let x = left; x < left + spanX && x < width; x++) {
+      const index = (y * width + x) * 4;
+      if (index + 3 >= pixels.length || pixels[index + 3] < 128) continue;
+      red += pixels[index];
+      green += pixels[index + 1];
+      blue += pixels[index + 2];
+      count += 1;
+    }
+  }
+  if (count === 0) return [0, 0, 0];
+  return [red / count, green / count, blue / count];
+}
+
+function medianColor(colors: Array<[number, number, number]>): [number, number, number] {
+  const channel = (index: 0 | 1 | 2) => {
+    const sorted = colors.map((color) => color[index]).sort((a, b) => a - b);
+    return sorted[Math.floor(sorted.length / 2)] ?? 0;
+  };
+  return [channel(0), channel(1), channel(2)];
+}
+
+function colorDelta(a: [number, number, number], b: [number, number, number]): number {
+  return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 }
 
 function mappedMaterial(

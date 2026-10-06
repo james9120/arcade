@@ -197,9 +197,21 @@ h1 {
 
 .hud-actions { display: flex; gap: 8px; align-items: center; }
 
-#hud #to-title {
+#hud #to-title,
+#hud #gfx {
   background: rgba(246, 241, 230, 0.94);
   padding: 8px 14px;
+}
+
+#hud #gfx {
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 2px var(--ink);
+  font-weight: 700;
+}
+
+#hud #gfx[aria-pressed="true"] {
+  background: var(--ink);
+  color: #f6f1e6;
 }
 
 .weather {
