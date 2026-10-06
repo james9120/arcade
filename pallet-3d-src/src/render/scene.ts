@@ -274,7 +274,13 @@ export function createScene(
       reflect.strength(planar ? wetness : 0);
       if (high) {
         trace ??= createTraceLook();
-        trace.render(renderer, scene, camera, wetness, skyNow);
+        try {
+          trace.render(renderer, scene, camera, wetness, skyNow);
+        } catch (error) {
+          console.error(error);
+          renderer.setRenderTarget(null);
+          renderer.render(scene, camera);
+        }
       } else {
         renderer.setRenderTarget(null);
         renderer.render(scene, camera);

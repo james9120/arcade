@@ -39,8 +39,7 @@ const runButton = must<HTMLButtonElement>("run");
 const battleMode = must<HTMLElement>("battle-mode");
 const battleLog = must<HTMLParagraphElement>("battle-log");
 
-const desktopGraphics =
-  window.matchMedia("(pointer: fine)").matches && Math.min(window.innerWidth, window.screen?.width || window.innerWidth) >= 900;
+const desktopGraphics = window.innerWidth >= 900 && !window.matchMedia("(pointer: coarse)").matches;
 let graphics: GraphicsMode = readGraphicsMode(window.location.search, desktopGraphics);
 let mode: Mode = "title";
 let town: TownMap | null = null;

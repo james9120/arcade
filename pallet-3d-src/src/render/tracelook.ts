@@ -44,7 +44,7 @@ const SSR_FS = `
     vec3 posX = viewPosition(vUv + vec2(texel.x, 0.0), texture2D(tDepth, vUv + vec2(texel.x, 0.0)).x);
     vec3 posY = viewPosition(vUv + vec2(0.0, texel.y), texture2D(tDepth, vUv + vec2(0.0, texel.y)).x);
     vec3 normal = normalize(cross(posX - pos, posY - pos));
-    if (dot(normal, pos) > 0.0) normal = -normal;
+    if (dot(normal, viewUp) < 0.0) normal = -normal;
     float upness = dot(normal, viewUp);
     if (upness < 0.62) {
       gl_FragColor = vec4(0.0);
@@ -59,59 +59,56 @@ const SSR_FS = `
     }
 
     float roughness = mix(0.55, 0.06, clamp(wetness, 0.0, 1.0));
-    vec3 from = pos + normal * 0.12;
-    vec3 to = from + refl * 9.0;
-    vec4 c0 = cameraProjectionMatrix * vec4(from, 1.0);
-    vec4 c1 = cameraProjectionMatrix * vec4(to, 1.0);
-    vec3 n0 = c0.xyz / max(c0.w, 0.0001);
-    vec3 n1 = c1.xyz / max(c1.w, 0.0001);
-    vec2 uv0 = n0.xy * 0.5 + 0.5;
-    vec2 uv1 = n1.xy * 0.5 + 0.5;
-    float z0 = n0.z * 0.5 + 0.5;
-    float z1 = n1.z * 0.5 + 0.5;
-    const int STEPS = 14;
-    vec2 stepUv = (uv1 - uv0) / float(STEPS);
-    float stepZ = (z1 - z0) / float(STEPS);
-    vec2 uv = uv0;
-    float rayZ = z0;
+    vec3 origin = pos + normal * 0.2;
+    const int STEPS = 16;
+    const float MAX_DIST = 16.0;
     bool hit = false;
-    vec2 hitUv = uv;
+    vec2 hitUv = vUv;
     float hitDelta = 1.0;
-    for (int i = 0; i < STEPS; i++) {
-      uv += stepUv;
-      rayZ += stepZ;
-      if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) break;
-      if (i < 2) continue;
-      float sceneZ = texture2D(tDepth, uv).x;
-      float gap = rayZ - sceneZ;
-      float thickness = 0.012 + roughness * 0.045;
-      if (sceneZ < 0.999 && gap > 0.0015 && gap < thickness) {
-        hit = true;
-        hitUv = uv;
-        hitDelta = gap;
-        break;
-      }
-    }
-    if (hit) {
-      vec2 lo = hitUv - stepUv;
-      float loZ = rayZ - stepZ;
-      for (int b = 0; b < 4; b++) {
-        vec2 mid = (lo + hitUv) * 0.5;
-        float midZ = (loZ + rayZ) * 0.5;
-        float sceneZ = texture2D(tDepth, mid).x;
-        if (sceneZ < 0.999 && midZ > sceneZ) {
-          hitUv = mid;
-          rayZ = midZ;
-        } else {
-          lo = mid;
-          loZ = midZ;
+    float prevT = 0.0;
+    for (int i = 1; i <= STEPS; i++) {
+      float t = float(i) / float(STEPS);
+      t = t * t;
+      vec3 samplePos = origin + refl * (MAX_DIST * t);
+      vec4 clip = cameraProjectionMatrix * vec4(samplePos, 1.0);
+      if (clip.w < 0.05) break;
+      vec2 uv = clip.xy / clip.w * 0.5 + 0.5;
+      if (uv.x < 0.02 || uv.y < 0.02 || uv.x > 0.98 || uv.y > 0.98) break;
+      float sceneDepth = texture2D(tDepth, uv).x;
+      if (sceneDepth < 0.999) {
+        vec3 scenePos = viewPosition(uv, sceneDepth);
+        float diff = scenePos.z - samplePos.z;
+        float stepLen = MAX_DIST * (t - prevT) + 0.35;
+        bool selfHit = distance(scenePos, pos) < 0.45;
+        if (i > 1 && diff > 0.04 && diff < stepLen && !selfHit) {
+          hit = true;
+          hitUv = uv;
+          hitDelta = diff;
+          float lo = prevT;
+          float hi = t;
+          for (int b = 0; b < 4; b++) {
+            float mid = (lo + hi) * 0.5;
+            vec3 midPos = origin + refl * (MAX_DIST * mid);
+            vec4 midClip = cameraProjectionMatrix * vec4(midPos, 1.0);
+            vec2 midUv = midClip.xy / max(midClip.w, 0.0001) * 0.5 + 0.5;
+            float midDepth = texture2D(tDepth, midUv).x;
+            vec3 midScene = viewPosition(midUv, midDepth);
+            if (midDepth < 0.999 && midScene.z - midPos.z > 0.0) {
+              hi = mid;
+              hitUv = midUv;
+            } else {
+              lo = mid;
+            }
+          }
+          break;
         }
       }
+      prevT = t;
     }
 
     vec3 color = skyColor;
     if (hit) {
-      float spread = (1.0 + roughness * 7.0 + hitDelta * 18.0);
+      float spread = 1.0 + roughness * (2.0 + hitDelta);
       vec2 texel = spread / resolution;
       float hash = fract(sin(dot(vUv, vec2(12.9898, 78.233))) * 43758.5453);
       vec2 jitter = (vec2(hash, fract(hash * 17.0)) - 0.5) * texel * roughness * 2.0;
@@ -135,8 +132,9 @@ const SSR_FS = `
     float ndotv = clamp(dot(normal, -incident), 0.0, 1.0);
     float fresnel = 0.42 + 0.58 * pow(1.0 - ndotv, 5.0);
     float fade = smoothstep(0.62, 0.86, upness);
-    float alpha = min(0.78, fresnel * fade * smoothstep(0.04, 0.28, wetness));
-    gl_FragColor = vec4(color, hit ? alpha : alpha * 0.35);
+    float wet = smoothstep(0.04, 0.2, wetness);
+    float alpha = (hit ? min(0.74, 0.48 + fresnel * 0.4) : fresnel * 0.22) * fade * wet;
+    gl_FragColor = vec4(color, alpha);
   }
 `;
 
@@ -170,7 +168,7 @@ const SSAO_FS = `
     vec3 posX = viewPosition(vUv + vec2(texel.x, 0.0), texture2D(tDepth, vUv + vec2(texel.x, 0.0)).x);
     vec3 posY = viewPosition(vUv + vec2(0.0, texel.y), texture2D(tDepth, vUv + vec2(0.0, texel.y)).x);
     vec3 normal = normalize(cross(posX - pos, posY - pos));
-    if (dot(normal, pos) > 0.0) normal = -normal;
+    if (dot(normal, viewUp) < 0.0) normal = -normal;
     float radius = 0.52;
     float occ = 0.0;
     float samples = 8.0;
@@ -454,14 +452,14 @@ function makeColor(
   sceneColor: boolean,
   depthType?: THREE.TextureDataType,
 ): THREE.WebGLRenderTarget {
-  const depthTexture = sceneColor ? new THREE.DepthTexture(width, height, depthType ?? THREE.UnsignedIntType) : undefined;
-  const target = new THREE.WebGLRenderTarget(width, height, {
-    depthTexture,
+  const options: THREE.RenderTargetOptions = {
     minFilter: THREE.LinearFilter,
     magFilter: THREE.LinearFilter,
     generateMipmaps: false,
     depthBuffer: true,
-  });
+  };
+  if (sceneColor) options.depthTexture = new THREE.DepthTexture(width, height, depthType ?? THREE.UnsignedIntType);
+  const target = new THREE.WebGLRenderTarget(width, height, options);
   target.texture.colorSpace = sceneColor ? THREE.SRGBColorSpace : THREE.LinearSRGBColorSpace;
   target.texture.minFilter = THREE.LinearFilter;
   target.texture.magFilter = THREE.LinearFilter;
