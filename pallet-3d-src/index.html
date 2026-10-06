@@ -22,13 +22,13 @@
         <p class="eyebrow">Bring-your-own-ROM field prototype</p>
         <h1>Pallet Town</h1>
         <p class="lede">
-          A low-poly walk around the first town, plus one grass battle. Load a FireRed ROM you already
-          own and the map is parsed in this browser, or play the demo — original blocks and a made-up creature.
+          Walk Pallet Town into Route 1. The map, tiles, overworld sprite, and the grass battle are
+          read from a FireRed ROM you already own. Nothing is uploaded.
         </p>
         <div class="actions">
           <button id="load-rom" class="primary" type="button">Load your FireRed ROM</button>
-          <button id="play-demo" class="secondary" type="button">Play demo (no ROM)</button>
         </div>
+        <div id="starters" class="starters" hidden></div>
         <p id="title-error" class="error" role="alert" hidden></p>
         <p class="fine">
           US FireRed v1.0 only (header game code BPRE, revision 0). The file stays in this tab and is never
@@ -44,7 +44,14 @@
         <span id="mode-pill" class="pill"></span>
         <p id="status">Walk north into the tall grass.</p>
       </div>
-      <button id="to-title" type="button">Title</button>
+      <div class="hud-actions">
+        <div id="weather" class="weather weather-clear" role="status" aria-label="Clear">
+          <span class="weather-mark" aria-hidden="true"></span>
+          <span id="weather-label">Clear</span>
+        </div>
+        <button id="gfx" type="button" aria-pressed="true">High</button>
+        <button id="to-title" type="button">Title</button>
+      </div>
     </header>
 
     <nav id="dpad" class="dpad" hidden aria-label="Move">

@@ -1,4 +1,5 @@
 import { computeDamage } from "./stats";
+import { typeMultiplier } from "../rom/monsters";
 import type { Combatant } from "./types";
 
 export type BattleOutcome = "win" | "lose" | "run";
@@ -24,6 +25,7 @@ export class Battle {
     readonly player: Combatant,
     readonly wild: Combatant,
     private readonly rng: () => number = Math.random,
+    private readonly chart: readonly number[] = [],
   ) {}
 
   get over(): boolean {
@@ -86,7 +88,9 @@ export class Battle {
     const defenderSide = attackerSide === "player" ? "wild" : "player";
     const defender = defenderSide === "player" ? this.player : this.wild;
     const variance = 0.9 + this.rng() * 0.2;
-    const damage = computeDamage(attacker, defender, attacker.movePower, variance);
+    const stab = attacker.typeIds.includes(attacker.moveTypeId) ? 1.5 : 1;
+    const matchup = typeMultiplier(this.chart, attacker.moveTypeId, defender.typeIds);
+    const damage = computeDamage(attacker, defender, attacker.movePower, variance * stab * matchup);
     defender.hp = Math.max(0, defender.hp - damage);
     return {
       kind: "hit",

@@ -1,4 +1,4 @@
-import type { Cell, Direction, PartyMember, TileVisual, TownMap, WildSlot } from "../game/types";
+import type { Cell, Direction, PartyMember, PropKind, TileVisual, TownMap, WildSlot } from "../game/types";
 import { fileOffset, optionalFileOffset, readS32, readU16, readU32, readU8, sliceBytes } from "./bytes";
 import {
   ATTR_BEHAVIOR_MASK,
@@ -19,7 +19,6 @@ import {
   MB_JUMP_WEST,
   MB_TALL_GRASS,
   METATILE_BYTES,
-  NORTH_STRIP_ROWS,
   NUM_METATILES_IN_PRIMARY,
   NUM_METATILES_TOTAL,
   NUM_PALS_IN_PRIMARY,
@@ -34,21 +33,8 @@ import {
 import { RomError } from "./error";
 import { normalizeRom, readHeader } from "./header";
 import { decompressLz77 } from "./lz77";
-import { decodeText } from "./text";
+import { readHero, readSpeciesProfile, readTypeChart } from "./monsters";
 import { decodePalettes, renderMetatile, type Rgb } from "./tiles";
-
-const BODY_ACCENTS = [
-  "#d4544a",
-  "#3d74c4",
-  "#e2c14a",
-  "#4eae62",
-  "#2a2a2a",
-  "#8a6239",
-  "#7a4ea8",
-  "#8a8f96",
-  "#f4f1ea",
-  "#e48aaa",
-];
 
 const WATER_BEHAVIORS = new Set([
   0x10, 0x11, 0x12, 0x13, 0x15, 0x16, 0x17, 0x19, 0x1a, 0x1b,
@@ -134,7 +120,12 @@ export function parseTown(rom: Uint8Array, table: FireredTable, headerTitle = ""
     stitched.rowShift,
     table.indoorPalletGroup,
   );
-  const player = readPartyMember(rom, table, table.partnerSpecies, table.partnerLevel);
+  const starters = [table.starterA, table.starterB, table.starterC]
+    .filter((species) => species > 0)
+    .map((species) => readPartyMember(rom, table, species, table.partnerLevel));
+  if (starters.length === 0) {
+    throw new RomError("This ROM didn't contain a partner species to walk with.");
+  }
 
   const title = headerTitle ? `Pallet Town · ${headerTitle}` : "Pallet Town";
   return {
@@ -143,12 +134,16 @@ export function parseTown(rom: Uint8Array, table: FireredTable, headerTitle = ""
     modeDetail: "ROM · FireRed US v1.0",
     width: stitched.width,
     height: stitched.height,
+    northRows: stitched.rowShift,
     cells: stitched.cells,
     spawnX: spawn.x,
     spawnY: spawn.y,
-    player,
+    player: starters[0],
+    starters,
     wildLocal: localSlots,
     wildNorth: northSlots,
+    hero: readHero(rom, table),
+    chart: readTypeChart(rom, table),
   };
 }
 
@@ -271,47 +266,55 @@ function cellFromEntry(
   let encounter = false;
   let blockEnter: Direction[] | undefined;
   let visual: TileVisual = "ground";
+  let kind: PropKind = "ground";
   let height = 0;
 
   if (water) {
     visual = "water";
+    kind = "water";
     blocked = true;
-    height = 0;
   } else if (tallGrass && collision === 0) {
     visual = "tallGrass";
+    kind = "grass";
     blocked = false;
     encounter = true;
-    height = 0;
   } else if (jump && collision === 0) {
     visual = "ledge";
+    kind = "ledge";
     blocked = false;
     blockEnter = (["n", "s", "e", "w"] as Direction[]).filter((dir) => dir !== jump);
-    height = 0.2;
+    height = 0.18;
   } else if (oneWay && !blocked) {
     blockEnter = [oneWay];
     visual = "ledge";
+    kind = "ledge";
     height = 0.12;
   } else if (blocked) {
     const sample = sampleImage(pixels);
     if (furniture) {
       visual = "sign";
+      kind = "sign";
       height = 0.7;
     } else if (sample.alphaTop < 0.35 && sample.alphaBottom > 0.4) {
       visual = "fence";
-      height = 0.42;
+      kind = "fence";
+      height = 0.55;
     } else if (sample.green > 0.42) {
       visual = "tree";
-      height = 1.75;
+      kind = "tree";
+      height = 1.6;
     } else if (sample.red > 0.28) {
       visual = "roof";
-      height = 1.5;
+      kind = "structure";
+      height = 0.38;
     } else {
       visual = "wall";
-      height = 1.15;
+      kind = "structure";
+      height = 0.5;
     }
   }
 
-  return { visual, blocked, encounter, blockEnter, height, wild: "none", pixels, textureKey };
+  return { visual, kind, blocked, encounter, blockEnter, height, wild: "none", pixels, textureKey };
 }
 
 function metatileImage(
@@ -430,26 +433,34 @@ function stitchNorth(
   if (!north) {
     return { width: pallet.width, height: pallet.height, cells: pallet.cells, rowShift: 0 };
   }
-  const rows = Math.min(NORTH_STRIP_ROWS, north.height);
-  const extra: Cell[] = [];
-  for (let row = 0; row < rows; row++) {
-    const sourceY = north.height - rows + row;
-    for (let x = 0; x < pallet.width; x++) {
-      const sourceX = x - offset;
-      if (sourceX < 0 || sourceX >= north.width) {
-        extra.push(edgeCell());
+  const minX = Math.min(0, offset);
+  const maxX = Math.max(pallet.width, offset + north.width);
+  const width = maxX - minX;
+  const height = north.height + pallet.height;
+  const cells: Cell[] = [];
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const worldX = x + minX;
+      if (y < north.height) {
+        const sourceX = worldX - offset;
+        if (sourceX < 0 || sourceX >= north.width) {
+          cells.push(edgeCell());
+          continue;
+        }
+        const source = north.cells[y * north.width + sourceX];
+        cells.push({ ...source, wild: source.encounter ? "north" : "none" });
         continue;
       }
-      const source = north.cells[sourceY * north.width + sourceX];
-      extra.push({ ...source, wild: source.encounter ? "north" : "none" });
+      const sourceX = worldX;
+      const sourceY = y - north.height;
+      if (sourceX < 0 || sourceX >= pallet.width) {
+        cells.push(edgeCell());
+        continue;
+      }
+      cells.push(pallet.cells[sourceY * pallet.width + sourceX]);
     }
   }
-  return {
-    width: pallet.width,
-    height: pallet.height + rows,
-    cells: extra.concat(pallet.cells),
-    rowShift: rows,
-  };
+  return { width, height, cells, rowShift: north.height };
 }
 
 function tagEncounters(cells: Cell[], source: "local" | "north"): void {
@@ -461,6 +472,7 @@ function tagEncounters(cells: Cell[], source: "local" | "north"): void {
 function edgeCell(): Cell {
   return {
     visual: "tree",
+    kind: "tree",
     blocked: true,
     encounter: false,
     height: 1.4,
@@ -485,9 +497,13 @@ function findSpawn(
     modeDetail: "",
     spawnX: 0,
     spawnY: 0,
+    northRows: 0,
     player: unusedMember(),
+    starters: [],
     wildLocal: [],
     wildNorth: [],
+    hero: null,
+    chart: [],
   };
   const ranked = [...warps].sort((a, b) => warpRank(a, indoorGroup) - warpRank(b, indoorGroup));
   const neighborOrder: Array<[number, number]> = [
@@ -565,46 +581,62 @@ function readWildSlots(rom: Uint8Array, table: FireredTable, mapGroup: number, m
 }
 
 function readPartyMember(rom: Uint8Array, table: FireredTable, species: number, level: number): PartyMember {
-  return { ...readSpecies(rom, table, species), level };
+  const profile = readSpeciesProfile(rom, table, species, level);
+  return {
+    name: profile.name,
+    species: profile.species,
+    level,
+    baseHp: profile.baseHp,
+    baseAttack: profile.baseAttack,
+    baseDefense: profile.baseDefense,
+    baseSpeed: profile.baseSpeed,
+    typeIds: profile.typeIds,
+    typeNames: profile.typeNames,
+    moveName: profile.move.name,
+    movePower: profile.move.power,
+    moveTypeId: profile.move.typeId,
+    moveTypeName: profile.move.typeName,
+    front: profile.front,
+    back: profile.back,
+  };
 }
 
 function readSpecies(rom: Uint8Array, table: FireredTable, species: number) {
-  if (species <= 0 || species >= table.speciesCount) {
-    throw new RomError("A species index in the ROM is outside the US v1.0 table.");
-  }
-  const info = fileOffset(rom, table.speciesInfo) + species * table.speciesInfoStride;
-  const nameOffset = fileOffset(rom, table.speciesNames) + species * table.speciesNameStride;
-  const name = decodeText(sliceBytes(rom, nameOffset, table.speciesNameStride));
-  if (!/[A-Za-z0-9]/.test(name)) {
-    throw new RomError(
-      "Species names at the US v1.0 table didn't decode. This may not be an unmodified v1.0 ROM.",
-    );
-  }
-  const body = readU8(rom, info + 0x19) & 0x7f;
+  const profile = readSpeciesProfile(rom, table, species, 1);
   return {
-    name,
-    baseHp: readU8(rom, info),
-    baseAttack: readU8(rom, info + 1),
-    baseDefense: readU8(rom, info + 2),
-    baseSpeed: readU8(rom, info + 3),
-    moveName: "Strike",
-    movePower: 4,
-    accent: BODY_ACCENTS[body] ?? "#7d8c6a",
-    portrait: "blob" as const,
+    name: profile.name,
+    species: profile.species,
+    baseHp: profile.baseHp,
+    baseAttack: profile.baseAttack,
+    baseDefense: profile.baseDefense,
+    baseSpeed: profile.baseSpeed,
+    typeIds: profile.typeIds,
+    typeNames: profile.typeNames,
+    moveName: profile.move.name,
+    movePower: profile.move.power,
+    moveTypeId: profile.move.typeId,
+    moveTypeName: profile.move.typeName,
+    front: profile.front,
+    back: profile.back,
   };
 }
 
 function unusedMember(): PartyMember {
   return {
     name: "",
+    species: 0,
     level: 1,
     baseHp: 1,
     baseAttack: 1,
     baseDefense: 1,
     baseSpeed: 1,
+    typeIds: [],
+    typeNames: [],
     moveName: "Strike",
     movePower: 4,
-    accent: "#7d8c6a",
-    portrait: "blob",
+    moveTypeId: 0,
+    moveTypeName: "",
+    front: null,
+    back: null,
   };
 }

@@ -163,6 +163,92 @@ h1 {
 
 .fine { color: #516056; font-size: 13px; margin: 0; }
 
+.starters { margin: 8px 0 14px; }
+
+.starter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.starter {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: 148px;
+  padding: 10px 8px 12px;
+  border-radius: 16px;
+  background: white;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 2px var(--line);
+}
+
+.starter img {
+  width: 84px;
+  height: 84px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.starter strong { font-size: 14px; }
+
+.starter span { color: #516056; font-size: 12px; text-align: center; }
+
+.hud-actions { display: flex; gap: 8px; align-items: center; }
+
+#hud #to-title,
+#hud #gfx {
+  background: rgba(246, 241, 230, 0.94);
+  padding: 8px 14px;
+}
+
+#hud #gfx {
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 2px var(--ink);
+  font-weight: 700;
+}
+
+#hud #gfx[aria-pressed="true"] {
+  background: var(--ink);
+  color: #f6f1e6;
+}
+
+.weather {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(246, 241, 230, 0.94);
+  box-shadow: inset 0 0 0 2px var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.weather-mark {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #f2c14e;
+  box-shadow: 0 0 0 3px rgba(242, 193, 78, 0.35);
+}
+
+.weather-clouds .weather-mark {
+  border-radius: 40%;
+  background: #8ea0ae;
+  box-shadow: 6px 1px 0 -2px #d5dee4, -6px 2px 0 -3px #e4ebf0;
+}
+
+.weather-light .weather-mark,
+.weather-heavy .weather-mark {
+  border-radius: 40% 40% 46% 46%;
+  background: #7f93a3;
+  box-shadow: 3px 11px 0 -1px #e7f2fb, -4px 13px 0 -2px #d5e4f2;
+}
+
+.weather-heavy .weather-mark { background: #4d6272; }
+
 .arcade-back { margin-top: 14px; }
 
 .arcade-back a {
@@ -295,7 +381,14 @@ h1 {
 .mon.wild { order: 2; }
 .mon.player { order: 1; }
 
-.portrait svg { width: 92px; height: 92px; display: block; }
+.portrait img {
+  width: 92px;
+  height: 92px;
+  display: block;
+  object-fit: contain;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
 
 .mon h2 {
   font-family: Georgia, Palatino, serif;

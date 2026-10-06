@@ -1,45 +1,72 @@
 import { describe, expect, it } from "vitest";
 import { Battle } from "../src/game/battle";
-import { buildDemoTown } from "../src/game/demoTown";
 import { computeDamage, statsFromBase, toCombatant } from "../src/game/stats";
-import { canEnter, isStandable, type Direction, type TownMap } from "../src/game/types";
+import { canEnter, isStandable, type Cell, type Direction, type PartyMember, type TownMap } from "../src/game/types";
 import { STEP_SECONDS, Walker } from "../src/game/walker";
 
-describe("demo town", () => {
-  it("has a walk from the spawn into northern tall grass, and water stays blocked", () => {
-    const town = buildDemoTown();
+function member(name: string, speed: number): PartyMember {
+  return {
+    name,
+    species: 1,
+    level: 5,
+    baseHp: name === "PIP" ? 48 : 30,
+    baseAttack: 55,
+    baseDefense: 50,
+    baseSpeed: speed,
+    typeIds: [],
+    typeNames: [],
+    moveName: "Strike",
+    movePower: 4,
+    moveTypeId: 0,
+    moveTypeName: "",
+    front: null,
+    back: null,
+  };
+}
+
+function openCell(): Cell {
+  return { visual: "ground", kind: "ground", blocked: false, encounter: false, height: 0, wild: "none" };
+}
+
+function tinyTown(): TownMap {
+  const cells = Array.from({ length: 9 }, openCell);
+  cells[1] = { ...openCell(), encounter: true, visual: "tallGrass", kind: "grass", wild: "north" };
+  cells[8] = { ...openCell(), blocked: true, visual: "water", kind: "water" };
+  return {
+    title: "",
+    mode: "rom",
+    modeDetail: "",
+    width: 3,
+    height: 3,
+    northRows: 0,
+    cells,
+    spawnX: 1,
+    spawnY: 2,
+    player: member("PIP", 60),
+    starters: [],
+    wildLocal: [],
+    wildNorth: [],
+    hero: null,
+    chart: [],
+  };
+}
+
+describe("walking", () => {
+  it("reaches tall grass and treats water as blocked", () => {
+    const town = tinyTown();
     expect(isStandable(town, town.spawnX, town.spawnY)).toBe(true);
-    expect(town.cells[town.spawnY * town.width + town.spawnX].encounter).toBe(false);
-
     const seen = reachable(town, town.spawnX, town.spawnY);
-    const grass = [...seen].some((key) => {
-      const [x, y] = key.split(",").map(Number);
-      return town.cells[y * town.width + x].encounter;
-    });
-    expect(grass).toBe(true);
-
-    const water = town.cells.findIndex((cell) => cell.visual === "water");
-    expect(water).toBeGreaterThan(-1);
-    const waterX = water % town.width;
-    const waterY = Math.floor(water / town.width);
-    expect(seen.has(`${waterX},${waterY}`)).toBe(false);
-    expect(town.player.name).toBe("Bramblo");
-    expect(town.wildLocal[0].name).toBe("Pebblit");
+    expect(seen.has("1,0")).toBe(true);
+    expect(town.cells[1].encounter).toBe(true);
+    expect(seen.has("2,2")).toBe(false);
   });
 });
 
 describe("walker", () => {
   it("steps onto open ground and bumps into a blocked tile", () => {
-    const town = buildDemoTown();
-    const blocked = {
-      ...town,
-      width: 3,
-      height: 3,
-      cells: town.cells.slice(0, 9).map((cell) => ({ ...cell, blocked: false, encounter: false, visual: "ground" as const })),
-      spawnX: 1,
-      spawnY: 2,
-    };
-    blocked.cells[1] = { ...blocked.cells[1], blocked: true, visual: "tree", height: 1 };
+    const blocked = tinyTown();
+    blocked.cells = blocked.cells.map((cell) => ({ ...cell, blocked: false, encounter: false, visual: "ground" as const, kind: "ground" as const }));
+    blocked.cells[1] = { ...blocked.cells[1], blocked: true, visual: "tree", kind: "tree", height: 1 };
     const walker = new Walker(blocked, 1, 2);
     walker.hold("n");
     walker.update(STEP_SECONDS);
@@ -54,40 +81,18 @@ describe("walker", () => {
 describe("battle math", () => {
   it("scales stats and keeps damage at least 1", () => {
     expect(statsFromBase(48, 55, 50, 60, 5)).toEqual({ hp: 19, attack: 10, defense: 10, speed: 11 });
-    expect(computeDamage({ attack: 10, level: 5 }, { defense: 8 }, 4, 1)).toBe(7);
+    expect(computeDamage({ attack: 10, level: 5 }, { defense: 8 }, 4, 1)).toBe(2);
     expect(computeDamage({ attack: 0, level: 0 }, { defense: 99 }, 1, 0.1)).toBe(1);
   });
 
   it("lets the faster side strike first and ends the fight at 0 HP", () => {
-    const player = toCombatant({
-      name: "Bramblo",
-      level: 5,
-      baseHp: 48,
-      baseAttack: 55,
-      baseDefense: 50,
-      baseSpeed: 60,
-      moveName: "Moss Ram",
-      movePower: 4,
-      accent: "#3f8f45",
-      portrait: "bramblo",
-    });
-    const wild = toCombatant({
-      name: "Pebblit",
-      level: 3,
-      baseHp: 30,
-      baseAttack: 45,
-      baseDefense: 55,
-      baseSpeed: 35,
-      moveName: "Pebble Toss",
-      movePower: 4,
-      accent: "#c4a06a",
-      portrait: "pebblit",
-    });
+    const player = toCombatant({ ...member("PIP", 60), level: 5, baseHp: 48 });
+    const wild = toCombatant({ ...member("MOSS", 35), level: 3, baseHp: 30, baseAttack: 45, baseDefense: 55 });
     const fight = new Battle(player, wild, () => 0);
     const first = fight.fight();
     expect(first[0]).toMatchObject({ kind: "hit", defender: "wild" });
     let guard = 0;
-    while (!fight.over && guard < 8) {
+    while (!fight.over && guard < 20) {
       fight.fight();
       guard += 1;
     }

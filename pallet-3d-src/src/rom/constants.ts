@@ -25,9 +25,35 @@ export const FIRERED_US_V10 = {
   palletMap: 0,
   /** gMapGroup_IndoorPallet. */
   indoorPalletGroup: 4,
-  /** First partner species index in the species table. Name and stats are read from the ROM. */
-  partnerSpecies: 1,
+  /** Species-table slots for the three partner species. Names and sprites are read from the ROM. */
+  starterA: 1,
+  starterB: 4,
+  starterC: 7,
   partnerLevel: 5,
+  /** gMonFrontPicTable / gMonBackPicTable: CompressedSpriteSheet, 8 bytes. */
+  frontPicTable: 0x082350ac,
+  backPicTable: 0x0823654c,
+  /** gMonPaletteTable: compressed 16-color palettes, 8 bytes each. */
+  monPalettes: 0x0823730c,
+  /** gLevelUpLearnsets: pointer per species to packed LevelUpMove entries. */
+  levelUpLearnsets: 0x0825d7b4,
+  /** gBattleMoves: 12-byte BattleMove records. Index 0 is MOVE_NONE. */
+  battleMoves: 0x08250c04,
+  /** gMoveNames: 13 bytes each, gen-3 text, index 0 unused. */
+  moveNames: 0x08247094,
+  moveNameStride: 13,
+  /** gTypeNames: 7 bytes each, right-padded, 0xFF terminated. */
+  typeNames: 0x0824f1a0,
+  typeNameStride: 7,
+  /** gTypeEffectiveness: repeating atk, def, multiplier (0/5/10/20) until 0xFF. */
+  typeChart: 0x0824f050,
+  /**
+   * Pointer table of ObjectEventGraphicsInfo. Index 0 is Red's on-foot sprite
+   * (OBJ_EVENT_GFX_RED_NORMAL).
+   */
+  objectGraphics: 0x0839fdb0,
+  /** Object-event sprite palettes: pointer, tag, padding. 8 bytes. */
+  objectPalettes: 0x083a5148,
 } as const;
 
 export type FireredTable = { [K in keyof typeof FIRERED_US_V10]: number };
