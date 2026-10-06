@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { Cell, Direction, TownMap } from "../game/types";
+import { addStructures, applyWetness, type WetSurface } from "./buildings";
 import {
   approachWetness,
   blendWeather,
@@ -49,10 +50,10 @@ export function createScene(canvas: HTMLCanvasElement, town: TownMap): SceneCont
   const fog = new THREE.Fog(skyNow, 18, 48);
   scene.fog = fog;
 
-  const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 180);
+  const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 180);
   camera.layers.enable(1);
   camera.layers.enable(2);
-  const offset = new THREE.Vector3(6.4, 8.2, 7.6);
+  const offset = new THREE.Vector3(5.4, 6.5, 11.4);
   const look = new THREE.Vector3();
   const desired = new THREE.Vector3();
 
@@ -62,12 +63,14 @@ export function createScene(canvas: HTMLCanvasElement, town: TownMap): SceneCont
   sun.position.set(-10, 16, 8);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.bias = -0.0004;
+  sun.shadow.normalBias = 0.02;
   sun.shadow.camera.near = 2;
-  sun.shadow.camera.far = 40;
-  sun.shadow.camera.left = -14;
-  sun.shadow.camera.right = 14;
-  sun.shadow.camera.top = 14;
-  sun.shadow.camera.bottom = -14;
+  sun.shadow.camera.far = 56;
+  sun.shadow.camera.left = -18;
+  sun.shadow.camera.right = 18;
+  sun.shadow.camera.top = 18;
+  sun.shadow.camera.bottom = -18;
   scene.add(sun);
   scene.add(sun.target);
   const fill = new THREE.DirectionalLight("#c9d8ee", 0.28);
@@ -104,18 +107,19 @@ export function createScene(canvas: HTMLCanvasElement, town: TownMap): SceneCont
 
   const romMaterials = new Map<string, THREE.Material>();
   const sideMaterials = new Map<string, THREE.Material>();
-  const trunk = track(geometries, new THREE.CylinderGeometry(0.09, 0.12, 0.85, 6));
-  const canopy = track(geometries, new THREE.PlaneGeometry(1.15, 1.15));
+  const trunk = track(geometries, new THREE.CylinderGeometry(0.1, 0.14, 0.72, 6));
+  const crown = track(geometries, new THREE.SphereGeometry(0.56, 7, 5));
   const trunkMaterial = track(materials, new THREE.MeshLambertMaterial({ color: "#5c4632" }));
+  const wetSurfaces: WetSurface[] = addStructures(scene, town, geometries, materials, textures);
 
   for (let y = 0; y < town.height; y++) {
     for (let x = 0; x < town.width; x++) {
       const cell = town.cells[y * town.width + x];
       if (cell.kind === "tree") {
-        addTree(scene, cell, x, y, materials, textures, romMaterials, trunk, trunkMaterial, canopy);
+        addTree(scene, cell, x, y, materials, textures, romMaterials, trunk, trunkMaterial, crown, wetSurfaces);
       } else if (cell.kind === "sign") {
         addBillboard(scene, cell, x, y, materials, textures, romMaterials);
-      } else if (cell.kind === "structure" || cell.kind === "ledge") {
+      } else if (cell.kind === "ledge") {
         addVolume(scene, cell, x, y, geometries, materials, textures, romMaterials, sideMaterials);
       }
     }
@@ -197,7 +201,7 @@ export function createScene(canvas: HTMLCanvasElement, town: TownMap): SceneCont
         mirrorMaterial.needsUpdate = true;
       }
 
-      look.set(view.x, 0.4, view.y);
+      look.set(view.x, 0.85, view.y);
       desired.copy(look).add(offset);
       if (!snapped) {
         camera.position.copy(desired);
@@ -221,6 +225,7 @@ export function createScene(canvas: HTMLCanvasElement, town: TownMap): SceneCont
       groundMaterial.color.setRGB(1 - wetness * 0.42, 1 - wetness * 0.36, 1 - wetness * 0.28);
       groundMaterial.shininess = wetness * 70;
       groundMaterial.specular.setRGB(wetness * 0.28, wetness * 0.34, wetness * 0.4);
+      applyWetness(wetSurfaces, wetness);
       const skirtMaterial = skirt.material as THREE.MeshLambertMaterial;
       skirtMaterial.color.setRGB(0.43 - wetness * 0.12, 0.56 - wetness * 0.14, 0.3 - wetness * 0.08);
       mirror.visible = wetness > 0.05;
@@ -262,11 +267,15 @@ function paintGround(town: TownMap): HTMLCanvasElement {
       const cell = town.cells[y * town.width + x];
       const left = x * 16;
       const top = y * 16;
+      const standIn = cell.kind === "structure" ? neighborGround(town, x, y) : undefined;
       if (cell.kind === "tree") {
         context.fillStyle = "#6f9444";
         context.fillRect(left, top, 16, 16);
         context.fillStyle = "#5c4632";
         context.fillRect(left + 6, top + 6, 4, 4);
+      } else if (standIn && chipContext) {
+        chipContext.putImageData(new ImageData(new Uint8ClampedArray(standIn), 16, 16), 0, 0);
+        context.drawImage(chip, left, top);
       } else if (cell.pixels && chipContext) {
         chipContext.putImageData(new ImageData(new Uint8ClampedArray(cell.pixels), 16, 16), 0, 0);
         context.drawImage(chip, left, top);
@@ -279,6 +288,57 @@ function paintGround(town: TownMap): HTMLCanvasElement {
   return canvas;
 }
 
+function neighborGround(town: TownMap, x: number, y: number): Uint8ClampedArray | undefined {
+  for (let radius = 1; radius <= 6; radius++) {
+    const first: Array<[number, number]> = [
+      [0, radius],
+      [1, radius],
+      [-1, radius],
+    ];
+    for (const [dx, dy] of first) {
+      const pixels = groundPixels(town, x + dx, y + dy);
+      if (pixels) return pixels;
+    }
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
+        const pixels = groundPixels(town, x + dx, y + dy);
+        if (pixels) return pixels;
+      }
+    }
+  }
+  return undefined;
+}
+
+function groundPixels(town: TownMap, x: number, y: number): Uint8ClampedArray | undefined {
+  if (x < 0 || y < 0 || x >= town.width || y >= town.height) return undefined;
+  const cell = town.cells[y * town.width + x];
+  if (!cell || cell.kind === "structure" || cell.kind === "tree" || cell.kind === "fence" || !cell.pixels) return undefined;
+  return cell.pixels;
+}
+
+function leafMaterial(
+  cell: Cell,
+  materials: THREE.Material[],
+  textures: THREE.Texture[],
+  cache: Map<string, THREE.Material>,
+  surfaces: WetSurface[],
+): THREE.MeshPhongMaterial {
+  const key = `leaf:${cell.textureKey ?? cell.visual}`;
+  const cached = cache.get(key);
+  if (cached instanceof THREE.MeshPhongMaterial) return cached;
+  const material = new THREE.MeshPhongMaterial({
+    map: cell.pixels ? textureFromPixels(cell.pixels, 16, 16, textures) : null,
+    color: "#ffffff",
+    shininess: 0,
+    specular: new THREE.Color("#000000"),
+  });
+  materials.push(material);
+  surfaces.push({ material, kind: "leaf", base: [1, 1, 1] });
+  cache.set(key, material);
+  return material;
+}
+
 function addTree(
   scene: THREE.Scene,
   cell: Cell,
@@ -289,17 +349,21 @@ function addTree(
   cache: Map<string, THREE.Material>,
   trunk: THREE.BufferGeometry,
   trunkMaterial: THREE.Material,
-  canopyGeometry: THREE.BufferGeometry,
+  crown: THREE.BufferGeometry,
+  surfaces: WetSurface[],
 ): void {
   const stem = new THREE.Mesh(trunk, trunkMaterial);
-  stem.position.set(x, 0.42, y);
+  stem.position.set(x, 0.36, y);
   stem.castShadow = true;
+  stem.receiveShadow = true;
   stem.layers.set(1);
   scene.add(stem);
   if (!cell.pixels || !cell.textureKey) return;
-  const leaves = new THREE.Mesh(canopyGeometry, topMaterial(cell, materials, textures, cache, 0.2));
-  leaves.rotation.x = -Math.PI / 2;
-  leaves.position.set(x, 0.95, y);
+  const leaves = new THREE.Mesh(crown, leafMaterial(cell, materials, textures, cache, surfaces));
+  const turn = hash01(x, y) * Math.PI * 2;
+  leaves.rotation.y = turn;
+  leaves.scale.set(1.05 + (hash01(x + 3, y) - 0.5) * 0.18, 0.86, 1.05 + (hash01(x, y + 5) - 0.5) * 0.18);
+  leaves.position.set(x, 1.02, y);
   leaves.castShadow = true;
   leaves.receiveShadow = true;
   leaves.layers.set(1);
