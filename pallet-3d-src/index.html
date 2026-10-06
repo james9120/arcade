@@ -45,7 +45,10 @@
         <p id="status">Walk north into the tall grass.</p>
       </div>
       <div class="hud-actions">
-        <button id="rain" type="button" aria-pressed="false">Rain</button>
+        <div id="weather" class="weather weather-clear" role="status" aria-label="Clear">
+          <span class="weather-mark" aria-hidden="true"></span>
+          <span id="weather-label">Clear</span>
+        </div>
         <button id="to-title" type="button">Title</button>
       </div>
     </header>

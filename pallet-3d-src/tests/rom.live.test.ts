@@ -13,6 +13,7 @@ describe.skipIf(!romPath)("local FireRed ROM", () => {
     expect(town.mode).toBe("rom");
     expect(town.width).toBe(24);
     expect(town.height).toBe(60);
+    expect(town.northRows).toBe(40);
     expect(town.starters.map((starter) => starter.name)).toEqual(["BULBASAUR", "CHARMANDER", "SQUIRTLE"]);
     expect(town.starters[0]).toMatchObject({ baseHp: 45, level: 5, moveName: "TACKLE" });
     expect(town.starters[0].typeNames).toEqual(["GRASS", "POISON"]);

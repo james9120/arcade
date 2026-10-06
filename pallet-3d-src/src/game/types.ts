@@ -105,6 +105,8 @@ export interface TownMap {
   modeDetail: string;
   width: number;
   height: number;
+  /** Rows of the northern connected map. Pallet Town starts at this row. */
+  northRows: number;
   cells: Cell[];
   spawnX: number;
   spawnY: number;

@@ -11,6 +11,7 @@ import {
 } from "./game/types";
 import { Walker } from "./game/walker";
 import { createScene, type SceneController } from "./render/scene";
+import type { WeatherSample } from "./render/weather";
 import { RomError } from "./rom/error";
 import { loadFireRedTown } from "./rom/map";
 
@@ -29,7 +30,8 @@ const startersEl = must<HTMLElement>("starters");
 const modePill = must<HTMLElement>("mode-pill");
 const status = must<HTMLParagraphElement>("status");
 const toTitle = must<HTMLButtonElement>("to-title");
-const rainButton = must<HTMLButtonElement>("rain");
+const weatherEl = must<HTMLElement>("weather");
+const weatherLabel = must<HTMLElement>("weather-label");
 const fightButton = must<HTMLButtonElement>("fight");
 const runButton = must<HTMLButtonElement>("run");
 const battleMode = must<HTMLElement>("battle-mode");
@@ -44,7 +46,6 @@ let battle: Battle | null = null;
 let busy = false;
 let chain = 0;
 let calm = 0;
-let raining = false;
 const keys = new Set<Direction>();
 let pad: Direction | null = null;
 let last = performance.now();
@@ -62,12 +63,6 @@ title.addEventListener("drop", (event) => {
   if (chosen) void readRom(chosen);
 });
 toTitle.addEventListener("click", showTitle);
-rainButton.addEventListener("click", () => {
-  raining = !raining;
-  rainButton.textContent = raining ? "Rain on" : "Rain";
-  rainButton.setAttribute("aria-pressed", raining ? "true" : "false");
-  scene?.setRain(raining);
-});
 fightButton.addEventListener("click", () => void onFight());
 runButton.addEventListener("click", () => void onRun());
 
@@ -166,7 +161,6 @@ function startTown(loaded: TownMap, starter: PartyMember): void {
   town = { ...loaded, player: starter };
   walker = new Walker(town, town.spawnX, town.spawnY);
   scene = createScene(view, town);
-  scene.setRain(raining);
   mode = "world";
   chain = 0;
   calm = 0;
@@ -205,11 +199,11 @@ function frame(now: number): void {
   last = now;
   if (mode === "world" && walker && scene) {
     const sample = walker.update(dt);
-    scene.sync(sample, dt);
+    paintWeather(scene.sync(sample, dt));
     if (sample.entered) onEntered();
     else if (sample.bumped) status.textContent = "Something solid is in the way.";
   } else if (mode === "battle" && walker && scene) {
-    scene.sync({ x: walker.x, y: walker.y, dir: walker.dir, moving: false }, dt);
+    paintWeather(scene.sync({ x: walker.x, y: walker.y, dir: walker.dir, moving: false }, dt));
   }
   requestAnimationFrame(frame);
 }
@@ -344,6 +338,12 @@ function spriteElement(sprite: DecodedSprite | null, label: string): HTMLElement
 
 function typeLabel(names: readonly string[]): string {
   return names.filter((name, index) => Boolean(name) && name !== names[index - 1]).join(" / ");
+}
+
+function paintWeather(sample: WeatherSample): void {
+  weatherEl.className = `weather weather-${sample.name}`;
+  weatherLabel.textContent = sample.label;
+  weatherEl.setAttribute("aria-label", sample.label);
 }
 
 function setCommands(disabled: boolean): void {

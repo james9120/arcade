@@ -35,7 +35,7 @@ FIRERED_ROM=/path/to/your.gba npm test
 
 - **W A S D** or arrow keys to walk one tile at a time
 - On-screen **N E S W** pad
-- **Rain** toggles a simple weather pass
+- Weather changes on its own: clear, clouds, light rain, heavy rain, then clear again. Route 1 is on a different part of that cycle than Pallet Town. Wet ground darkens, puddles grow, and both dry out after the rain. Add `?weather=rain` to hold a downpour while testing.
 - In battle: **Fight** and **Run** (or **F** and **R**)
 
 Tall grass on Route 1 can start a battle. After a few steps in the grass, one is guaranteed. Run works most of the time.

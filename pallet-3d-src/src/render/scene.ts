@@ -1,5 +1,11 @@
 import * as THREE from "three";
 import type { Cell, Direction, TownMap } from "../game/types";
+import {
+  approachWetness,
+  blendWeather,
+  readWeatherOverride,
+  type WeatherSample,
+} from "./weather";
 
 const FACING: Record<Direction, number> = {
   n: 0,
@@ -23,8 +29,7 @@ export interface SceneView {
 }
 
 export interface SceneController {
-  sync(view: SceneView, dt: number): void;
-  setRain(on: boolean): void;
+  sync(view: SceneView, dt: number): WeatherSample;
   dispose(): void;
 }
 
@@ -36,18 +41,23 @@ export function createScene(canvas: HTMLCanvasElement, town: TownMap): SceneCont
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
 
-  const clear = new THREE.Color("#9fd0ea");
-  const rainy = new THREE.Color("#6e8496");
+  const skyClear = new THREE.Color("#9fd0ea");
+  const skyRain = new THREE.Color("#5d7284");
+  const skyNow = skyClear.clone();
   const scene = new THREE.Scene();
-  scene.background = clear;
-  scene.fog = new THREE.Fog(clear, 16, 46);
+  scene.background = skyNow;
+  const fog = new THREE.Fog(skyNow, 18, 48);
+  scene.fog = fog;
 
   const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 180);
+  camera.layers.enable(1);
+  camera.layers.enable(2);
   const offset = new THREE.Vector3(6.4, 8.2, 7.6);
   const look = new THREE.Vector3();
   const desired = new THREE.Vector3();
 
-  scene.add(new THREE.HemisphereLight("#e7f6ff", "#6d8a48", 0.72));
+  const hemi = new THREE.HemisphereLight("#e7f6ff", "#6d8a48", 0.72);
+  scene.add(hemi);
   const sun = new THREE.DirectionalLight("#fff0cc", 1.35);
   sun.position.set(-10, 16, 8);
   sun.castShadow = true;
@@ -76,15 +86,20 @@ export function createScene(canvas: HTMLCanvasElement, town: TownMap): SceneCont
   skirt.rotation.x = -Math.PI / 2;
   skirt.position.set((town.width - 1) / 2, -0.06, (town.height - 1) / 2);
   skirt.receiveShadow = true;
+  skirt.layers.set(2);
   scene.add(skirt);
 
-  const ground = new THREE.Mesh(
-    track(geometries, new THREE.PlaneGeometry(town.width, town.height)),
-    track(materials, new THREE.MeshLambertMaterial({ map: groundTexture })),
-  );
+  const groundMaterial = new THREE.MeshPhongMaterial({
+    map: groundTexture,
+    shininess: 0,
+    specular: new THREE.Color("#000000"),
+  });
+  materials.push(groundMaterial);
+  const ground = new THREE.Mesh(track(geometries, new THREE.PlaneGeometry(town.width, town.height)), groundMaterial);
   ground.geometry.rotateX(-Math.PI / 2);
   ground.position.set((town.width - 1) / 2, 0, (town.height - 1) / 2);
   ground.receiveShadow = true;
+  ground.layers.set(2);
   scene.add(ground);
 
   const romMaterials = new Map<string, THREE.Material>();
@@ -116,16 +131,34 @@ export function createScene(canvas: HTMLCanvasElement, town: TownMap): SceneCont
   );
   shadow.rotation.x = -Math.PI / 2;
   shadow.position.y = 0.03;
+  shadow.layers.set(2);
   scene.add(shadow);
   scene.add(player);
 
-  const rain = buildRain(town, geometries, materials);
-  scene.add(rain.points);
-  let raining = false;
+  const mirrorMaterial = new THREE.MeshBasicMaterial({
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    color: "#9eb0be",
+  });
+  materials.push(mirrorMaterial);
+  const mirror = new THREE.Mesh(track(geometries, new THREE.PlaneGeometry(0.72, 1.15)), mirrorMaterial);
+  mirror.rotation.x = -Math.PI / 2;
+  mirror.layers.set(2);
+  mirror.visible = false;
+  mirror.renderOrder = 3;
+  scene.add(mirror);
+
+  const weatherFx = buildWeatherFx(town, scene, geometries, materials, textures);
+  const forced = readWeatherOverride(window.location.search);
+  const reflect = buildReflection(renderer, town, geometries, materials);
+  scene.add(reflect.overlay);
 
   let facing = 0;
   let snapped = false;
   let clock = 0;
+  let wetness = 0;
+  let reflectFrame = 0;
 
   const resize = () => {
     const width = canvas.clientWidth || 1;
@@ -155,7 +188,14 @@ export function createScene(canvas: HTMLCanvasElement, town: TownMap): SceneCont
         const material = player.material as THREE.SpriteMaterial;
         if (material.map !== frame) material.map = frame;
       }
-      player.scale.x = Math.abs(player.scale.x) * (view.dir === "e" ? -1 : 1);
+      const flip = view.dir === "e" ? -1 : 1;
+      player.scale.x = Math.abs(player.scale.x) * flip;
+      mirror.position.set(view.x, 0.045, view.y + 0.15);
+      mirror.scale.set(flip, 1, 1);
+      if (frame && mirrorMaterial.map !== frame) {
+        mirrorMaterial.map = frame;
+        mirrorMaterial.needsUpdate = true;
+      }
 
       look.set(view.x, 0.4, view.y);
       desired.copy(look).add(offset);
@@ -168,19 +208,36 @@ export function createScene(canvas: HTMLCanvasElement, town: TownMap): SceneCont
       camera.lookAt(look);
       sun.position.set(view.x - 10, 16, view.y + 7);
       sun.target.position.set(view.x, 0, view.y);
-      if (raining) rain.step(dt, view.x, view.y);
+
+      const forecast = blendWeather(clock, view.y, town.northRows, forced);
+      wetness = approachWetness(wetness, forecast.rain, dt);
+      const overcast = Math.max(forecast.cloud, forecast.rain);
+      skyNow.copy(skyClear).lerp(skyRain, overcast);
+      fog.near = 18 - overcast * 10;
+      fog.far = 48 - overcast * 26;
+      sun.intensity = 1.35 - overcast * 0.97;
+      hemi.intensity = 0.72 - overcast * 0.28;
+      fill.intensity = 0.28 - overcast * 0.1;
+      groundMaterial.color.setRGB(1 - wetness * 0.42, 1 - wetness * 0.36, 1 - wetness * 0.28);
+      groundMaterial.shininess = wetness * 70;
+      groundMaterial.specular.setRGB(wetness * 0.28, wetness * 0.34, wetness * 0.4);
+      const skirtMaterial = skirt.material as THREE.MeshLambertMaterial;
+      skirtMaterial.color.setRGB(0.43 - wetness * 0.12, 0.56 - wetness * 0.14, 0.3 - wetness * 0.08);
+      mirror.visible = wetness > 0.05;
+      mirrorMaterial.opacity = wetness * 0.55;
+      (shadow.material as THREE.MeshBasicMaterial).opacity = 0.28 * (1 - wetness * 0.65);
+      weatherFx.step(dt, view.x, view.y, forecast.rain, wetness, clock);
+      reflectFrame += 1;
+      if (reflect.enabled(canvas) && wetness > 0.08 && reflectFrame % 3 === 0) {
+        reflect.capture(scene, camera);
+      }
+      reflect.strength(reflect.enabled(canvas) ? wetness : 0);
       renderer.render(scene, camera);
-    },
-    setRain(on) {
-      raining = on;
-      rain.points.visible = on;
-      sun.intensity = on ? 0.45 : 1.35;
-      const color = on ? rainy : clear;
-      scene.background = color;
-      if (scene.fog) scene.fog.color.copy(color);
+      return forecast;
     },
     dispose() {
       observer.disconnect();
+      reflect.dispose();
       for (const geometry of geometries) geometry.dispose();
       for (const material of materials) material.dispose();
       for (const texture of textures) texture.dispose();
@@ -237,6 +294,7 @@ function addTree(
   const stem = new THREE.Mesh(trunk, trunkMaterial);
   stem.position.set(x, 0.42, y);
   stem.castShadow = true;
+  stem.layers.set(1);
   scene.add(stem);
   if (!cell.pixels || !cell.textureKey) return;
   const leaves = new THREE.Mesh(canopyGeometry, topMaterial(cell, materials, textures, cache, 0.2));
@@ -244,6 +302,7 @@ function addTree(
   leaves.position.set(x, 0.95, y);
   leaves.castShadow = true;
   leaves.receiveShadow = true;
+  leaves.layers.set(1);
   scene.add(leaves);
 }
 
@@ -310,43 +369,423 @@ function pickHeroFrame(
   return frames[Math.min(index, frames.length - 1)] ?? null;
 }
 
-function buildRain(
+function buildWeatherFx(
   town: TownMap,
+  scene: THREE.Scene,
   geometries: THREE.BufferGeometry[],
   materials: THREE.Material[],
-): { points: THREE.Points; step(dt: number, x: number, z: number): void } {
-  const count = 480;
+  textures: THREE.Texture[],
+): { step(dt: number, x: number, z: number, rain: number, wetness: number, clock: number): void } {
+  const rain = buildRain(geometries, materials, textures);
+  scene.add(rain.points);
+  const puddles = buildPuddles(town, geometries, materials);
+  scene.add(puddles.group);
+  const splashes = buildSplashes(geometries, materials);
+  scene.add(splashes.points);
+  scene.add(splashes.rings);
+  return {
+    step(dt, x, z, amount, wetness, clock) {
+      rain.step(dt, x, z, amount, (hitX, hitZ) => {
+        splashes.burst(hitX, hitZ);
+      });
+      puddles.step(wetness, clock);
+      splashes.step(dt);
+    },
+  };
+}
+
+function buildRain(
+  geometries: THREE.BufferGeometry[],
+  materials: THREE.Material[],
+  textures: THREE.Texture[],
+): {
+  points: THREE.Points;
+  step(dt: number, x: number, z: number, amount: number, onHit: (x: number, z: number) => void): void;
+} {
+  const count = 360;
   const positions = new Float32Array(count * 3);
-  for (let index = 0; index < count; index++) {
-    positions[index * 3] = Math.random() * town.width;
-    positions[index * 3 + 1] = Math.random() * 12;
-    positions[index * 3 + 2] = Math.random() * town.height;
-  }
+  for (let index = 0; index < count; index++) resetDrop(positions, index, 0, 0, true);
   const geometry = track(geometries, new THREE.BufferGeometry());
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   const points = new THREE.Points(
     geometry,
     track(
       materials,
-      new THREE.PointsMaterial({ color: "#e7f2fb", size: 0.07, transparent: true, opacity: 0.7, depthWrite: false }),
+      new THREE.PointsMaterial({
+        map: rainStreak(textures),
+        color: "#e7f2fb",
+        size: 0.55,
+        transparent: true,
+        opacity: 0.8,
+        depthWrite: false,
+        sizeAttenuation: true,
+      }),
     ),
   );
-  points.visible = false;
+  points.layers.set(2);
   points.frustumCulled = false;
+  points.visible = false;
+  let dry = true;
   return {
     points,
-    step(dt, x, z) {
-      for (let index = 0; index < count; index++) {
-        positions[index * 3 + 1] -= dt * 16;
-        if (positions[index * 3 + 1] < 0) {
-          positions[index * 3] = x + (Math.random() - 0.5) * 22;
-          positions[index * 3 + 1] = 8 + Math.random() * 6;
-          positions[index * 3 + 2] = z + (Math.random() - 0.5) * 22;
+    step(dt, x, z, amount, onHit) {
+      const active = Math.floor(amount * count);
+      geometry.setDrawRange(0, active);
+      points.visible = active > 6;
+      const material = points.material as THREE.PointsMaterial;
+      material.opacity = 0.35 + amount * 0.55;
+      if (active === 0) {
+        dry = true;
+        return;
+      }
+      if (dry) {
+        for (let index = 0; index < count; index++) resetDrop(positions, index, x, z, false);
+        dry = false;
+      }
+      let hits = 0;
+      const fall = 12 + amount * 16;
+      for (let index = 0; index < active; index++) {
+        positions[index * 3 + 1] -= dt * fall;
+        if (positions[index * 3 + 1] > 0) continue;
+        const hitX = positions[index * 3];
+        const hitZ = positions[index * 3 + 2];
+        if (hits < 4 && Math.hypot(hitX - x, hitZ - z) < 9) {
+          onHit(hitX, hitZ);
+          hits += 1;
         }
+        resetDrop(positions, index, x, z, false);
       }
       geometry.attributes.position.needsUpdate = true;
     },
   };
+}
+
+function resetDrop(positions: Float32Array, index: number, x: number, z: number, anywhere: boolean): void {
+  positions[index * 3] = anywhere ? Math.random() * 80 - 20 : x + (Math.random() - 0.5) * 18;
+  positions[index * 3 + 1] = 4 + Math.random() * 8;
+  positions[index * 3 + 2] = anywhere ? Math.random() * 80 - 10 : z + (Math.random() - 0.5) * 18;
+}
+
+function rainStreak(textures: THREE.Texture[]): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 8;
+  canvas.height = 32;
+  const context = canvas.getContext("2d");
+  if (context) {
+    const fade = context.createLinearGradient(0, 0, 0, 32);
+    fade.addColorStop(0, "rgba(255,255,255,0)");
+    fade.addColorStop(1, "rgba(236,244,255,0.95)");
+    context.fillStyle = fade;
+    context.fillRect(3, 0, 2, 32);
+  }
+  return textureFromCanvas(canvas, textures);
+}
+
+function buildPuddles(
+  town: TownMap,
+  geometries: THREE.BufferGeometry[],
+  materials: THREE.Material[],
+): { group: THREE.Group; step(wetness: number, clock: number): void } {
+  const geometry = track(geometries, new THREE.CircleGeometry(0.5, 14));
+  const material = track(materials, puddleMaterial());
+  const group = new THREE.Group();
+  group.layers.set(2);
+  const spots: Array<{ mesh: THREE.Mesh; size: number }> = [];
+  const perBand = new Map<number, number>();
+  for (let y = 0; y < town.height; y++) {
+    for (let x = 0; x < town.width; x++) {
+      const band = Math.floor(y / 6);
+      if ((perBand.get(band) ?? 0) >= 3) continue;
+      const cell = town.cells[y * town.width + x];
+      if (!cell || cell.blocked || cell.kind === "water" || cell.kind === "tree" || cell.kind === "structure") continue;
+      const roll = hash01(x, y);
+      const grassy = cell.kind === "grass";
+      if (roll > (grassy ? 0.16 : 0.07)) continue;
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.set(x, 0.035, y);
+      mesh.layers.set(2);
+      mesh.visible = false;
+      group.add(mesh);
+      spots.push({ mesh, size: grassy ? 1.05 + roll * 3 : 0.8 + roll * 4 });
+      perBand.set(band, (perBand.get(band) ?? 0) + 1);
+    }
+  }
+  return {
+    group,
+    step(wetness, clock) {
+      const uniforms = (material as THREE.ShaderMaterial).uniforms;
+      uniforms.time.value = clock;
+      uniforms.wetness.value = wetness;
+      const show = wetness > 0.08;
+      for (const spot of spots) {
+        const grown = spot.size * smoothGrowth(wetness);
+        spot.mesh.visible = show;
+        spot.mesh.scale.set(grown, grown, 1);
+      }
+    },
+  };
+}
+
+function puddleMaterial(): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    uniforms: {
+      time: { value: 0 },
+      wetness: { value: 0 },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float time;
+      uniform float wetness;
+      varying vec2 vUv;
+      void main() {
+        float r = length(vUv - 0.5) * 2.0;
+        float disc = smoothstep(1.0, 0.62, r);
+        float ring = smoothstep(0.07, 0.0, abs(fract(r * 2.6 - time * 0.85) - 0.12));
+        float alpha = disc * wetness * (0.34 + ring * 0.28);
+        gl_FragColor = vec4(0.1, 0.18, 0.24, alpha);
+      }
+    `,
+  });
+}
+
+function buildSplashes(
+  geometries: THREE.BufferGeometry[],
+  materials: THREE.Material[],
+): { points: THREE.Points; rings: THREE.Group; burst(x: number, z: number): void; step(dt: number): void } {
+  const count = 48;
+  const positions = new Float32Array(count * 3);
+  positions.fill(-20);
+  const geometry = track(geometries, new THREE.BufferGeometry());
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  const points = new THREE.Points(
+    geometry,
+    track(
+      materials,
+      new THREE.PointsMaterial({ color: "#f4fbff", size: 0.16, transparent: true, opacity: 0.9, depthWrite: false }),
+    ),
+  );
+  points.layers.set(2);
+  points.frustumCulled = false;
+  const lives = new Float32Array(count);
+  const velocity = new Float32Array(count);
+  let cursor = 0;
+
+  const rings = new THREE.Group();
+  const ringGeometry = track(geometries, new THREE.RingGeometry(0.08, 0.16, 18));
+  const ringLives: number[] = [];
+  for (let index = 0; index < 10; index++) {
+    const mesh = new THREE.Mesh(
+      ringGeometry,
+      track(
+        materials,
+        new THREE.MeshBasicMaterial({ color: "#d7e9f6", transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }),
+      ),
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = 0.04;
+    mesh.visible = false;
+    mesh.layers.set(2);
+    rings.add(mesh);
+    ringLives.push(0);
+  }
+  let ringCursor = 0;
+
+  return {
+    points,
+    rings,
+    burst(x, z) {
+      const slot = cursor % count;
+      cursor += 1;
+      positions[slot * 3] = x + (Math.random() - 0.5) * 0.2;
+      positions[slot * 3 + 1] = 0.06;
+      positions[slot * 3 + 2] = z + (Math.random() - 0.5) * 0.2;
+      lives[slot] = 0.38;
+      velocity[slot] = 1.6 + Math.random() * 1.4;
+      const index = ringCursor % rings.children.length;
+      ringCursor += 1;
+      const ring = rings.children[index] as THREE.Mesh;
+      ring.visible = true;
+      ring.position.set(x, 0.045, z);
+      ring.scale.set(0.2, 0.2, 0.2);
+      ringLives[index] = 0.6;
+    },
+    step(dt) {
+      for (let index = 0; index < count; index++) {
+        if (lives[index] <= 0) continue;
+        lives[index] -= dt;
+        velocity[index] -= dt * 8;
+        positions[index * 3 + 1] += velocity[index] * dt;
+        if (lives[index] <= 0) positions[index * 3 + 1] = -20;
+      }
+      geometry.attributes.position.needsUpdate = true;
+      rings.children.forEach((child, index) => {
+        const mesh = child as THREE.Mesh;
+        const material = mesh.material as THREE.MeshBasicMaterial;
+        if (ringLives[index] <= 0) {
+          mesh.visible = false;
+          return;
+        }
+        ringLives[index] = Math.max(0, ringLives[index] - dt);
+        const age = 1 - ringLives[index] / 0.6;
+        const span = 0.25 + age * 1.15;
+        mesh.scale.set(span, span, span);
+        material.opacity = (1 - age) * 0.85;
+        mesh.visible = ringLives[index] > 0;
+      });
+    },
+  };
+}
+
+function buildReflection(
+  renderer: THREE.WebGLRenderer,
+  town: TownMap,
+  geometries: THREE.BufferGeometry[],
+  materials: THREE.Material[],
+): {
+  overlay: THREE.Mesh;
+  enabled(canvas: HTMLCanvasElement): boolean;
+  capture(scene: THREE.Scene, camera: THREE.PerspectiveCamera): void;
+  strength(wetness: number): void;
+  dispose(): void;
+} {
+  const target = new THREE.WebGLRenderTarget(192, 192);
+  target.texture.colorSpace = THREE.SRGBColorSpace;
+  const textureMatrix = new THREE.Matrix4();
+  const material = track(
+    materials,
+    new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      uniforms: {
+        tReflect: { value: target.texture },
+        textureMatrix: { value: textureMatrix },
+        wetness: { value: 0 },
+      },
+      vertexShader: `
+        uniform mat4 textureMatrix;
+        varying vec4 vUv;
+        void main() {
+          vUv = textureMatrix * vec4(position, 1.0);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D tReflect;
+        uniform float wetness;
+        varying vec4 vUv;
+        void main() {
+          vec4 refl = texture2DProj(tReflect, vUv);
+          gl_FragColor = vec4(refl.rgb * vec3(0.72, 0.8, 0.88), wetness * 0.62);
+        }
+      `,
+    }),
+  );
+  const overlay = new THREE.Mesh(track(geometries, new THREE.PlaneGeometry(town.width, town.height)), material);
+  overlay.rotation.x = -Math.PI / 2;
+  overlay.position.set((town.width - 1) / 2, 0.02, (town.height - 1) / 2);
+  overlay.layers.set(2);
+  overlay.renderOrder = 2;
+  overlay.visible = false;
+  const mirrorCamera = new THREE.PerspectiveCamera(28, 1, 0.1, 180);
+  mirrorCamera.layers.set(0);
+  const normal = new THREE.Vector3();
+  const rotationMatrix = new THREE.Matrix4();
+  const reflectorWorldPosition = new THREE.Vector3();
+  const cameraWorldPosition = new THREE.Vector3();
+  const view = new THREE.Vector3();
+  const targetPoint = new THREE.Vector3();
+  const lookAtPosition = new THREE.Vector3();
+  const reflectorPlane = new THREE.Plane();
+  const clipPlane = new THREE.Vector4();
+  const q = new THREE.Vector4();
+  const reflectSky = new THREE.Color("#243038");
+  return {
+    overlay,
+    enabled(canvas) {
+      return canvas.clientWidth >= 720;
+    },
+    capture(scene, camera) {
+      overlay.updateWorldMatrix(true, false);
+      reflectorWorldPosition.setFromMatrixPosition(overlay.matrixWorld);
+      cameraWorldPosition.setFromMatrixPosition(camera.matrixWorld);
+      rotationMatrix.extractRotation(overlay.matrixWorld);
+      normal.set(0, 0, 1).applyMatrix4(rotationMatrix);
+      view.subVectors(reflectorWorldPosition, cameraWorldPosition);
+      if (view.dot(normal) > 0) return;
+      view.reflect(normal).negate().add(reflectorWorldPosition);
+      rotationMatrix.extractRotation(camera.matrixWorld);
+      lookAtPosition.set(0, 0, -1).applyMatrix4(rotationMatrix).add(cameraWorldPosition);
+      targetPoint.subVectors(reflectorWorldPosition, lookAtPosition);
+      targetPoint.reflect(normal).negate().add(reflectorWorldPosition);
+      mirrorCamera.position.copy(view);
+      mirrorCamera.up.set(0, 1, 0).applyMatrix4(rotationMatrix);
+      mirrorCamera.up.reflect(normal);
+      mirrorCamera.lookAt(targetPoint);
+      mirrorCamera.far = camera.far;
+      mirrorCamera.updateMatrixWorld();
+      mirrorCamera.projectionMatrix.copy(camera.projectionMatrix);
+      textureMatrix.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1);
+      textureMatrix.multiply(mirrorCamera.projectionMatrix);
+      textureMatrix.multiply(mirrorCamera.matrixWorldInverse);
+      textureMatrix.multiply(overlay.matrixWorld);
+      reflectorPlane.setFromNormalAndCoplanarPoint(normal, reflectorWorldPosition);
+      reflectorPlane.applyMatrix4(mirrorCamera.matrixWorldInverse);
+      clipPlane.set(reflectorPlane.normal.x, reflectorPlane.normal.y, reflectorPlane.normal.z, reflectorPlane.constant);
+      const projection = mirrorCamera.projectionMatrix;
+      q.set(
+        (Math.sign(clipPlane.x) + projection.elements[8]) / projection.elements[0],
+        (Math.sign(clipPlane.y) + projection.elements[9]) / projection.elements[5],
+        -1,
+        (1 + projection.elements[10]) / projection.elements[14],
+      );
+      clipPlane.multiplyScalar(2 / clipPlane.dot(q));
+      projection.elements[2] = clipPlane.x;
+      projection.elements[6] = clipPlane.y;
+      projection.elements[10] = clipPlane.z + 1 - 0.003;
+      projection.elements[14] = clipPlane.w;
+      const shadows = renderer.shadowMap.enabled;
+      const previousFog = scene.fog;
+      const previousBackground = scene.background;
+      renderer.shadowMap.enabled = false;
+      scene.fog = null;
+      scene.background = reflectSky;
+      overlay.visible = false;
+      renderer.setRenderTarget(target);
+      renderer.clear();
+      renderer.render(scene, mirrorCamera);
+      renderer.setRenderTarget(null);
+      renderer.shadowMap.enabled = shadows;
+      scene.fog = previousFog;
+      scene.background = previousBackground;
+    },
+    strength(wetness) {
+      (material as THREE.ShaderMaterial).uniforms.wetness.value = wetness;
+      overlay.visible = wetness > 0.02;
+    },
+    dispose() {
+      target.dispose();
+    },
+  };
+}
+
+function hash01(x: number, y: number): number {
+  let n = Math.imul(x + 31, 374761393) ^ Math.imul(y + 17, 668265263);
+  n = (n ^ (n >>> 13)) >>> 0;
+  return n / 4294967296;
+}
+
+function smoothGrowth(wetness: number): number {
+  const t = Math.min(1, Math.max(0, (wetness - 0.08) / 0.92));
+  return t * t * (3 - 2 * t);
 }
 
 function spriteMaterial(

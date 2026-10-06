@@ -38,6 +38,7 @@ function tinyTown(): TownMap {
     modeDetail: "",
     width: 3,
     height: 3,
+    northRows: 0,
     cells,
     spawnX: 1,
     spawnY: 2,

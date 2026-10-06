@@ -197,17 +197,45 @@ h1 {
 
 .hud-actions { display: flex; gap: 8px; align-items: center; }
 
-#hud #to-title,
-#hud #rain {
+#hud #to-title {
   background: rgba(246, 241, 230, 0.94);
   padding: 8px 14px;
 }
 
-#hud #rain[aria-pressed="true"] {
-  background: #35586e;
-  color: #f4f7fb;
-  box-shadow: none;
+.weather {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(246, 241, 230, 0.94);
+  box-shadow: inset 0 0 0 2px var(--ink);
+  font-size: 13px;
+  font-weight: 700;
 }
+
+.weather-mark {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #f2c14e;
+  box-shadow: 0 0 0 3px rgba(242, 193, 78, 0.35);
+}
+
+.weather-clouds .weather-mark {
+  border-radius: 40%;
+  background: #8ea0ae;
+  box-shadow: 6px 1px 0 -2px #d5dee4, -6px 2px 0 -3px #e4ebf0;
+}
+
+.weather-light .weather-mark,
+.weather-heavy .weather-mark {
+  border-radius: 40% 40% 46% 46%;
+  background: #7f93a3;
+  box-shadow: 3px 11px 0 -1px #e7f2fb, -4px 13px 0 -2px #d5e4f2;
+}
+
+.weather-heavy .weather-mark { background: #4d6272; }
 
 .arcade-back { margin-top: 14px; }
 
